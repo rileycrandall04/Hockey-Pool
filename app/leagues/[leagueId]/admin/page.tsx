@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { teamOnTheClock, pickMeta } from "@/lib/draft";
 import type { League, RosterEntry, Team } from "@/lib/types";
 
 async function assertCommissioner(leagueId: string) {
@@ -112,12 +113,125 @@ async function removeAdjustmentAction(formData: FormData) {
   revalidatePath(`/leagues/${leagueId}/admin`);
 }
 
+/**
+ * Undo the most recent N draft picks.
+ *
+ * Deletes the N highest-pick_number rows for the league, then
+ * recomputes the on-the-clock team and draft status so the live
+ * draft room lands on the correct pick after the rollback.
+ *
+ * Safe to call during an in-progress OR completed draft. Rolling back
+ * from a completed state flips the league back to in_progress.
+ */
+async function rollbackPicksAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id"));
+  const rawCount = String(formData.get("count") ?? "1");
+  const count = Math.max(1, Math.min(50, parseInt(rawCount, 10) || 1));
+
+  const { league } = await assertCommissioner(leagueId);
+  const svc = createServiceClient();
+
+  const { data: latest } = await svc
+    .from("draft_picks")
+    .select("id, pick_number")
+    .eq("league_id", leagueId)
+    .order("pick_number", { ascending: false })
+    .limit(count);
+
+  if (!latest || latest.length === 0) {
+    // Nothing to roll back. Silently no-op — the admin page will just
+    // re-render unchanged.
+    revalidatePath(`/leagues/${leagueId}/admin`);
+    return;
+  }
+
+  const idsToDelete = latest.map((p) => p.id);
+  await svc.from("draft_picks").delete().in("id", idsToDelete);
+
+  // Recompute who's on the clock after the rollback.
+  const { data: teams } = await svc
+    .from("teams")
+    .select("*")
+    .eq("league_id", leagueId)
+    .order("draft_position", { ascending: true, nullsFirst: false });
+
+  const { count: newPickCount } = await svc
+    .from("draft_picks")
+    .select("id", { count: "exact", head: true })
+    .eq("league_id", leagueId);
+
+  const teamList = (teams ?? []) as Team[];
+  const totalPicks = teamList.length * league.roster_size;
+  const newPickIndex = newPickCount ?? 0;
+
+  const nextOnClock =
+    teamList.length > 0 && newPickIndex < totalPicks
+      ? teamOnTheClock(teamList, newPickIndex)
+      : null;
+
+  await svc
+    .from("leagues")
+    .update({
+      // Flip back to in_progress if the rollback uncompleted the draft.
+      draft_status: nextOnClock ? "in_progress" : league.draft_status,
+      draft_current_team: nextOnClock?.id ?? null,
+      draft_round: nextOnClock
+        ? pickMeta(newPickIndex, teamList.length).round
+        : 1,
+    })
+    .eq("id", leagueId);
+
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}/draft`);
+}
+
+/**
+ * Nuke the entire draft. Deletes every draft_picks row for the league
+ * and resets the league back to draft_status='pending' so the
+ * commissioner can re-start the draft (same teams, same roster size).
+ *
+ * Guarded by requiring the admin to type "RESET" into a confirmation
+ * field so a rogue tap can't wipe a live draft.
+ */
+async function resetDraftAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id"));
+  const confirm = String(formData.get("confirm") ?? "").trim();
+  if (confirm !== "RESET") {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent("Type RESET to confirm.")}`,
+    );
+  }
+
+  await assertCommissioner(leagueId);
+  const svc = createServiceClient();
+
+  await svc.from("draft_picks").delete().eq("league_id", leagueId);
+  await svc
+    .from("leagues")
+    .update({
+      draft_status: "pending",
+      draft_current_team: null,
+      draft_round: 1,
+    })
+    .eq("id", leagueId);
+
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}/draft`);
+}
+
 export default async function AdminPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ leagueId: string }>;
+  searchParams: Promise<{ reset_error?: string }>;
 }) {
   const { leagueId } = await params;
+  const { reset_error } = await searchParams;
   const { league, user } = await assertCommissioner(leagueId);
 
   const supabase = await createClient();
@@ -128,19 +242,27 @@ export default async function AdminPage({
     .single();
 
   const svc = createServiceClient();
-  const [{ data: teams }, { data: rosterRows }, { data: adjustments }] =
-    await Promise.all([
-      svc.from("teams").select("*").eq("league_id", leagueId),
-      svc
-        .from("v_team_rosters")
-        .select("*")
-        .eq("league_id", leagueId),
-      svc
-        .from("score_adjustments")
-        .select("*")
-        .eq("league_id", leagueId)
-        .order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: teams },
+    { data: rosterRows },
+    { data: adjustments },
+    { count: pickCount },
+  ] = await Promise.all([
+    svc.from("teams").select("*").eq("league_id", leagueId),
+    svc.from("v_team_rosters").select("*").eq("league_id", leagueId),
+    svc
+      .from("score_adjustments")
+      .select("*")
+      .eq("league_id", leagueId)
+      .order("created_at", { ascending: false }),
+    svc
+      .from("draft_picks")
+      .select("id", { count: "exact", head: true })
+      .eq("league_id", leagueId),
+  ]);
+
+  const currentPickCount = pickCount ?? 0;
+  const totalPicks = (teams?.length ?? 0) * league.roster_size;
 
   const rosterByTeam = new Map<string, RosterEntry[]>();
   for (const row of (rosterRows as RosterEntry[] | null) ?? []) {
@@ -168,6 +290,97 @@ export default async function AdminPage({
             timestamped to {user.email}.
           </p>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Draft controls</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="text-sm text-ice-300">
+              Status:{" "}
+              <span className="font-medium text-ice-100">
+                {league.draft_status.replace("_", " ")}
+              </span>
+              {" · "}
+              {currentPickCount}/{totalPicks} picks made
+            </div>
+
+            {reset_error && (
+              <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                {reset_error}
+              </div>
+            )}
+
+            <div>
+              <h3 className="mb-2 font-semibold text-ice-50">
+                Undo recent picks
+              </h3>
+              <p className="mb-3 text-xs text-ice-400">
+                Deletes the N most recent picks from the draft board and
+                flips &ldquo;on the clock&rdquo; back to whoever should
+                have that pick. Safe to use during a live draft — everyone
+                watching the draft room will see the rollback in real time.
+              </p>
+              <form
+                action={rollbackPicksAction}
+                className="flex flex-wrap items-end gap-2"
+              >
+                <input type="hidden" name="league_id" value={leagueId} />
+                <div className="space-y-1">
+                  <Label htmlFor="count"># of picks</Label>
+                  <Input
+                    id="count"
+                    name="count"
+                    type="number"
+                    min={1}
+                    max={50}
+                    defaultValue={1}
+                    className="max-w-[120px]"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  disabled={currentPickCount === 0}
+                >
+                  Undo
+                </Button>
+              </form>
+            </div>
+
+            <div className="rounded-md border border-red-500/30 bg-red-500/5 p-4">
+              <h3 className="mb-2 font-semibold text-red-300">
+                Reset entire draft
+              </h3>
+              <p className="mb-3 text-xs text-ice-400">
+                Wipes every draft pick in this league and puts the draft
+                back to the waiting-to-start state. Team names and owners
+                are untouched. There is no undo — use this only if the
+                draft went off the rails.
+              </p>
+              <form
+                action={resetDraftAction}
+                className="flex flex-wrap items-end gap-2"
+              >
+                <input type="hidden" name="league_id" value={leagueId} />
+                <div className="space-y-1">
+                  <Label htmlFor="confirm">
+                    Type <span className="font-mono">RESET</span> to confirm
+                  </Label>
+                  <Input
+                    id="confirm"
+                    name="confirm"
+                    placeholder="RESET"
+                    className="max-w-[180px] font-mono"
+                  />
+                </div>
+                <Button type="submit" variant="danger">
+                  Reset draft
+                </Button>
+              </form>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
