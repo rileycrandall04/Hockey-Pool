@@ -131,7 +131,7 @@ create table if not exists public.score_adjustments (
 create index if not exists score_adj_league_idx on public.score_adjustments (league_id);
 
 -- ============================================================================
--- TRIGGERS
+-- TRIGGERS + HELPER FUNCTIONS
 -- ============================================================================
 
 -- Auto-create a profile whenever a new auth user is created.
@@ -157,6 +157,39 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Membership helpers. SECURITY DEFINER so they bypass RLS on their inner
+-- queries and avoid recursive policy evaluation (leagues -> teams ->
+-- leagues -> ...). Both functions are STABLE so Postgres can cache them
+-- within a single query.
+create or replace function public.is_league_member(_league_id uuid, _user_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.teams
+    where league_id = _league_id and owner_id = _user_id
+  );
+$$;
+
+create or replace function public.is_league_commissioner(_league_id uuid, _user_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.leagues
+    where id = _league_id and commissioner_id = _user_id
+  );
+$$;
+
+grant execute on function public.is_league_member(uuid, uuid)       to authenticated;
+grant execute on function public.is_league_commissioner(uuid, uuid) to authenticated;
 
 -- ============================================================================
 -- ROW LEVEL SECURITY
@@ -210,10 +243,7 @@ create policy "members can read their leagues"
   to authenticated
   using (
     commissioner_id = auth.uid()
-    or exists (
-      select 1 from public.teams t
-      where t.league_id = leagues.id and t.owner_id = auth.uid()
-    )
+    or public.is_league_member(id, auth.uid())
   );
 
 drop policy if exists "users can create leagues" on public.leagues;
@@ -241,14 +271,8 @@ create policy "league members can read teams"
   to authenticated
   using (
     owner_id = auth.uid()
-    or exists (
-      select 1 from public.leagues l
-      where l.id = teams.league_id and l.commissioner_id = auth.uid()
-    )
-    or exists (
-      select 1 from public.teams t2
-      where t2.league_id = teams.league_id and t2.owner_id = auth.uid()
-    )
+    or public.is_league_commissioner(league_id, auth.uid())
+    or public.is_league_member(league_id, auth.uid())
   );
 
 drop policy if exists "users can create their own team" on public.teams;
@@ -263,10 +287,7 @@ create policy "owner or commissioner can update team"
   to authenticated
   using (
     owner_id = auth.uid()
-    or exists (
-      select 1 from public.leagues l
-      where l.id = teams.league_id and l.commissioner_id = auth.uid()
-    )
+    or public.is_league_commissioner(league_id, auth.uid())
   );
 
 drop policy if exists "owner or commissioner can delete team" on public.teams;
@@ -275,10 +296,7 @@ create policy "owner or commissioner can delete team"
   to authenticated
   using (
     owner_id = auth.uid()
-    or exists (
-      select 1 from public.leagues l
-      where l.id = teams.league_id and l.commissioner_id = auth.uid()
-    )
+    or public.is_league_commissioner(league_id, auth.uid())
   );
 
 -- ----- draft_picks ------------------------------------------------------
@@ -289,14 +307,8 @@ create policy "league members can read picks"
   on public.draft_picks for select
   to authenticated
   using (
-    exists (
-      select 1 from public.teams t
-      where t.league_id = draft_picks.league_id and t.owner_id = auth.uid()
-    )
-    or exists (
-      select 1 from public.leagues l
-      where l.id = draft_picks.league_id and l.commissioner_id = auth.uid()
-    )
+    public.is_league_member(league_id, auth.uid())
+    or public.is_league_commissioner(league_id, auth.uid())
   );
 
 -- ----- score_adjustments ------------------------------------------------
@@ -305,14 +317,8 @@ create policy "league members can read adjustments"
   on public.score_adjustments for select
   to authenticated
   using (
-    exists (
-      select 1 from public.teams t
-      where t.league_id = score_adjustments.league_id and t.owner_id = auth.uid()
-    )
-    or exists (
-      select 1 from public.leagues l
-      where l.id = score_adjustments.league_id and l.commissioner_id = auth.uid()
-    )
+    public.is_league_member(league_id, auth.uid())
+    or public.is_league_commissioner(league_id, auth.uid())
   );
 
 -- ============================================================================
