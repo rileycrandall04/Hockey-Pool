@@ -6,6 +6,7 @@ import {
 } from "@/lib/nhl-api";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * Nightly stats ingestion.

@@ -14,7 +14,12 @@ import type { League, Team } from "@/lib/types";
 
 type LeagueWithTeam = League & { team: Team | null };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ seeded?: string; seed_error?: string }>;
+}) {
+  const { seeded, seed_error } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -49,10 +54,47 @@ export default async function DashboardPage() {
   }
   const leagues = [...leaguesById.values()];
 
+  // First-run setup: is the player pool seeded yet? If not, any signed-in
+  // user can kick off the seed from here.
+  const { count: playerCount } = await supabase
+    .from("players")
+    .select("id", { count: "exact", head: true });
+  const poolEmpty = (playerCount ?? 0) === 0;
+
   return (
     <>
       <NavBar displayName={profile?.display_name ?? user.email ?? "Player"} />
       <main className="mx-auto max-w-6xl px-6 py-10">
+        {seeded && (
+          <div className="mb-6 rounded-md border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-200">
+            ✅ Player pool seeded: {seeded}. You&rsquo;re ready to draft.
+          </div>
+        )}
+        {seed_error && (
+          <div className="mb-6 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            ❌ Seed failed: {seed_error}
+          </div>
+        )}
+        {poolEmpty && !seeded && (
+          <Card className="mb-6 border-ice-500/60 bg-ice-500/5">
+            <CardHeader>
+              <CardTitle>One-time setup: seed the player pool</CardTitle>
+              <CardDescription>
+                The NHL player pool is empty. Click below to fetch every
+                current NHL team roster from the league&rsquo;s public API
+                (~30–45 seconds). You only need to do this once. Once the
+                playoff field is locked in, a commissioner can trim the
+                pool from the Supabase dashboard or the cron endpoint.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action="/api/admin/seed" method="post">
+                <Button type="submit">Seed player pool</Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-ice-50">Your leagues</h1>
