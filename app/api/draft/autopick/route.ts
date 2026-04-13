@@ -149,5 +149,6 @@ export async function POST(request: Request) {
   if (!res.ok) {
     return NextResponse.json(json, { status: res.status });
   }
-  return NextResponse.json({ ok: true, player_id: ranked[0].id, ...json });
+  // json already contains { ok, round, pick, inserted } — forward it.
+  return NextResponse.json({ player_id: ranked[0].id, ...json });
 }

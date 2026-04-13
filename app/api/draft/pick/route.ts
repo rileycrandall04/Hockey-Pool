@@ -114,15 +114,22 @@ export async function POST(request: Request) {
 
   const meta = pickMeta(pickIndex, teams?.length ?? 1);
 
-  const { error: insertError } = await svc.from("draft_picks").insert({
-    league_id,
-    team_id,
-    player_id,
-    round: meta.round,
-    pick_number: meta.pick_number,
-  });
-  if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+  const { data: inserted, error: insertError } = await svc
+    .from("draft_picks")
+    .insert({
+      league_id,
+      team_id,
+      player_id,
+      round: meta.round,
+      pick_number: meta.pick_number,
+    })
+    .select("*")
+    .single();
+  if (insertError || !inserted) {
+    return NextResponse.json(
+      { error: insertError?.message ?? "Failed to insert pick" },
+      { status: 500 },
+    );
   }
 
   // Advance the on-the-clock pointer.
@@ -143,5 +150,10 @@ export async function POST(request: Request) {
     })
     .eq("id", league_id);
 
-  return NextResponse.json({ ok: true, round: meta.round, pick: meta.pick_number });
+  return NextResponse.json({
+    ok: true,
+    round: meta.round,
+    pick: meta.pick_number,
+    inserted,
+  });
 }

@@ -243,33 +243,58 @@ export function DraftRoom({
   }, [picks]);
 
   // ---- actions ------------------------------------------------------------
+  // Returns the parsed JSON body on 2xx, or null on failure (after flashing
+  // the error message). Callers that care about the response body can
+  // inspect the returned value; callers that don't can just ignore it.
   const post = useCallback(
-    async (url: string, body: unknown) => {
+    async <T,>(url: string, body: unknown): Promise<T | null> => {
       setBusy(true);
       setMessage(null);
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } catch (err) {
+        setBusy(false);
+        setMessage(err instanceof Error ? err.message : "Network error");
+        return null;
+      }
       setBusy(false);
       if (!res.ok) {
         const txt = await res.text();
         setMessage(txt || "Request failed");
-        return false;
+        return null;
       }
-      return true;
+      try {
+        return (await res.json()) as T;
+      } catch {
+        return null;
+      }
     },
     [],
   );
 
+  // Optimistically add a pick to local state the moment our own API call
+  // returns. Supabase Realtime will also fire an INSERT event on the
+  // channel, and the subscription handler dedupes by id — so we end up
+  // with exactly one copy regardless of which arrives first.
+  const applyLocalPick = useCallback((pick: PickRow) => {
+    setPicks((prev) =>
+      prev.some((p) => p.id === pick.id) ? prev : [...prev, pick],
+    );
+  }, []);
+
   const handlePick = async (playerId: number) => {
     if (!onClockTeam) return;
-    await post("/api/draft/pick", {
+    const result = await post<{ inserted?: PickRow }>("/api/draft/pick", {
       league_id: league.id,
       team_id: onClockTeam.id,
       player_id: playerId,
     });
+    if (result?.inserted) applyLocalPick(result.inserted);
   };
 
   const handleStartDraft = async () => {
@@ -278,10 +303,11 @@ export function DraftRoom({
 
   const handleAutoPick = async () => {
     if (!onClockTeam) return;
-    await post("/api/draft/autopick", {
+    const result = await post<{ inserted?: PickRow }>("/api/draft/autopick", {
       league_id: league.id,
       team_id: onClockTeam.id,
     });
+    if (result?.inserted) applyLocalPick(result.inserted);
   };
 
   // ---- render -------------------------------------------------------------
