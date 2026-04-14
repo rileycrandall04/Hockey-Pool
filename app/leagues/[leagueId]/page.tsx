@@ -153,6 +153,11 @@ export default async function LeagueStandingsPage({
     rosterByTeam.set(row.team_id, arr);
   }
 
+  // For each team: compute the scored lineup + bench, then sort BOTH
+  // by playoff fantasy points desc so the dropdown view shows them in
+  // pool-points order (highest contributors first, lowest at the
+  // bottom of the bench section). The visual separator is just the
+  // CSS divider between the two arrays.
   const standings = (teams ?? [])
     .map((t: Team) => {
       const roster = rosterByTeam.get(t.id) ?? [];
@@ -162,12 +167,20 @@ export default async function LeagueStandingsPage({
         requiredDefensemen: league.required_defensemen,
       });
       const adj = adjByTeam.get(t.id) ?? 0;
+      // Re-sort each section by playoff fantasy points (desc), with
+      // games_played as a tiebreak. scoreTeam already does this for
+      // the scoring list but the bench is in arbitrary order.
+      const byPlayoffPts = (a: RosterEntry, b: RosterEntry) => {
+        if (b.fantasy_points !== a.fantasy_points)
+          return b.fantasy_points - a.fantasy_points;
+        return b.games_played - a.games_played;
+      };
       return {
         team: t,
         total: scored.totalPoints + adj,
-        scoringCount: scored.scoring.length,
-        benchCount: scored.bench.length,
         adjustment: adj,
+        scoring: [...scored.scoring].sort(byPlayoffPts),
+        bench: [...scored.bench].sort(byPlayoffPts),
       };
     })
     .sort((a, b) => b.total - a.total);
@@ -203,70 +216,55 @@ export default async function LeagueStandingsPage({
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Standings</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-puck-border text-left text-ice-300">
-                  <th className="px-4 py-3">#</th>
-                  <th className="px-4 py-3">Team</th>
-                  <th className="px-4 py-3 text-right">Scoring</th>
-                  <th className="px-4 py-3 text-right">Adj.</th>
-                  <th className="px-4 py-3 text-right">Total</th>
-                  <th className="px-4 py-3 text-right"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {standings.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-6 text-center text-ice-400"
-                    >
-                      No teams yet. Share your join code{" "}
-                      <span className="font-mono text-ice-200">
-                        {league.join_code}
-                      </span>
-                      .
-                    </td>
-                  </tr>
-                ) : (
-                  standings.map((row, i) => (
-                    <tr
-                      key={row.team.id}
-                      className="border-b border-puck-border last:border-0"
-                    >
-                      <td className="px-4 py-3 text-ice-400">{i + 1}</td>
-                      <td className="px-4 py-3 font-medium text-ice-50">
-                        {row.team.name}
-                      </td>
-                      <td className="px-4 py-3 text-right text-ice-300">
-                        {row.scoringCount}/{league.roster_size}
-                      </td>
-                      <td className="px-4 py-3 text-right text-ice-300">
-                        {row.adjustment >= 0 ? `+${row.adjustment}` : row.adjustment}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-ice-50">
-                        {row.total}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link
-                          href={`/leagues/${league.id}/team/${row.team.id}`}
-                          className="text-ice-400 hover:underline"
-                        >
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+        {standings.length === 0 ? (
+          <Card>
+            <CardContent className="px-4 py-6 text-center text-ice-400">
+              No teams yet. Share your join code{" "}
+              <span className="font-mono text-ice-200">
+                {league.join_code}
+              </span>
+              .
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {standings.map((row, i) => (
+              <details
+                key={row.team.id}
+                className="group rounded-md border border-puck-border bg-puck-card"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 hover:bg-puck-border/40 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="inline-block w-6 text-right text-ice-400 transition-transform group-open:rotate-90">
+                      ▶
+                    </span>
+                    <span className="text-ice-400">{i + 1}.</span>
+                    <span className="truncate font-medium text-ice-50">
+                      {row.team.name}
+                    </span>
+                  </span>
+                  <span className="flex-shrink-0 text-lg font-bold text-ice-50">
+                    {row.total}
+                    <span className="ml-1 text-xs font-normal uppercase text-ice-400">
+                      pts
+                    </span>
+                  </span>
+                </summary>
+                <div className="border-t border-puck-border px-4 py-3 text-sm">
+                  {row.scoring.length === 0 ? (
+                    <p className="text-ice-400">No players drafted yet.</p>
+                  ) : (
+                    <RosterList
+                      players={row.scoring}
+                      footerPlayers={row.bench}
+                      adjustment={row.adjustment}
+                    />
+                  )}
+                </div>
+              </details>
+            ))}
+          </div>
+        )}
 
         {leave_error && (
           <div className="mt-4 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
@@ -319,5 +317,98 @@ export default async function LeagueStandingsPage({
         )}
       </main>
     </>
+  );
+}
+
+/**
+ * Renders a team's roster inside the standings dropdown.
+ *
+ * - Top section: scoring lineup (counts toward total). Each player
+ *   is a clickable link to /players/[id].
+ * - Visible separator line.
+ * - Bottom section: bench (does NOT count toward total). Same layout.
+ * - If the team has any commissioner score adjustments, summarize
+ *   the net delta below the bench so users can see why the headline
+ *   total doesn't equal the sum of the listed players.
+ */
+function RosterList({
+  players,
+  footerPlayers,
+  adjustment,
+}: {
+  players: RosterEntry[];
+  footerPlayers: RosterEntry[];
+  adjustment: number;
+}) {
+  return (
+    <div className="space-y-1">
+      {players.map((p) => (
+        <PlayerRow key={p.player_id} p={p} />
+      ))}
+      {footerPlayers.length > 0 && (
+        <>
+          <div className="my-2 border-t border-dashed border-puck-border" />
+          <p className="mb-1 text-[10px] uppercase tracking-wider text-ice-500">
+            Bench &middot; not counted
+          </p>
+          {footerPlayers.map((p) => (
+            <PlayerRow key={p.player_id} p={p} muted />
+          ))}
+        </>
+      )}
+      {adjustment !== 0 && (
+        <div className="mt-2 border-t border-puck-border pt-2 text-xs text-ice-300">
+          Commissioner adjustment:{" "}
+          <span
+            className={
+              adjustment >= 0 ? "text-green-300" : "text-red-300"
+            }
+          >
+            {adjustment >= 0 ? "+" : ""}
+            {adjustment} pts
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlayerRow({
+  p,
+  muted = false,
+}: {
+  p: RosterEntry;
+  muted?: boolean;
+}) {
+  return (
+    <Link
+      href={`/players/${p.player_id}`}
+      className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-puck-border/40"
+    >
+      <span className="flex min-w-0 items-baseline gap-2">
+        <span
+          className={
+            p.position === "D"
+              ? "rounded bg-ice-500/20 px-1 text-[10px] font-semibold text-ice-200"
+              : "rounded bg-puck-border px-1 text-[10px] text-ice-300"
+          }
+        >
+          {p.position}
+        </span>
+        <span
+          className={`truncate ${muted ? "text-ice-400" : "text-ice-100"}`}
+        >
+          {p.full_name}
+        </span>
+        <span className="text-[10px] text-ice-500">
+          {p.nhl_abbrev ?? "—"}
+        </span>
+      </span>
+      <span
+        className={`flex-shrink-0 font-semibold ${muted ? "text-ice-400" : "text-ice-50"}`}
+      >
+        {p.fantasy_points}
+      </span>
+    </Link>
   );
 }

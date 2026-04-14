@@ -143,7 +143,14 @@ export default async function PlayersPage({
                         key={p.id}
                         className="border-b border-puck-border last:border-0"
                       >
-                        <td className="px-4 py-2 text-ice-100">{p.full_name}</td>
+                        <td className="px-4 py-2 text-ice-100">
+                          <Link
+                            href={`/players/${p.id}`}
+                            className="hover:underline"
+                          >
+                            {p.full_name}
+                          </Link>
+                        </td>
                         <td className="px-2 py-2 text-ice-300">{p.position}</td>
                         <td className="px-2 py-2 text-ice-300">
                           {team?.abbrev ?? "—"}

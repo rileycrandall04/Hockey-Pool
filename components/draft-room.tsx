@@ -594,13 +594,16 @@ export function DraftRoom({
                       className="border-b border-puck-border last:border-0"
                     >
                       <td className="px-2 py-1.5 font-medium text-ice-100">
-                        <span className="inline-flex items-center">
+                        <Link
+                          href={`/players/${p.id}`}
+                          className="inline-flex items-center hover:underline"
+                        >
                           {p.full_name}
                           <InjuryBadge
                             status={p.injury_status}
                             description={p.injury_description}
                           />
-                        </span>
+                        </Link>
                       </td>
                       <td className="px-2 py-1.5 text-ice-300">{p.position}</td>
                       <td className="px-2 py-1.5 text-ice-300">
@@ -667,7 +670,12 @@ export function DraftRoom({
                           return (
                             <li key={pick.id}>
                               {pick.round}.{pick.pick_number}{" "}
-                              {player?.full_name ?? `#${pick.player_id}`}
+                              <Link
+                                href={`/players/${pick.player_id}`}
+                                className="hover:underline"
+                              >
+                                {player?.full_name ?? `#${pick.player_id}`}
+                              </Link>
                               {player && ` (${player.position})`}
                             </li>
                           );

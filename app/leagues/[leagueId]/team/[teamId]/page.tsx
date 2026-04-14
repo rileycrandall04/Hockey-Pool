@@ -177,7 +177,12 @@ function RosterTable({
             className="border-b border-puck-border last:border-0"
           >
             <td className="px-4 py-2 font-medium text-ice-100">
-              {r.full_name}
+              <Link
+                href={`/players/${r.player_id}`}
+                className="hover:underline"
+              >
+                {r.full_name}
+              </Link>
             </td>
             <td className="px-2 py-2">
               <span
