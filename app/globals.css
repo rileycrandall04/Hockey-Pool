@@ -20,3 +20,34 @@ body {
 table {
   border-collapse: collapse;
 }
+
+/* ---------------------------------------------------------------------------
+ * Marquee animation for the daily ticker.
+ *
+ * The inner track contains the set of game cards duplicated twice so that
+ * a translateX(-50%) keeps the end of the first copy seamlessly aligned
+ * with the start of the second. When the ticker pauses (user selects a
+ * game), we set animation-play-state via React state.
+ *
+ * prefers-reduced-motion: skip the animation entirely for users who have
+ * that OS-level preference on.
+ * ------------------------------------------------------------------------- */
+@keyframes ticker-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker {
+  animation: ticker-marquee 60s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticker {
+    animation: none;
+  }
+}
