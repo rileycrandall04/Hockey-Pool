@@ -183,7 +183,7 @@ export default async function DashboardPage({
                         ) : (
                           l.team && (
                             <Link
-                              href={`/leagues/${l.id}#leave-league`}
+                              href={`/leagues/${l.id}/leave`}
                               role="menuitem"
                               className="block rounded px-3 py-2 text-sm text-red-300 hover:bg-puck-border"
                             >

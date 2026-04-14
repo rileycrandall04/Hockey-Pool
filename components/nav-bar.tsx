@@ -155,6 +155,12 @@ export function NavBar({
     },
   );
 
+  // Leave league: only shown to non-commissioner team owners on a
+  // league-scoped page. The dedicated confirmation form lives at
+  // /leagues/{id}/leave. Commissioners see Delete league in the
+  // admin page instead.
+  const showLeave = Boolean(leagueId) && !isCommissioner;
+
   return (
     <header className="border-b border-puck-border bg-puck-card">
       <div className="mx-auto grid max-w-6xl grid-cols-[auto_1fr_auto] items-center gap-2 px-4 py-3">
@@ -204,6 +210,17 @@ export function NavBar({
                   </MenuLink>
                 ))}
               </div>
+              {showLeave && leagueId && (
+                <div className="border-t border-puck-border py-1">
+                  <Link
+                    href={`/leagues/${leagueId}/leave`}
+                    role="menuitem"
+                    className="block px-3 py-2 text-sm text-red-300 hover:bg-puck-border"
+                  >
+                    Leave league
+                  </Link>
+                </div>
+              )}
               <div className="border-t border-puck-border p-2">
                 <form action="/auth/signout" method="post">
                   <Button
