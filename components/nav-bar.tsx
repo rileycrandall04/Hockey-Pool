@@ -113,6 +113,21 @@ export function NavBar({ displayName, leagueId, draftStatus }: NavBarProps) {
     });
   }
 
+  // Always-visible "create a league" + "join a league" entries so the
+  // dashboard can stay a clean list with no action buttons of its own.
+  const leagueActions: Item[] = [
+    {
+      href: "/leagues/new",
+      label: "Create league",
+      active: isActive("/leagues/new", true),
+    },
+    {
+      href: "/leagues/join",
+      label: "Join league",
+      active: isActive("/leagues/join", true),
+    },
+  ];
+
   return (
     <header className="border-b border-puck-border bg-puck-card">
       <div className="mx-auto grid max-w-6xl grid-cols-[auto_1fr_auto] items-center gap-2 px-4 py-3">
@@ -151,6 +166,17 @@ export function NavBar({ displayName, leagueId, draftStatus }: NavBarProps) {
                   </MenuLink>
                 ))}
               </nav>
+              <div className="border-t border-puck-border py-1">
+                {leagueActions.map((item) => (
+                  <MenuLink
+                    key={item.href}
+                    href={item.href}
+                    active={item.active}
+                  >
+                    {item.label}
+                  </MenuLink>
+                ))}
+              </div>
               <div className="border-t border-puck-border p-2">
                 <form action="/auth/signout" method="post">
                   <Button
