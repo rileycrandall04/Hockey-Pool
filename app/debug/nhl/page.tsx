@@ -16,6 +16,7 @@ import {
   fetchTeamSeasonStats,
   fetchEliminatedTeams,
   fetchPlayerInjury,
+  fetchPlayerLandingRaw,
 } from "@/lib/nhl-api";
 
 export const dynamic = "force-dynamic";
@@ -33,13 +34,20 @@ export const maxDuration = 60;
  * ~32+ external NHL API requests — not something random pool members
  * should be able to spam.
  */
-export default async function DebugNhlPage() {
+export default async function DebugNhlPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ playerId?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   if (!isAppOwner(user.email)) redirect("/dashboard");
+
+  const { playerId: queryPlayerId } = await searchParams;
+  const inspectId = Number(queryPlayerId) || 8478402; // McDavid default
 
   const season = currentSeason();
 
@@ -50,23 +58,43 @@ export default async function DebugNhlPage() {
   const allTeams = Array.isArray(allTeamsResult) ? allTeamsResult : [];
 
   // Run the secondary fetches in parallel
-  const [eliminated, mcDavidInjury, torRoster, allTeamStats] =
-    await Promise.all([
-      fetchEliminatedTeams().catch(() => new Set<string>()),
-      fetchPlayerInjury(8478402).catch((e) => ({
-        error: e instanceof Error ? e.message : "fail",
+  const [
+    eliminated,
+    inspectInjury,
+    inspectRaw,
+    torRoster,
+    allTeamStats,
+  ] = await Promise.all([
+    fetchEliminatedTeams().catch(() => new Set<string>()),
+    fetchPlayerInjury(inspectId),
+    fetchPlayerLandingRaw(inspectId),
+    fetchTeamRoster("TOR").catch((e) => ({
+      error: e instanceof Error ? e.message : "fail",
+    })),
+    // Run season-stats fetcher for every team in parallel.
+    Promise.all(
+      allTeams.map(async (t) => ({
+        abbrev: t.abbrev,
+        result: await fetchTeamSeasonStats(t.abbrev, season),
       })),
-      fetchTeamRoster("TOR").catch((e) => ({
-        error: e instanceof Error ? e.message : "fail",
-      })),
-      // Run season-stats fetcher for every team in parallel.
-      Promise.all(
-        allTeams.map(async (t) => ({
-          abbrev: t.abbrev,
-          result: await fetchTeamSeasonStats(t.abbrev, season),
-        })),
-      ),
-    ]);
+    ),
+  ]);
+
+  // Extract the player's display name from the raw landing payload
+  // (if it returned anything) so the section header is friendly.
+  let inspectName = `player ${inspectId}`;
+  if (inspectRaw.ok && inspectRaw.data && typeof inspectRaw.data === "object") {
+    const d = inspectRaw.data as Record<string, unknown>;
+    const fn = (d.firstName as { default?: string } | undefined)?.default;
+    const ln = (d.lastName as { default?: string } | undefined)?.default;
+    if (fn || ln) inspectName = `${fn ?? ""} ${ln ?? ""}`.trim();
+  }
+
+  // Truncate the raw payload to a reasonable size for the <pre> tag,
+  // but keep the keys we care about visible at the top.
+  const rawPretty = inspectRaw.ok
+    ? JSON.stringify(inspectRaw.data, null, 2)
+    : null;
 
   const okCount = allTeamStats.filter((t) => t.result.rows.length > 0).length;
   const seasonOk = allTeamStats.filter((t) => t.result.source === "season").length;
@@ -211,24 +239,118 @@ export default async function DebugNhlPage() {
           )}
         </Section>
 
-        <Section title="Player landing — Connor McDavid (/player/8478402/landing)">
-          {"status" in (mcDavidInjury as object) &&
-          !(mcDavidInjury as { error?: string }).error ? (
-            <div>
-              currentInjury:{" "}
-              <span className="font-mono text-ice-100">
-                {JSON.stringify(mcDavidInjury)}
-              </span>
+        <Section
+          title={`Player landing — ${inspectName} (/player/${inspectId}/landing)`}
+        >
+          <form
+            method="get"
+            className="mb-4 flex flex-wrap items-end gap-2"
+          >
+            <div className="space-y-1">
+              <label
+                htmlFor="playerId"
+                className="block text-xs uppercase tracking-wide text-ice-400"
+              >
+                Inspect a different player ID
+              </label>
+              <input
+                id="playerId"
+                name="playerId"
+                defaultValue={inspectId}
+                placeholder="8478402"
+                className="rounded-md border border-puck-border bg-puck-bg px-3 py-1.5 text-sm text-ice-100"
+              />
             </div>
+            <button
+              type="submit"
+              className="rounded-md bg-ice-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-ice-600"
+            >
+              Inspect
+            </button>
+          </form>
+
+          <div className="mb-3 text-sm">
+            <span className="text-ice-400">Parsed injury status:</span>{" "}
+            {inspectInjury.source === "error" ? (
+              <span className="text-red-300">
+                ❌ error: {inspectInjury.error}
+              </span>
+            ) : inspectInjury.source === "none" ? (
+              <span className="text-ice-300">
+                no injury detected (source=&ldquo;none&rdquo;)
+              </span>
+            ) : (
+              <span className="text-yellow-200">
+                🚑 {inspectInjury.status}
+                {inspectInjury.description
+                  ? ` — ${inspectInjury.description}`
+                  : ""}{" "}
+                <span className="text-ice-500">
+                  (source={inspectInjury.source})
+                </span>
+              </span>
+            )}
+          </div>
+
+          <div className="mb-2 text-xs text-ice-400">
+            Raw response (top-level keys + currentInjury / injury / inGameStatus
+            extracted). If you can see the player&rsquo;s name in JSON below,
+            the endpoint is reachable. If <span className="font-mono">currentInjury</span>{" "}
+            is present, our parser uses it; otherwise we fall through to the
+            other shapes documented in lib/nhl-api.ts.
+          </div>
+
+          {rawPretty ? (
+            <pre className="max-h-96 overflow-auto rounded bg-puck-bg p-3 text-[11px] leading-snug text-ice-300">
+              {extractKeyFields(JSON.parse(rawPretty))}
+            </pre>
           ) : (
             <div className="text-red-300">
-              ❌ {(mcDavidInjury as { error: string }).error}
+              ❌ {!inspectRaw.ok ? inspectRaw.error : "no data"}
             </div>
           )}
+
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs text-ice-400 hover:text-ice-200">
+              Show full raw payload
+            </summary>
+            <pre className="mt-2 max-h-96 overflow-auto rounded bg-puck-bg p-3 text-[10px] leading-tight text-ice-400">
+              {rawPretty ?? "(no payload)"}
+            </pre>
+          </details>
         </Section>
       </main>
     </>
   );
+}
+
+/**
+ * Extracts the keys most relevant for diagnosing injury parsing from
+ * an arbitrary NHL player landing payload, so the UI doesn't have to
+ * render the entire 30 KB JSON blob to be useful.
+ */
+function extractKeyFields(data: unknown): string {
+  if (!data || typeof data !== "object") return "(no data)";
+  const d = data as Record<string, unknown>;
+  const keep: Record<string, unknown> = {};
+  for (const k of [
+    "playerId",
+    "firstName",
+    "lastName",
+    "currentTeamAbbrev",
+    "currentInjury",
+    "injury",
+    "inLineup",
+    "inGameStatus",
+    "isInjured",
+    "isUnsigned",
+    "isRetired",
+    "position",
+  ]) {
+    if (k in d) keep[k] = d[k];
+  }
+  keep["__topLevelKeys"] = Object.keys(d);
+  return JSON.stringify(keep, null, 2);
 }
 
 function Section({

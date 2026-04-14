@@ -388,31 +388,98 @@ export function currentSeason(now: Date = new Date()): string {
 export interface PlayerInjuryInfo {
   status: string | null;
   description: string | null;
+  source: "currentInjury" | "inGameStatus" | "scratched" | "none" | "error";
+  error?: string;
 }
 
 /**
  * Best-effort fetch of a single player's current injury status.
  *
- * The NHL public API does not have a dedicated injury report endpoint,
- * but the `/player/{id}/landing` payload sometimes includes a
- * `currentInjury` object. If the field is missing or the request fails,
- * we return { status: null }, meaning "healthy as far as we know".
+ * The NHL public API does not have a dedicated injury report endpoint
+ * and the player landing payload's shape has shifted over time. We
+ * try every field name the community has documented and return on
+ * the first match:
+ *
+ *   1. data.currentInjury  — { description?, duration? }
+ *   2. data.injury         — older shape, same fields
+ *   3. data.inGameStatus / inLineup === false → "scratched"
+ *
+ * If none of those match we return source="none" (healthy as far as
+ * we know). Errors are surfaced via source="error" + the message.
+ *
+ * Returns the raw `currentInjury`-shaped result so the cron and
+ * /debug/nhl can both use it without duplicating the parser.
  */
 export async function fetchPlayerInjury(
   playerId: number,
 ): Promise<PlayerInjuryInfo> {
   try {
-    const data = await nhlFetch<NhlPlayerLandingResponse>(
+    const data = await nhlFetch<Record<string, unknown>>(
       `/player/${playerId}/landing`,
     );
-    const injury = data.currentInjury;
-    if (!injury) return { status: null, description: null };
+
+    // Shape 1: currentInjury
+    const cur = data.currentInjury as
+      | { description?: string; duration?: string }
+      | undefined;
+    if (cur && (cur.description || cur.duration)) {
+      return {
+        status: cur.duration ?? "Injured",
+        description: cur.description ?? null,
+        source: "currentInjury",
+      };
+    }
+
+    // Shape 2: legacy "injury"
+    const legacy = data.injury as
+      | { description?: string; duration?: string }
+      | undefined;
+    if (legacy && (legacy.description || legacy.duration)) {
+      return {
+        status: legacy.duration ?? "Injured",
+        description: legacy.description ?? null,
+        source: "currentInjury",
+      };
+    }
+
+    // Shape 3: scratch / lineup status
+    const inLineup = data.inLineup;
+    const inGameStatus = data.inGameStatus as string | undefined;
+    if (inLineup === false || inGameStatus === "SCRATCH") {
+      return {
+        status: "Scratched",
+        description: typeof inGameStatus === "string" ? inGameStatus : null,
+        source: "scratched",
+      };
+    }
+
+    return { status: null, description: null, source: "none" };
+  } catch (err) {
     return {
-      status: injury.duration ?? "Injured",
-      description: injury.description ?? null,
+      status: null,
+      description: null,
+      source: "error",
+      error: err instanceof Error ? err.message : String(err),
     };
-  } catch {
-    return { status: null, description: null };
+  }
+}
+
+/**
+ * Raw fetch of /player/{id}/landing. Used by the debug page so we can
+ * see exactly what fields the API is returning for a given player and
+ * adjust the parser if the shape shifts.
+ */
+export async function fetchPlayerLandingRaw(
+  playerId: number,
+): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
+  try {
+    const data = await nhlFetch<unknown>(`/player/${playerId}/landing`);
+    return { ok: true, data };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
