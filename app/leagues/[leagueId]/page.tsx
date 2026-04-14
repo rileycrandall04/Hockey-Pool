@@ -117,10 +117,12 @@ export default async function LeagueStandingsPage({
         isCommissioner={isCommissioner}
       />
       <DailyTicker />
-      <main className="mx-auto max-w-5xl px-6 py-10">
-        <div className="mb-6 flex flex-col items-center gap-2 text-center">
-          <h1 className="text-3xl font-bold text-ice-50">{league.name}</h1>
-          <p className="text-sm text-ice-300">
+      <main className="mx-auto max-w-4xl px-3 py-6 sm:px-6 sm:py-8">
+        <div className="mb-4 flex flex-col items-center gap-1.5 text-center">
+          <h1 className="text-2xl font-bold text-ice-50 sm:text-3xl">
+            {league.name}
+          </h1>
+          <p className="text-xs text-ice-300 sm:text-sm">
             Season {league.season} &middot; Join code{" "}
             <span className="rounded bg-puck-card px-1.5 py-0.5 font-mono text-ice-100">
               {league.join_code}
@@ -165,9 +167,9 @@ export default async function LeagueStandingsPage({
                 key={row.team.id}
                 className="group rounded-md border border-puck-border bg-puck-card"
               >
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 hover:bg-puck-border/40 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="inline-block w-4 text-right text-ice-400 transition-transform group-open:rotate-90">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-1.5 px-2.5 py-2 text-[11px] hover:bg-puck-border/40 [&::-webkit-details-marker]:hidden sm:gap-2 sm:px-3 sm:text-sm">
+                  <span className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+                    <span className="inline-block w-3 text-right text-ice-400 transition-transform group-open:rotate-90">
                       ▶
                     </span>
                     <span className="text-ice-400">{i + 1}.</span>
@@ -175,7 +177,7 @@ export default async function LeagueStandingsPage({
                       <span
                         title={rankTitle}
                         aria-label="Moved up overnight"
-                        className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-green-500/20 text-[10px] font-bold text-green-300"
+                        className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-green-500/20 text-[8px] font-bold text-green-300"
                       >
                         ▲
                       </span>
@@ -184,7 +186,7 @@ export default async function LeagueStandingsPage({
                       <span
                         title={rankTitle}
                         aria-label="Moved down overnight"
-                        className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-red-500/20 text-[10px] font-bold text-red-300"
+                        className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-red-500/20 text-[8px] font-bold text-red-300"
                       >
                         ▼
                       </span>
@@ -196,20 +198,20 @@ export default async function LeagueStandingsPage({
                       <span
                         title={`Hot streak: +${delta?.delta_points} pts overnight, ${leagueAvgDelta.toFixed(1)} avg`}
                         aria-label="On a hot streak"
-                        className="flex-shrink-0"
+                        className="flex-shrink-0 text-xs"
                       >
                         🔥
                       </span>
                     )}
                   </span>
-                  <span className="flex-shrink-0 text-lg font-bold text-ice-50">
+                  <span className="flex-shrink-0 text-base font-bold text-ice-50 sm:text-lg">
                     {row.total}
-                    <span className="ml-1 text-xs font-normal uppercase text-ice-400">
+                    <span className="ml-0.5 text-[9px] font-normal uppercase text-ice-400 sm:ml-1 sm:text-xs">
                       pts
                     </span>
                   </span>
                 </summary>
-                <div className="border-t border-puck-border px-4 py-3 text-sm">
+                <div className="border-t border-puck-border px-2.5 py-2 text-[11px] sm:px-3 sm:text-sm">
                   {row.scoring.length === 0 ? (
                     <p className="text-ice-400">No players drafted yet.</p>
                   ) : (

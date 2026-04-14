@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isAppOwner } from "@/lib/auth";
+import { getCurrentLeagueContext } from "@/lib/current-league";
 import { NavBar } from "@/components/nav-bar";
 import {
   Card,
@@ -45,6 +46,8 @@ export default async function DebugNhlPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   if (!isAppOwner(user.email)) redirect("/dashboard");
+
+  const leagueCtx = await getCurrentLeagueContext(user.id);
 
   const { playerId: queryPlayerId } = await searchParams;
   const inspectId = Number(queryPlayerId) || 8478402; // McDavid default
@@ -103,7 +106,12 @@ export default async function DebugNhlPage({
 
   return (
     <>
-      <NavBar displayName={user.email ?? "Player"} />
+      <NavBar
+        displayName={user.email ?? "Player"}
+        leagueId={leagueCtx.leagueId}
+        draftStatus={leagueCtx.draftStatus}
+        isCommissioner={leagueCtx.isCommissioner}
+      />
       <main className="mx-auto max-w-4xl px-6 py-10 space-y-6">
         <div>
           <Link href="/dashboard" className="text-sm text-ice-400 hover:underline">

@@ -6,6 +6,7 @@ import {
   PlayersTable,
   type PlayersTableRow,
 } from "@/components/players-table";
+import { getCurrentLeagueContext } from "@/lib/current-league";
 import type { Position } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,8 @@ export default async function PlayersIndexPage() {
     .select("display_name")
     .eq("id", user.id)
     .single();
+
+  const leagueCtx = await getCurrentLeagueContext(user.id);
 
   const { data: rows } = await supabase
     .from("players")
@@ -80,7 +83,12 @@ export default async function PlayersIndexPage() {
 
   return (
     <>
-      <NavBar displayName={profile?.display_name ?? user.email ?? "Player"} />
+      <NavBar
+        displayName={profile?.display_name ?? user.email ?? "Player"}
+        leagueId={leagueCtx.leagueId}
+        draftStatus={leagueCtx.draftStatus}
+        isCommissioner={leagueCtx.isCommissioner}
+      />
       <DailyTicker />
       <main className="mx-auto max-w-4xl px-3 py-6 sm:px-6 sm:py-8">
         <div className="mb-4">

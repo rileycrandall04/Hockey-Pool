@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { InjuryBadge } from "@/components/injury-badge";
+import { getCurrentLeagueContext } from "@/lib/current-league";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,8 @@ export default async function PlayerPage({
     .select("display_name")
     .eq("id", user.id)
     .single();
+
+  const leagueCtx = await getCurrentLeagueContext(user.id);
 
   const { data: player } = await supabase
     .from("players")
@@ -75,13 +78,18 @@ export default async function PlayerPage({
 
   return (
     <>
-      <NavBar displayName={profile?.display_name ?? user.email ?? "Player"} />
+      <NavBar
+        displayName={profile?.display_name ?? user.email ?? "Player"}
+        leagueId={leagueCtx.leagueId}
+        draftStatus={leagueCtx.draftStatus}
+        isCommissioner={leagueCtx.isCommissioner}
+      />
       <main className="mx-auto max-w-3xl px-6 py-10 space-y-6">
         <Link
-          href="/dashboard"
+          href={leagueCtx.leagueId ? `/leagues/${leagueCtx.leagueId}` : "/dashboard"}
           className="text-sm text-ice-400 hover:underline"
         >
-          ← Dashboard
+          ← Back
         </Link>
 
         <div className="flex items-start gap-4">
