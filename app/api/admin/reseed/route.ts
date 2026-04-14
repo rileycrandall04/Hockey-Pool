@@ -33,8 +33,14 @@ export async function POST(request: Request) {
     const url = new URL("/dashboard", request.url);
     url.searchParams.set(
       "seeded",
-      `${result.teams} teams, ${result.players} players`,
+      `${result.teams} teams · ${result.players} players · ${result.players_with_season_stats} with ${result.season_used} stats`,
     );
+    if (result.teams_without_stats.length > 0) {
+      url.searchParams.set(
+        "seed_warning",
+        `Season stats unavailable for: ${result.teams_without_stats.join(", ")}`,
+      );
+    }
     return NextResponse.redirect(url, { status: 303 });
   } catch (err) {
     const url = new URL("/dashboard", request.url);

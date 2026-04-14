@@ -317,6 +317,12 @@ export default async function AdminPage({
     { data: adjustments },
     { count: pickCount },
     { data: nhlTeams },
+    { count: totalPlayerCount },
+    { count: playersWithSeasonStats },
+    { count: injuredCount },
+    { count: eliminatedTeamCount },
+    { data: latestPlayerUpdate },
+    { data: latestRecap },
   ] = await Promise.all([
     svc.from("teams").select("*").eq("league_id", leagueId),
     svc.from("v_team_rosters").select("*").eq("league_id", leagueId),
@@ -333,7 +339,37 @@ export default async function AdminPage({
       .from("nhl_teams")
       .select("id, abbrev, name, eliminated")
       .order("name"),
+    svc.from("players").select("id", { count: "exact", head: true }),
+    svc
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .gt("season_points", 0),
+    svc
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .not("injury_status", "is", null),
+    svc
+      .from("nhl_teams")
+      .select("id", { count: "exact", head: true })
+      .eq("eliminated", true),
+    svc
+      .from("players")
+      .select("updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1),
+    svc
+      .from("daily_recaps")
+      .select("game_date")
+      .order("game_date", { ascending: false })
+      .limit(1),
   ]);
+
+  const lastPlayerUpdateAt =
+    (latestPlayerUpdate?.[0] as { updated_at?: string } | undefined)
+      ?.updated_at ?? null;
+  const lastRecapDate =
+    (latestRecap?.[0] as { game_date?: string } | undefined)?.game_date ??
+    null;
 
   const currentPickCount = pickCount ?? 0;
   const totalPicks = (teams?.length ?? 0) * league.roster_size;
@@ -364,6 +400,48 @@ export default async function AdminPage({
             timestamped to {user.email}.
           </p>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Data freshness</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-xs text-ice-400">
+              All data below is pulled live from the NHL public API. If
+              the &ldquo;with current-season stats&rdquo; count is much
+              lower than the player count, the season-stats endpoint
+              probably failed for some teams &mdash; tap{" "}
+              <Link href="/debug/nhl" className="text-ice-200 underline">
+                debug NHL endpoints
+              </Link>{" "}
+              to see exactly what came back.
+            </p>
+            <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+              <Stat label="Players in pool" value={totalPlayerCount ?? 0} />
+              <Stat
+                label="With current-season stats"
+                value={playersWithSeasonStats ?? 0}
+              />
+              <Stat label="Currently injured" value={injuredCount ?? 0} />
+              <Stat
+                label="Eliminated teams"
+                value={eliminatedTeamCount ?? 0}
+              />
+              <Stat
+                label="Last player refresh"
+                value={
+                  lastPlayerUpdateAt
+                    ? relativeTime(lastPlayerUpdateAt)
+                    : "never"
+                }
+              />
+              <Stat
+                label="Latest recap date"
+                value={lastRecapDate ?? "none yet"}
+              />
+            </dl>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -725,3 +803,29 @@ export default async function AdminPage({
   );
 }
 
+function Stat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-md border border-puck-border bg-puck-bg px-3 py-2">
+      <div className="text-xs uppercase tracking-wide text-ice-400">
+        {label}
+      </div>
+      <div className="text-lg font-semibold text-ice-50">{value}</div>
+    </div>
+  );
+}
+
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return iso;
+  const seconds = Math.floor((Date.now() - then) / 1000);
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86_400)}d ago`;
+}

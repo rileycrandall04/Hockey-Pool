@@ -17,9 +17,13 @@ type LeagueWithTeam = League & { team: Team | null };
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ seeded?: string; seed_error?: string }>;
+  searchParams: Promise<{
+    seeded?: string;
+    seed_error?: string;
+    seed_warning?: string;
+  }>;
 }) {
-  const { seeded, seed_error } = await searchParams;
+  const { seeded, seed_error, seed_warning } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -68,6 +72,11 @@ export default async function DashboardPage({
         {seeded && (
           <div className="mb-6 rounded-md border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-200">
             ✅ Player pool seeded: {seeded}. You&rsquo;re ready to draft.
+          </div>
+        )}
+        {seed_warning && (
+          <div className="mb-6 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+            ⚠️ {seed_warning}
           </div>
         )}
         {seed_error && (

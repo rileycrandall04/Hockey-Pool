@@ -23,8 +23,6 @@ interface DraftablePlayer extends Player {
   ot_goals: number;
 }
 
-type SortMode = "season" | "playoff";
-
 interface PickRow {
   id: string;
   league_id: string;
@@ -56,7 +54,6 @@ export function DraftRoom({
   const [positionFilter, setPositionFilter] = useState<Position | "ALL">(
     "ALL",
   );
-  const [sortMode, setSortMode] = useState<SortMode>("season");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -233,8 +230,6 @@ export function DraftRoom({
 
   const filteredPlayers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const sortKey = (p: DraftablePlayer): number =>
-      sortMode === "playoff" ? p.fantasy_points : p.season_points;
     return players
       .filter((p) => !pickedPlayerIds.has(p.id))
       .filter((p) =>
@@ -251,13 +246,13 @@ export function DraftRoom({
           p.nhl_abbrev?.toLowerCase().includes(q),
       )
       .sort((a, b) => {
-        const diff = sortKey(b) - sortKey(a);
+        // Always rank by current-season points; tiebreak by games played.
+        const diff = b.season_points - a.season_points;
         if (diff !== 0) return diff;
-        // tiebreak: more games played comes first
         return b.season_games_played - a.season_games_played;
       })
       .slice(0, 300);
-  }, [players, pickedPlayerIds, positionFilter, search, sortMode]);
+  }, [players, pickedPlayerIds, positionFilter, search]);
 
   const rosterByTeam = useMemo(() => {
     const map = new Map<string, PickRow[]>();
@@ -449,30 +444,6 @@ export function DraftRoom({
                 onChange={(e) => setSearch(e.target.value)}
                 className="flex-1 min-w-[180px]"
               />
-              <div className="flex overflow-hidden rounded-md border border-puck-border text-xs">
-                <button
-                  type="button"
-                  onClick={() => setSortMode("season")}
-                  className={
-                    sortMode === "season"
-                      ? "bg-ice-500 px-3 py-2 text-white"
-                      : "bg-puck-bg px-3 py-2 text-ice-300 hover:bg-puck-border"
-                  }
-                >
-                  Season
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSortMode("playoff")}
-                  className={
-                    sortMode === "playoff"
-                      ? "bg-ice-500 px-3 py-2 text-white"
-                      : "bg-puck-bg px-3 py-2 text-ice-300 hover:bg-puck-border"
-                  }
-                >
-                  Playoff
-                </button>
-              </div>
               {(isMyTurn || isCommissioner) && !draftOver && (
                 <Button
                   variant="secondary"
@@ -490,8 +461,8 @@ export function DraftRoom({
                     <th className="px-2 py-2">Player</th>
                     <th className="px-2 py-2">Pos</th>
                     <th className="px-2 py-2">Team</th>
-                    <th className="px-2 py-2 text-right">SEAS</th>
-                    <th className="px-2 py-2 text-right">PO</th>
+                    <th className="px-2 py-2 text-right">GP</th>
+                    <th className="px-2 py-2 text-right">PTS</th>
                     <th className="px-2 py-2"></th>
                   </tr>
                 </thead>
@@ -524,23 +495,11 @@ export function DraftRoom({
                       <td className="px-2 py-1.5 text-ice-300">
                         {p.nhl_abbrev ?? "—"}
                       </td>
-                      <td
-                        className={
-                          sortMode === "season"
-                            ? "px-2 py-1.5 text-right font-semibold text-ice-50"
-                            : "px-2 py-1.5 text-right text-ice-300"
-                        }
-                      >
-                        {p.season_points}
+                      <td className="px-2 py-1.5 text-right text-ice-300">
+                        {p.season_games_played}
                       </td>
-                      <td
-                        className={
-                          sortMode === "playoff"
-                            ? "px-2 py-1.5 text-right font-semibold text-ice-50"
-                            : "px-2 py-1.5 text-right text-ice-300"
-                        }
-                      >
-                        {p.fantasy_points}
+                      <td className="px-2 py-1.5 text-right font-semibold text-ice-50">
+                        {p.season_points}
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         <Button

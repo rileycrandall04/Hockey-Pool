@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const url = new URL("/dashboard", request.url);
     url.searchParams.set(
       "seeded",
-      `${result.teams} teams, ${result.players} players`,
+      `${result.teams} teams · ${result.players} players · ${result.players_with_season_stats} with ${result.season_used} stats`,
     );
     return NextResponse.redirect(url, { status: 303 });
   } catch (err) {

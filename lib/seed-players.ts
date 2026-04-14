@@ -47,6 +47,9 @@ export async function seedPlayers(abbrevs?: string[]) {
   // 3. For each team, pull roster + season stats and upsert players.
   const season = currentSeason();
   let totalPlayers = 0;
+  let playersWithSeasonStats = 0;
+  const teamsWithoutStats: string[] = [];
+
   for (const t of teamsToInsert) {
     const [roster, seasonStats] = await Promise.all([
       fetchTeamRoster(t.abbrev),
@@ -55,10 +58,15 @@ export async function seedPlayers(abbrevs?: string[]) {
     const teamId = teamIdByAbbrev.get(t.abbrev);
     if (!teamId) continue;
 
+    if (seasonStats.length === 0 && roster.length > 0) {
+      teamsWithoutStats.push(t.abbrev);
+    }
+
     const seasonByPlayer = new Map(seasonStats.map((s) => [s.playerId, s]));
 
     const rows = roster.map((p) => {
       const s = seasonByPlayer.get(p.id);
+      if (s && s.points > 0) playersWithSeasonStats += 1;
       return {
         id: p.id,
         full_name: p.full_name,
@@ -93,5 +101,11 @@ export async function seedPlayers(abbrevs?: string[]) {
     totalPlayers += rows.length;
   }
 
-  return { teams: teamsToInsert.length, players: totalPlayers };
+  return {
+    teams: teamsToInsert.length,
+    players: totalPlayers,
+    players_with_season_stats: playersWithSeasonStats,
+    season_used: season,
+    teams_without_stats: teamsWithoutStats,
+  };
 }
