@@ -42,7 +42,7 @@ export default async function DraftPage({
         leagueId={leagueId}
         draftStatus={league.draft_status}
       />
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-6xl px-2 py-6 sm:px-4">
         <DraftRoom
           league={league}
           teams={(teams ?? []) as Team[]}

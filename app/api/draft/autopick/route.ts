@@ -96,38 +96,35 @@ export async function POST(request: Request) {
   const dNeeded = Math.max(league.required_defensemen - currentD, 0);
   const forceD = dNeeded >= remainingPicksForTeam;
 
-  // Best-available lookup. Rank by playoff points if any have been
-  // accumulated, otherwise fall back to regular-season points.
+  // Best available: pure regular-season points on a non-eliminated
+  // NHL team. Ordered server-side by season_points DESC so the top
+  // 200 rows we fetch contain the actual top scorers regardless of
+  // the pool's size. If forceD is true we additionally constrain to
+  // defensemen so the team doesn't paint itself into a 2-D corner.
   let query = svc
     .from("players")
     .select(
-      "id, position, season_points, nhl_teams!inner(eliminated), player_stats(fantasy_points)",
+      "id, position, season_points, season_games_played, nhl_teams!inner(eliminated)",
     )
     .eq("active", true)
     .eq("nhl_teams.eliminated", false)
-    .limit(100);
+    .order("season_points", { ascending: false, nullsFirst: false })
+    .order("season_games_played", { ascending: false, nullsFirst: false })
+    .limit(200);
   if (forceD) {
     query = query.eq("position", "D");
   }
   const { data: candidates } = await query;
 
+  // The server-side order is already correct; just drop anyone who
+  // was picked by someone else in this league and take the first.
   const ranked = (candidates ?? [])
     .filter((c) => !picked.has(c.id as number))
-    .map((c) => {
-      const statRow = Array.isArray(c.player_stats)
-        ? c.player_stats[0]
-        : c.player_stats;
-      const playoff =
-        (statRow as { fantasy_points: number } | null)?.fantasy_points ?? 0;
-      const season = (c.season_points as number | null) ?? 0;
-      return {
-        id: c.id as number,
-        position: c.position as string,
-        // Use playoff points if we have any; otherwise use season points.
-        rank: playoff > 0 ? playoff * 1000 : season,
-      };
-    })
-    .sort((a, b) => b.rank - a.rank);
+    .map((c) => ({
+      id: c.id as number,
+      position: c.position as string,
+      season_points: (c.season_points as number | null) ?? 0,
+    }));
 
   if (ranked.length === 0) {
     return NextResponse.json(

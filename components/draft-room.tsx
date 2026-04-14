@@ -576,17 +576,18 @@ export function DraftRoom({
               ))}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 sm:px-5">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <Input
                 placeholder="Search player or team..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 min-w-[180px]"
+                className="flex-1 min-w-[160px]"
               />
               {(isMyTurn || isCommissioner) && !draftOver && (
                 <Button
                   variant="secondary"
+                  size="sm"
                   onClick={handleAutoPick}
                   disabled={busy}
                 >
@@ -595,15 +596,27 @@ export function DraftRoom({
               )}
             </div>
             <div className="max-h-[60vh] overflow-y-auto">
-              <table className="w-full text-sm">
+              <table className="w-full table-fixed text-[11px] sm:text-sm">
+                <colgroup>
+                  <col />
+                  <col className="w-[28px] sm:w-[44px]" />
+                  <col className="w-[32px] sm:w-[44px]" />
+                  <col className="hidden w-[36px] sm:table-column" />
+                  <col className="w-[34px] sm:w-[44px]" />
+                  <col className="w-[44px] sm:w-[64px]" />
+                </colgroup>
                 <thead className="sticky top-0 bg-puck-card">
                   <tr className="border-b border-puck-border text-left text-ice-400">
-                    <th className="px-2 py-2">Player</th>
-                    <th className="px-2 py-2">Pos</th>
-                    <th className="px-2 py-2">Team</th>
-                    <th className="px-2 py-2 text-right">GP</th>
-                    <th className="px-2 py-2 text-right">PTS</th>
-                    <th className="px-2 py-2"></th>
+                    <th className="px-1.5 py-1.5 sm:px-2 sm:py-2">Player</th>
+                    <th className="px-1 py-1.5 sm:px-2 sm:py-2">Pos</th>
+                    <th className="px-1 py-1.5 sm:px-2 sm:py-2">Team</th>
+                    <th className="hidden px-1 py-1.5 text-right sm:table-cell sm:px-2 sm:py-2">
+                      GP
+                    </th>
+                    <th className="px-1 py-1.5 text-right sm:px-2 sm:py-2">
+                      PTS
+                    </th>
+                    <th className="px-1 py-1.5 sm:px-2 sm:py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -622,40 +635,45 @@ export function DraftRoom({
                       key={p.id}
                       className="border-b border-puck-border last:border-0"
                     >
-                      <td className="px-2 py-1.5 font-medium text-ice-100">
+                      <td className="px-1.5 py-1.5 font-medium text-ice-100 sm:px-2">
                         <Link
                           href={`/players/${p.id}`}
-                          className="inline-flex items-center hover:underline"
+                          className="flex min-w-0 items-center hover:underline"
                         >
-                          {p.full_name}
+                          <span className="truncate">{p.full_name}</span>
                           <InjuryBadge
                             status={p.injury_status}
                             description={p.injury_description}
                           />
                         </Link>
                       </td>
-                      <td className="px-2 py-1.5 text-ice-300">{p.position}</td>
-                      <td className="px-2 py-1.5 text-ice-300">
+                      <td className="px-1 py-1.5 text-ice-300 sm:px-2">
+                        {p.position}
+                      </td>
+                      <td className="px-1 py-1.5 text-ice-300 sm:px-2">
                         {p.nhl_abbrev ?? "—"}
                       </td>
-                      <td className="px-2 py-1.5 text-right text-ice-300">
+                      <td className="hidden px-1 py-1.5 text-right text-ice-300 sm:table-cell sm:px-2">
                         {p.season_games_played}
                       </td>
-                      <td className="px-2 py-1.5 text-right font-semibold text-ice-50">
+                      <td className="px-1 py-1.5 text-right font-semibold text-ice-50 sm:px-2">
                         {p.season_points}
                       </td>
-                      <td className="px-2 py-1.5 text-right">
-                        <Button
-                          size="sm"
+                      <td className="px-1 py-1.5 text-right sm:px-2">
+                        <button
+                          type="button"
                           onClick={() => handlePick(p.id)}
                           disabled={
                             busy ||
                             draftOver ||
                             (!isMyTurn && !isCommissioner)
                           }
+                          aria-label={`Draft ${p.full_name}`}
+                          className="inline-flex h-7 min-w-[34px] items-center justify-center rounded bg-ice-500 px-2 text-[11px] font-medium text-white hover:bg-ice-600 disabled:cursor-not-allowed disabled:bg-ice-800 disabled:text-ice-300 sm:h-8 sm:text-xs"
                         >
-                          Draft
-                        </Button>
+                          <span className="sm:hidden">+</span>
+                          <span className="hidden sm:inline">Draft</span>
+                        </button>
                       </td>
                     </tr>
                   ))}
