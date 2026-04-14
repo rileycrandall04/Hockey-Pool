@@ -90,6 +90,11 @@ export function NavBar({
       : `/leagues/${leagueId}/draft`
     : null;
 
+  // When the user is inside a league, "home" is that league's
+  // standings page — not the global dashboard. The Switch leagues
+  // item (further down) is the escape hatch back to /dashboard.
+  const homeHref = leagueId ? `/leagues/${leagueId}` : "/dashboard";
+
   const isActive = (href: string, exact = false): boolean => {
     if (!pathname) return false;
     if (exact) return pathname === href;
@@ -99,9 +104,11 @@ export function NavBar({
   type Item = { href: string; label: string; active: boolean };
   const items: Item[] = [
     {
-      href: "/dashboard",
+      href: homeHref,
       label: "Home",
-      active: isActive("/dashboard", true),
+      active: leagueId
+        ? isActive(homeHref, true)
+        : isActive("/dashboard", true),
     },
     {
       href: "/players",
@@ -116,13 +123,6 @@ export function NavBar({
       active: isActive(draftHref),
     });
   }
-  if (leagueId) {
-    items.push({
-      href: `/leagues/${leagueId}`,
-      label: "Standings",
-      active: isActive(`/leagues/${leagueId}`, true),
-    });
-  }
   if (leagueId && isCommissioner) {
     items.push({
       href: `/leagues/${leagueId}/admin`,
@@ -131,9 +131,18 @@ export function NavBar({
     });
   }
 
-  // Always-visible "create a league" + "join a league" entries so the
-  // dashboard can stay a clean list with no action buttons of its own.
-  const leagueActions: Item[] = [
+  // Always-visible "create a league" + "join a league" entries, plus
+  // a "switch leagues" entry when the user is inside a league so
+  // they have a one-tap path back to the global /dashboard picker.
+  const leagueActions: Item[] = [];
+  if (leagueId) {
+    leagueActions.push({
+      href: "/dashboard",
+      label: "Switch leagues",
+      active: false,
+    });
+  }
+  leagueActions.push(
     {
       href: "/leagues/new",
       label: "Create league",
@@ -144,7 +153,7 @@ export function NavBar({
       label: "Join league",
       active: isActive("/leagues/join", true),
     },
-  ];
+  );
 
   return (
     <header className="border-b border-puck-border bg-puck-card">
@@ -211,9 +220,11 @@ export function NavBar({
           )}
         </div>
 
-        {/* Center: logo (links back to dashboard) */}
+        {/* Center: logo. Links to the league's standings if the
+            user is inside a league, otherwise to the global
+            dashboard — matches the Home item's behavior. */}
         <Link
-          href="/dashboard"
+          href={homeHref}
           className="justify-self-center text-lg font-semibold tracking-tight text-ice-50"
         >
           🏒{" "}

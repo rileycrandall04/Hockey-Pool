@@ -117,6 +117,12 @@ export default async function LeagueTeamsPage({
       <DailyTicker />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-6">
+          <Link
+            href={`/leagues/${leagueId}`}
+            className="text-sm text-ice-400 hover:underline"
+          >
+            ← {league.name}
+          </Link>
           <h1 className="text-3xl font-bold text-ice-50">Teams</h1>
           <p className="text-sm text-ice-300">
             Full rosters for every team in {league.name}, sorted by
