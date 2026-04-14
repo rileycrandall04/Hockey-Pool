@@ -51,6 +51,7 @@ export async function POST(request: Request) {
       `${result.unchanged} unchanged`,
     ];
     if (result.errors > 0) parts.push(`${result.errors} errors`);
+    if (result.truncated) parts.push("truncated (time budget)");
     url.searchParams.set(
       "seeded",
       `Injury sync · ${parts.join(" · ")} (${(result.duration_ms / 1000).toFixed(1)}s)`,
