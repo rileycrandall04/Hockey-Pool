@@ -52,6 +52,31 @@ export interface Player {
   jersey_number: number | null;
   headshot_url: string | null;
   active: boolean;
+  season_goals: number;
+  season_assists: number;
+  season_points: number;
+  season_games_played: number;
+  injury_status: string | null;
+  injury_description: string | null;
+}
+
+export interface DailyRecap {
+  id: string;
+  game_date: string;
+  game_id: number;
+  away_team_abbrev: string;
+  away_team_score: number;
+  home_team_abbrev: string;
+  home_team_score: number;
+  game_state: string;
+  was_overtime: boolean;
+  scorers: Array<{
+    player_id: number;
+    name: string;
+    team: string;
+    goals: number;
+    assists: number;
+  }>;
 }
 
 export interface PlayerStats {

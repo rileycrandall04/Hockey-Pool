@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import type { League, Player, Position, Team } from "@/lib/types";
 import { teamOnTheClock, pickMeta } from "@/lib/draft";
+import { InjuryBadge } from "@/components/injury-badge";
 
 interface DraftablePlayer extends Player {
   nhl_abbrev: string | null;
@@ -21,6 +22,8 @@ interface DraftablePlayer extends Player {
   assists: number;
   ot_goals: number;
 }
+
+type SortMode = "season" | "playoff";
 
 interface PickRow {
   id: string;
@@ -53,6 +56,7 @@ export function DraftRoom({
   const [positionFilter, setPositionFilter] = useState<Position | "ALL">(
     "ALL",
   );
+  const [sortMode, setSortMode] = useState<SortMode>("season");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -64,9 +68,10 @@ export function DraftRoom({
         supabase
           .from("players")
           .select(
-            "id, full_name, position, nhl_team_id, jersey_number, headshot_url, active, nhl_teams(abbrev), player_stats(goals, assists, ot_goals, fantasy_points)",
+            "id, full_name, position, nhl_team_id, jersey_number, headshot_url, active, season_goals, season_assists, season_points, season_games_played, injury_status, injury_description, nhl_teams!inner(abbrev, eliminated), player_stats(goals, assists, ot_goals, fantasy_points)",
           )
           .eq("active", true)
+          .eq("nhl_teams.eliminated", false)
           .limit(2000),
         supabase
           .from("draft_picks")
@@ -87,7 +92,16 @@ export function DraftRoom({
             jersey_number: number | null;
             headshot_url: string | null;
             active: boolean;
-            nhl_teams: { abbrev: string } | { abbrev: string }[] | null;
+            season_goals: number | null;
+            season_assists: number | null;
+            season_points: number | null;
+            season_games_played: number | null;
+            injury_status: string | null;
+            injury_description: string | null;
+            nhl_teams:
+              | { abbrev: string; eliminated: boolean }
+              | { abbrev: string; eliminated: boolean }[]
+              | null;
             player_stats:
               | {
                   goals: number;
@@ -116,6 +130,12 @@ export function DraftRoom({
             jersey_number: p.jersey_number,
             headshot_url: p.headshot_url,
             active: p.active,
+            season_goals: p.season_goals ?? 0,
+            season_assists: p.season_assists ?? 0,
+            season_points: p.season_points ?? 0,
+            season_games_played: p.season_games_played ?? 0,
+            injury_status: p.injury_status,
+            injury_description: p.injury_description,
             nhl_abbrev: teamRow?.abbrev ?? null,
             goals: statRow?.goals ?? 0,
             assists: statRow?.assists ?? 0,
@@ -213,6 +233,8 @@ export function DraftRoom({
 
   const filteredPlayers = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const sortKey = (p: DraftablePlayer): number =>
+      sortMode === "playoff" ? p.fantasy_points : p.season_points;
     return players
       .filter((p) => !pickedPlayerIds.has(p.id))
       .filter((p) =>
@@ -228,9 +250,14 @@ export function DraftRoom({
           p.full_name.toLowerCase().includes(q) ||
           p.nhl_abbrev?.toLowerCase().includes(q),
       )
-      .sort((a, b) => b.fantasy_points - a.fantasy_points)
+      .sort((a, b) => {
+        const diff = sortKey(b) - sortKey(a);
+        if (diff !== 0) return diff;
+        // tiebreak: more games played comes first
+        return b.season_games_played - a.season_games_played;
+      })
       .slice(0, 300);
-  }, [players, pickedPlayerIds, positionFilter, search]);
+  }, [players, pickedPlayerIds, positionFilter, search, sortMode]);
 
   const rosterByTeam = useMemo(() => {
     const map = new Map<string, PickRow[]>();
@@ -415,12 +442,37 @@ export function DraftRoom({
             </div>
           </CardHeader>
           <CardContent>
-            <div className="mb-3 flex gap-2">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <Input
                 placeholder="Search player or team..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                className="flex-1 min-w-[180px]"
               />
+              <div className="flex overflow-hidden rounded-md border border-puck-border text-xs">
+                <button
+                  type="button"
+                  onClick={() => setSortMode("season")}
+                  className={
+                    sortMode === "season"
+                      ? "bg-ice-500 px-3 py-2 text-white"
+                      : "bg-puck-bg px-3 py-2 text-ice-300 hover:bg-puck-border"
+                  }
+                >
+                  Season
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortMode("playoff")}
+                  className={
+                    sortMode === "playoff"
+                      ? "bg-ice-500 px-3 py-2 text-white"
+                      : "bg-puck-bg px-3 py-2 text-ice-300 hover:bg-puck-border"
+                  }
+                >
+                  Playoff
+                </button>
+              </div>
               {(isMyTurn || isCommissioner) && !draftOver && (
                 <Button
                   variant="secondary"
@@ -438,7 +490,8 @@ export function DraftRoom({
                     <th className="px-2 py-2">Player</th>
                     <th className="px-2 py-2">Pos</th>
                     <th className="px-2 py-2">Team</th>
-                    <th className="px-2 py-2 text-right">PTS</th>
+                    <th className="px-2 py-2 text-right">SEAS</th>
+                    <th className="px-2 py-2 text-right">PO</th>
                     <th className="px-2 py-2"></th>
                   </tr>
                 </thead>
@@ -446,7 +499,7 @@ export function DraftRoom({
                   {filteredPlayers.length === 0 && (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="px-2 py-6 text-center text-ice-400"
                       >
                         No players match your filters.
@@ -459,13 +512,34 @@ export function DraftRoom({
                       className="border-b border-puck-border last:border-0"
                     >
                       <td className="px-2 py-1.5 font-medium text-ice-100">
-                        {p.full_name}
+                        <span className="inline-flex items-center">
+                          {p.full_name}
+                          <InjuryBadge
+                            status={p.injury_status}
+                            description={p.injury_description}
+                          />
+                        </span>
                       </td>
                       <td className="px-2 py-1.5 text-ice-300">{p.position}</td>
                       <td className="px-2 py-1.5 text-ice-300">
                         {p.nhl_abbrev ?? "—"}
                       </td>
-                      <td className="px-2 py-1.5 text-right text-ice-200">
+                      <td
+                        className={
+                          sortMode === "season"
+                            ? "px-2 py-1.5 text-right font-semibold text-ice-50"
+                            : "px-2 py-1.5 text-right text-ice-300"
+                        }
+                      >
+                        {p.season_points}
+                      </td>
+                      <td
+                        className={
+                          sortMode === "playoff"
+                            ? "px-2 py-1.5 text-right font-semibold text-ice-50"
+                            : "px-2 py-1.5 text-right text-ice-300"
+                        }
+                      >
                         {p.fantasy_points}
                       </td>
                       <td className="px-2 py-1.5 text-right">

@@ -89,6 +89,62 @@ interface NhlBoxPlayer {
   assists?: number;
 }
 
+interface NhlClubStatsResponse {
+  skaters?: Array<{
+    playerId: number;
+    goals?: number;
+    assists?: number;
+    points?: number;
+    gamesPlayed?: number;
+  }>;
+  goalies?: Array<{
+    playerId: number;
+    gamesPlayed?: number;
+  }>;
+}
+
+interface NhlPlayerLandingResponse {
+  playerId: number;
+  currentInjury?: {
+    description?: string;
+    duration?: string;
+  };
+}
+
+interface NhlGameLandingResponse {
+  id: number;
+  gameDate: string;
+  gameState: string;
+  awayTeam: { abbrev: string; score: number; name?: { default: string } };
+  homeTeam: { abbrev: string; score: number; name?: { default: string } };
+  periodDescriptor?: { number: number; periodType: string };
+  summary?: {
+    scoring?: Array<{
+      periodDescriptor: { number: number; periodType: string };
+      goals: Array<{
+        playerId: number;
+        firstName?: { default: string };
+        lastName?: { default: string };
+        teamAbbrev?: { default: string };
+        assists: Array<{
+          playerId: number;
+          firstName?: { default: string };
+          lastName?: { default: string };
+        }>;
+      }>;
+    }>;
+  };
+}
+
+interface NhlStandingsClinchResponse {
+  standings: Array<{
+    teamAbbrev: { default: string };
+    clinchIndicator?: string;
+    leagueSequence?: number;
+    wildcardSequence?: number;
+  }>;
+}
+
 // ----- helpers -----------------------------------------------------------
 
 export function normalizePosition(code: string): Position {
@@ -231,4 +287,224 @@ export async function fetchGameStats(
   return [...byPlayer.values()].filter(
     (r) => r.goals || r.assists || r.otGoals,
   );
+}
+
+// ----- season stats per team --------------------------------------------
+
+export interface NhlSeasonStat {
+  playerId: number;
+  goals: number;
+  assists: number;
+  points: number;
+  gamesPlayed: number;
+}
+
+/**
+ * Fetch every player's regular-season stats for a team in one request.
+ *
+ *   abbrev: team abbreviation, e.g. "TOR"
+ *   season: NHL season string, e.g. "20242025" (no dash)
+ *
+ * Endpoint: /club-stats/{abbrev}/{season}/2  (gameType 2 = regular season)
+ *
+ * Returns an empty array if the endpoint fails — the caller is expected
+ * to fall back to whatever season_points it already had stored.
+ */
+export async function fetchTeamSeasonStats(
+  abbrev: string,
+  season: string,
+): Promise<NhlSeasonStat[]> {
+  try {
+    const data = await nhlFetch<NhlClubStatsResponse>(
+      `/club-stats/${abbrev}/${season}/2`,
+    );
+    const skaters = data.skaters ?? [];
+    return skaters.map((s) => ({
+      playerId: s.playerId,
+      goals: s.goals ?? 0,
+      assists: s.assists ?? 0,
+      points:
+        s.points ?? ((s.goals ?? 0) + (s.assists ?? 0)),
+      gamesPlayed: s.gamesPlayed ?? 0,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Resolve the "current" NHL season string in the format the club-stats
+ * endpoint expects ("YYYYYYYY"). The NHL season starts in October of one
+ * calendar year and ends in June of the next, so we use Oct 1 as the
+ * cutover date.
+ */
+export function currentSeason(now: Date = new Date()): string {
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth() + 1; // 1-12
+  if (month >= 10) {
+    return `${year}${year + 1}`;
+  }
+  return `${year - 1}${year}`;
+}
+
+// ----- per-player injury status -----------------------------------------
+
+export interface PlayerInjuryInfo {
+  status: string | null;
+  description: string | null;
+}
+
+/**
+ * Best-effort fetch of a single player's current injury status.
+ *
+ * The NHL public API does not have a dedicated injury report endpoint,
+ * but the `/player/{id}/landing` payload sometimes includes a
+ * `currentInjury` object. If the field is missing or the request fails,
+ * we return { status: null }, meaning "healthy as far as we know".
+ */
+export async function fetchPlayerInjury(
+  playerId: number,
+): Promise<PlayerInjuryInfo> {
+  try {
+    const data = await nhlFetch<NhlPlayerLandingResponse>(
+      `/player/${playerId}/landing`,
+    );
+    const injury = data.currentInjury;
+    if (!injury) return { status: null, description: null };
+    return {
+      status: injury.duration ?? "Injured",
+      description: injury.description ?? null,
+    };
+  } catch {
+    return { status: null, description: null };
+  }
+}
+
+// ----- playoff elimination detection ------------------------------------
+
+/**
+ * Pull the current standings and return the abbrevs of any team marked
+ * as eliminated. Best-effort: returns an empty set on failure.
+ *
+ * The NHL API uses the `clinchIndicator` field on each standings row
+ * during the regular season; values include "x" (clinched playoff
+ * berth), "y" (clinched division), "p" (presidents trophy), and "e"
+ * (eliminated from playoff contention). After the playoffs start, the
+ * standings endpoint is less authoritative — eliminated teams should
+ * also be detectable via the playoff bracket endpoint, but we keep the
+ * cron simple and rely on commissioner overrides for that.
+ */
+export async function fetchEliminatedTeams(): Promise<Set<string>> {
+  try {
+    const data = await nhlFetch<NhlStandingsClinchResponse>("/standings/now");
+    const out = new Set<string>();
+    for (const row of data.standings) {
+      if (row.clinchIndicator === "e") {
+        out.add(row.teamAbbrev.default);
+      }
+    }
+    return out;
+  } catch {
+    return new Set();
+  }
+}
+
+// ----- game recaps for the home page ticker -----------------------------
+
+export interface GameRecap {
+  gameId: number;
+  gameDate: string;
+  gameState: string;
+  awayAbbrev: string;
+  awayScore: number;
+  homeAbbrev: string;
+  homeScore: number;
+  wasOvertime: boolean;
+  scorers: Array<{
+    player_id: number;
+    name: string;
+    team: string;
+    goals: number;
+    assists: number;
+  }>;
+}
+
+/**
+ * Fetch a single finished game and reduce it down to a ticker-friendly
+ * shape: final scores plus an aggregated list of every player who got a
+ * goal or an assist in the game. Returns null on failure.
+ */
+export async function fetchGameRecap(
+  gameId: number,
+): Promise<GameRecap | null> {
+  try {
+    const data = await nhlFetch<NhlGameLandingResponse>(
+      `/gamecenter/${gameId}/landing`,
+    );
+
+    // Walk the scoring summary and tally G/A per player.
+    type Tally = {
+      player_id: number;
+      name: string;
+      team: string;
+      goals: number;
+      assists: number;
+    };
+    const byPlayer = new Map<number, Tally>();
+    let wasOvertime = false;
+
+    for (const period of data.summary?.scoring ?? []) {
+      const isOt =
+        period.periodDescriptor.periodType === "OT" ||
+        period.periodDescriptor.number >= 4;
+      if (isOt) wasOvertime = true;
+
+      for (const goal of period.goals) {
+        const scorerName =
+          `${goal.firstName?.default ?? ""} ${goal.lastName?.default ?? ""}`.trim() ||
+          `#${goal.playerId}`;
+        const scorerTeam = goal.teamAbbrev?.default ?? "";
+        const scorer =
+          byPlayer.get(goal.playerId) ?? {
+            player_id: goal.playerId,
+            name: scorerName,
+            team: scorerTeam,
+            goals: 0,
+            assists: 0,
+          };
+        scorer.goals += 1;
+        byPlayer.set(goal.playerId, scorer);
+
+        for (const a of goal.assists ?? []) {
+          const assistName =
+            `${a.firstName?.default ?? ""} ${a.lastName?.default ?? ""}`.trim() ||
+            `#${a.playerId}`;
+          const helper =
+            byPlayer.get(a.playerId) ?? {
+              player_id: a.playerId,
+              name: assistName,
+              team: scorerTeam,
+              goals: 0,
+              assists: 0,
+            };
+          helper.assists += 1;
+          byPlayer.set(a.playerId, helper);
+        }
+      }
+    }
+
+    return {
+      gameId: data.id,
+      gameDate: data.gameDate,
+      gameState: data.gameState,
+      awayAbbrev: data.awayTeam.abbrev,
+      awayScore: data.awayTeam.score ?? 0,
+      homeAbbrev: data.homeTeam.abbrev,
+      homeScore: data.homeTeam.score ?? 0,
+      wasOvertime,
+      scorers: [...byPlayer.values()],
+    };
+  } catch {
+    return null;
+  }
 }

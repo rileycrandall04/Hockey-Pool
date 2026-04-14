@@ -223,6 +223,75 @@ async function resetDraftAction(formData: FormData) {
   revalidatePath(`/leagues/${leagueId}/draft`);
 }
 
+/**
+ * Manually mark an NHL team as eliminated (or un-eliminate).
+ * When eliminated, the team's undrafted players are flipped to inactive
+ * so they drop out of the draft pool. Already-drafted players are
+ * untouched — points they already earned still count.
+ */
+async function toggleTeamEliminationAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id"));
+  const teamIdRaw = String(formData.get("nhl_team_id"));
+  const teamId = parseInt(teamIdRaw, 10);
+  const eliminate = String(formData.get("action")) === "eliminate";
+
+  await assertCommissioner(leagueId);
+  if (!Number.isFinite(teamId)) return;
+
+  const svc = createServiceClient();
+  await svc
+    .from("nhl_teams")
+    .update({
+      eliminated: eliminate,
+      eliminated_at: eliminate ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", teamId);
+
+  // Flip every undrafted player on that team. We can't tell from here
+  // which players are drafted in OTHER leagues, so we deactivate them
+  // globally — fine since the per-league draft state is independent of
+  // active flag. (active=false just means "don't show in the draftable
+  // pool for any new draft going forward".)
+  await svc
+    .from("players")
+    .update({ active: !eliminate })
+    .eq("nhl_team_id", teamId);
+
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  revalidatePath(`/leagues/${leagueId}/draft`);
+}
+
+/**
+ * Manually mark a single player as injured/healthy. Useful when the
+ * automatic NHL injury feed misses someone, or for game-time
+ * scratches that haven't shown up yet.
+ */
+async function toggleInjuryAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id"));
+  const playerIdRaw = String(formData.get("player_id"));
+  const playerId = parseInt(playerIdRaw, 10);
+  const status = String(formData.get("status") ?? "").trim() || null;
+
+  await assertCommissioner(leagueId);
+  if (!Number.isFinite(playerId)) return;
+
+  const svc = createServiceClient();
+  await svc
+    .from("players")
+    .update({
+      injury_status: status,
+      injury_description: status ? "(commissioner-flagged)" : null,
+      injury_updated_at: new Date().toISOString(),
+    })
+    .eq("id", playerId);
+
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  revalidatePath(`/leagues/${leagueId}/draft`);
+}
+
 export default async function AdminPage({
   params,
   searchParams,
@@ -247,6 +316,7 @@ export default async function AdminPage({
     { data: rosterRows },
     { data: adjustments },
     { count: pickCount },
+    { data: nhlTeams },
   ] = await Promise.all([
     svc.from("teams").select("*").eq("league_id", leagueId),
     svc.from("v_team_rosters").select("*").eq("league_id", leagueId),
@@ -259,6 +329,10 @@ export default async function AdminPage({
       .from("draft_picks")
       .select("id", { count: "exact", head: true })
       .eq("league_id", leagueId),
+    svc
+      .from("nhl_teams")
+      .select("id, abbrev, name, eliminated")
+      .order("name"),
   ]);
 
   const currentPickCount = pickCount ?? 0;
@@ -379,6 +453,107 @@ export default async function AdminPage({
                 </Button>
               </form>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Playoff teams</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-xs text-ice-400">
+              The nightly cron tries to detect eliminations from the NHL
+              standings, but you can also override that here. Marking a
+              team eliminated removes their undrafted players from the
+              available pool. Players already drafted are untouched.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(nhlTeams ?? []).map(
+                (t: {
+                  id: number;
+                  abbrev: string;
+                  name: string;
+                  eliminated: boolean;
+                }) => (
+                  <form
+                    key={t.id}
+                    action={toggleTeamEliminationAction}
+                    className="flex items-center justify-between gap-2 rounded-md border border-puck-border bg-puck-bg px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="hidden"
+                      name="league_id"
+                      value={leagueId}
+                    />
+                    <input
+                      type="hidden"
+                      name="nhl_team_id"
+                      value={t.id}
+                    />
+                    <input
+                      type="hidden"
+                      name="action"
+                      value={t.eliminated ? "uneliminate" : "eliminate"}
+                    />
+                    <div>
+                      <span className="font-medium text-ice-100">
+                        {t.abbrev}
+                      </span>{" "}
+                      <span className="text-ice-400">{t.name}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      type="submit"
+                      variant={t.eliminated ? "secondary" : "danger"}
+                    >
+                      {t.eliminated ? "Reinstate" : "Eliminate"}
+                    </Button>
+                  </form>
+                ),
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Injury override</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-xs text-ice-400">
+              Manually flag a player as injured (or clear an existing
+              flag) when the NHL feed misses someone. Leave the status
+              field blank to clear an injury.
+            </p>
+            <form
+              action={toggleInjuryAction}
+              className="flex flex-wrap items-end gap-2"
+            >
+              <input type="hidden" name="league_id" value={leagueId} />
+              <div className="space-y-1">
+                <Label htmlFor="injury_player_id">Player ID</Label>
+                <Input
+                  id="injury_player_id"
+                  name="player_id"
+                  type="number"
+                  placeholder="8478402"
+                  className="max-w-[180px]"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="injury_status">Injury status</Label>
+                <Input
+                  id="injury_status"
+                  name="status"
+                  placeholder="Day-to-day (leave blank to clear)"
+                  className="max-w-[280px]"
+                />
+              </div>
+              <Button type="submit" variant="secondary">
+                Save
+              </Button>
+            </form>
           </CardContent>
         </Card>
 

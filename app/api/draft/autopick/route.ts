@@ -96,14 +96,16 @@ export async function POST(request: Request) {
   const dNeeded = Math.max(league.required_defensemen - currentD, 0);
   const forceD = dNeeded >= remainingPicksForTeam;
 
-  // Best-available lookup (join players + player_stats).
+  // Best-available lookup. Rank by playoff points if any have been
+  // accumulated, otherwise fall back to regular-season points.
   let query = svc
     .from("players")
     .select(
-      "id, position, player_stats(fantasy_points)",
+      "id, position, season_points, nhl_teams!inner(eliminated), player_stats(fantasy_points)",
     )
     .eq("active", true)
-    .limit(50);
+    .eq("nhl_teams.eliminated", false)
+    .limit(100);
   if (forceD) {
     query = query.eq("position", "D");
   }
@@ -115,13 +117,17 @@ export async function POST(request: Request) {
       const statRow = Array.isArray(c.player_stats)
         ? c.player_stats[0]
         : c.player_stats;
+      const playoff =
+        (statRow as { fantasy_points: number } | null)?.fantasy_points ?? 0;
+      const season = (c.season_points as number | null) ?? 0;
       return {
         id: c.id as number,
         position: c.position as string,
-        fp: (statRow as { fantasy_points: number } | null)?.fantasy_points ?? 0,
+        // Use playoff points if we have any; otherwise use season points.
+        rank: playoff > 0 ? playoff * 1000 : season,
       };
     })
-    .sort((a, b) => b.fp - a.fp);
+    .sort((a, b) => b.rank - a.rank);
 
   if (ranked.length === 0) {
     return NextResponse.json(

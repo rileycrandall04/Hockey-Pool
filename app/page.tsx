@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { DailyTicker } from "@/components/daily-ticker";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -9,7 +10,9 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-16">
+    <>
+      <DailyTicker />
+      <main className="mx-auto max-w-5xl px-6 py-16">
       <div className="mb-12 flex items-center justify-between">
         <div className="text-xl font-semibold tracking-tight text-ice-50">
           🏒 Stanley Cup Pool
@@ -75,10 +78,11 @@ export default async function HomePage() {
         />
         <Feature
           title="Nightly updates"
-          body="Pulls finalized NHL games each night at 4am so standings stay fresh."
+          body="Pulls finalized NHL games every morning at 6am so standings stay fresh."
         />
       </section>
     </main>
+    </>
   );
 }
 
