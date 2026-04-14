@@ -113,8 +113,8 @@ export default async function DashboardPage({
           </div>
           <div className="flex flex-wrap gap-2">
             <form action="/api/admin/reseed" method="post">
-              <Button type="submit" variant="ghost" size="sm">
-                Refresh NHL data
+              <Button type="submit" variant="secondary">
+                ↻ Refresh NHL data
               </Button>
             </form>
             <Link href="/leagues/join">

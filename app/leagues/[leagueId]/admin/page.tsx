@@ -416,7 +416,7 @@ export default async function AdminPage({
               </Link>{" "}
               to see exactly what came back.
             </p>
-            <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+            <dl className="mb-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
               <Stat label="Players in pool" value={totalPlayerCount ?? 0} />
               <Stat
                 label="With current-season stats"
@@ -440,6 +440,18 @@ export default async function AdminPage({
                 value={lastRecapDate ?? "none yet"}
               />
             </dl>
+            <div className="flex flex-wrap gap-2">
+              <form action="/api/admin/reseed" method="post">
+                <Button type="submit">↻ Refresh NHL data now</Button>
+              </form>
+              <Link href="/debug/nhl">
+                <Button variant="secondary">Debug NHL endpoints</Button>
+              </Link>
+            </div>
+            <p className="mt-2 text-xs text-ice-500">
+              Refresh takes ~30–60 seconds. It pulls every NHL team
+              roster + this season&rsquo;s point totals + injuries.
+            </p>
           </CardContent>
         </Card>
 
