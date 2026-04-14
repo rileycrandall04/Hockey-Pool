@@ -7,6 +7,7 @@ import {
   fetchEliminatedTeams,
 } from "@/lib/nhl-api";
 import { syncInjuries } from "@/lib/sync-injuries";
+import { snapshotAllLeagues } from "@/lib/snapshot-standings";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
     recaps_written: 0,
     eliminated: 0,
     injuries_checked: 0,
+    snapshots_written: 0,
   };
 
   // -------------------------------------------------------------------
@@ -211,6 +213,18 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error("Failed to refresh injuries", err);
     }
+  }
+
+  // -------------------------------------------------------------------
+  // 5. Standings snapshot (one row per team per league per day).
+  // Powers the overnight up/down/fire indicators on the standings
+  // page. Runs last so it captures the just-updated totals.
+  // -------------------------------------------------------------------
+  try {
+    const snapResult = await snapshotAllLeagues();
+    summary.snapshots_written = snapResult.teams;
+  } catch (err) {
+    console.error("Failed to write standings snapshots", err);
   }
 
   return NextResponse.json(summary);

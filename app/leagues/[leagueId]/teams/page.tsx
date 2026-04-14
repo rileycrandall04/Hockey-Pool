@@ -112,6 +112,7 @@ export default async function LeagueTeamsPage({
         displayName={profile?.display_name ?? user.email ?? "Player"}
         leagueId={leagueId}
         draftStatus={league.draft_status}
+        isCommissioner={league.commissioner_id === user.id}
       />
       <DailyTicker />
       <main className="mx-auto max-w-6xl px-4 py-8">

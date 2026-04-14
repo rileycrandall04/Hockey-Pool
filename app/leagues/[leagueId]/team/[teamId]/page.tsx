@@ -65,6 +65,7 @@ export default async function TeamPage({
         displayName={profile?.display_name ?? user.email ?? "Player"}
         leagueId={leagueId}
         draftStatus={league.draft_status}
+        isCommissioner={league.commissioner_id === user.id}
       />
       <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">

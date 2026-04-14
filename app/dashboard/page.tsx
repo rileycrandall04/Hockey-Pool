@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { RowMenu } from "@/components/row-menu";
 import type { League, Team } from "@/lib/types";
 
 type LeagueWithTeam = League & { team: Team | null };
@@ -147,43 +148,55 @@ export default async function DashboardPage({
           </Card>
         ) : (
           <ul className="space-y-2">
-            {leagues.map((l) => (
-              <li
-                key={l.id}
-                className="flex items-center gap-2 rounded-md border border-puck-border bg-puck-card"
-              >
-                <Link
-                  href={`/leagues/${l.id}`}
-                  className="flex min-w-0 flex-1 flex-col px-4 py-3 hover:bg-puck-border/40"
+            {leagues.map((l) => {
+              const isCommish = l.commissioner_id === user.id;
+              const hasAction = isCommish || Boolean(l.team);
+              return (
+                <li
+                  key={l.id}
+                  className="flex items-center gap-2 rounded-md border border-puck-border bg-puck-card"
                 >
-                  <span className="truncate text-base font-semibold text-ice-50">
-                    {l.name}
-                  </span>
-                  <span className="truncate text-xs text-ice-400">
-                    Season {l.season} &middot;{" "}
-                    {l.draft_status.replace("_", " ")}
-                    {l.commissioner_id === user.id && " · commissioner"}
-                  </span>
-                </Link>
-                <div className="flex-shrink-0 pr-2">
-                  {l.commissioner_id === user.id ? (
-                    <Link href={`/leagues/${l.id}/admin#delete-league`}>
-                      <Button size="sm" variant="danger">
-                        Delete
-                      </Button>
-                    </Link>
-                  ) : (
-                    l.team && (
-                      <Link href={`/leagues/${l.id}#leave-league`}>
-                        <Button size="sm" variant="danger">
-                          Leave
-                        </Button>
-                      </Link>
-                    )
+                  <Link
+                    href={`/leagues/${l.id}`}
+                    className="flex min-w-0 flex-1 flex-col px-4 py-3 hover:bg-puck-border/40"
+                  >
+                    <span className="truncate text-base font-semibold text-ice-50">
+                      {l.name}
+                    </span>
+                    <span className="truncate text-xs text-ice-400">
+                      Season {l.season} &middot;{" "}
+                      {l.draft_status.replace("_", " ")}
+                      {isCommish && " · commissioner"}
+                    </span>
+                  </Link>
+                  {hasAction && (
+                    <div className="flex-shrink-0 pr-2">
+                      <RowMenu>
+                        {isCommish ? (
+                          <Link
+                            href={`/leagues/${l.id}/admin#delete-league`}
+                            role="menuitem"
+                            className="block rounded px-3 py-2 text-sm text-red-300 hover:bg-puck-border"
+                          >
+                            Delete league
+                          </Link>
+                        ) : (
+                          l.team && (
+                            <Link
+                              href={`/leagues/${l.id}#leave-league`}
+                              role="menuitem"
+                              className="block rounded px-3 py-2 text-sm text-red-300 hover:bg-puck-border"
+                            >
+                              Leave league
+                            </Link>
+                          )
+                        )}
+                      </RowMenu>
+                    </div>
                   )}
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </main>

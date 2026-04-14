@@ -545,6 +545,7 @@ export default async function AdminPage({
         displayName={profile?.display_name ?? user.email ?? "Player"}
         leagueId={leagueId}
         draftStatus={league.draft_status}
+        isCommissioner={true}
       />
       <main className="mx-auto max-w-5xl px-6 py-10 space-y-6">
         <div>

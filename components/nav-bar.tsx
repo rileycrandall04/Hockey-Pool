@@ -20,6 +20,12 @@ interface NavBarProps {
    * complete, and to swap its target URL accordingly.
    */
   draftStatus?: DraftStatus;
+  /**
+   * Set when the viewing user is the commissioner of the current
+   * league. Adds an Admin item to the dropdown pointing at
+   * /leagues/{leagueId}/admin.
+   */
+  isCommissioner?: boolean;
 }
 
 /**
@@ -38,7 +44,12 @@ interface NavBarProps {
  *
  * The dropdown closes on route change, Escape, and click-outside.
  */
-export function NavBar({ displayName, leagueId, draftStatus }: NavBarProps) {
+export function NavBar({
+  displayName,
+  leagueId,
+  draftStatus,
+  isCommissioner = false,
+}: NavBarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -110,6 +121,13 @@ export function NavBar({ displayName, leagueId, draftStatus }: NavBarProps) {
       href: `/leagues/${leagueId}`,
       label: "Standings",
       active: isActive(`/leagues/${leagueId}`, true),
+    });
+  }
+  if (leagueId && isCommissioner) {
+    items.push({
+      href: `/leagues/${leagueId}/admin`,
+      label: "Admin",
+      active: isActive(`/leagues/${leagueId}/admin`),
     });
   }
 

@@ -7,6 +7,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DailyTicker } from "@/components/daily-ticker";
 import { scoreTeam } from "@/lib/scoring";
+import { getOvernightDeltas } from "@/lib/snapshot-standings";
 import type { League, RosterEntry, Team } from "@/lib/types";
 
 /**
@@ -154,6 +155,16 @@ export default async function LeagueStandingsPage({
     rosterByTeam.set(row.team_id, arr);
   }
 
+  // Overnight deltas for the up/down/fire indicators. Returns null
+  // until we have at least two snapshot dates for this league.
+  const overnight = await getOvernightDeltas(leagueId);
+  const deltas = overnight?.deltas ?? null;
+  const leagueAvgDelta = overnight?.leagueAvgDeltaPoints ?? 0;
+  // "Hot" threshold: scored >= 130% of the league average overnight.
+  // Require the league to actually have scored something so a zero
+  // average doesn't light every team up.
+  const hotThreshold = leagueAvgDelta > 0 ? leagueAvgDelta * 1.3 : null;
+
   // For each team: compute the scored lineup + bench, then sort BOTH
   // by playoff fantasy points desc so the dropdown view shows them in
   // pool-points order (highest contributors first, lowest at the
@@ -192,34 +203,26 @@ export default async function LeagueStandingsPage({
         displayName={profile?.display_name ?? user.email ?? "Player"}
         leagueId={leagueId}
         draftStatus={league.draft_status}
+        isCommissioner={isCommissioner}
       />
       <DailyTicker />
       <main className="mx-auto max-w-5xl px-6 py-10">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-ice-50">{league.name}</h1>
-            <p className="text-sm text-ice-300">
-              Season {league.season} &middot; Join code{" "}
-              <span className="rounded bg-puck-card px-1.5 py-0.5 font-mono text-ice-100">
-                {league.join_code}
-              </span>{" "}
-              &middot; Draft: {league.draft_status.replace("_", " ")}
-            </p>
-          </div>
-          <div className="flex gap-2">
+        <div className="mb-6 flex flex-col items-center gap-2 text-center">
+          <h1 className="text-3xl font-bold text-ice-50">{league.name}</h1>
+          <p className="text-sm text-ice-300">
+            Season {league.season} &middot; Join code{" "}
+            <span className="rounded bg-puck-card px-1.5 py-0.5 font-mono text-ice-100">
+              {league.join_code}
+            </span>{" "}
+            &middot; Draft: {league.draft_status.replace("_", " ")}
+          </p>
+          {league.draft_status !== "complete" && (
             <Link href={`/leagues/${league.id}/draft`}>
               <Button size="sm" variant="secondary">
                 Draft room
               </Button>
             </Link>
-            {league.commissioner_id === user.id && (
-              <Link href={`/leagues/${league.id}/admin`}>
-                <Button size="sm" variant="ghost">
-                  Admin
-                </Button>
-              </Link>
-            )}
-          </div>
+          )}
         </div>
 
         {standings.length === 0 ? (
@@ -234,20 +237,59 @@ export default async function LeagueStandingsPage({
           </Card>
         ) : (
           <div className="space-y-2">
-            {standings.map((row, i) => (
+            {standings.map((row, i) => {
+              const delta = deltas?.get(row.team.id) ?? null;
+              const movedUp = delta ? delta.delta_rank > 0 : false;
+              const movedDown = delta ? delta.delta_rank < 0 : false;
+              const hot =
+                delta != null &&
+                hotThreshold != null &&
+                delta.delta_points >= hotThreshold &&
+                delta.delta_points > 0;
+              const rankTitle = delta
+                ? `Was #${delta.rank_from} yesterday (${delta.delta_points >= 0 ? "+" : ""}${delta.delta_points} pts overnight)`
+                : undefined;
+              return (
               <details
                 key={row.team.id}
                 className="group rounded-md border border-puck-border bg-puck-card"
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 hover:bg-puck-border/40 [&::-webkit-details-marker]:hidden">
-                  <span className="flex min-w-0 items-center gap-3">
-                    <span className="inline-block w-6 text-right text-ice-400 transition-transform group-open:rotate-90">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="inline-block w-4 text-right text-ice-400 transition-transform group-open:rotate-90">
                       ▶
                     </span>
                     <span className="text-ice-400">{i + 1}.</span>
+                    {movedUp && (
+                      <span
+                        title={rankTitle}
+                        aria-label="Moved up overnight"
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-green-500/20 text-[10px] font-bold text-green-300"
+                      >
+                        ▲
+                      </span>
+                    )}
+                    {movedDown && (
+                      <span
+                        title={rankTitle}
+                        aria-label="Moved down overnight"
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-red-500/20 text-[10px] font-bold text-red-300"
+                      >
+                        ▼
+                      </span>
+                    )}
                     <span className="truncate font-medium text-ice-50">
                       {row.team.name}
                     </span>
+                    {hot && (
+                      <span
+                        title={`Hot streak: +${delta?.delta_points} pts overnight, ${leagueAvgDelta.toFixed(1)} avg`}
+                        aria-label="On a hot streak"
+                        className="flex-shrink-0"
+                      >
+                        🔥
+                      </span>
+                    )}
                   </span>
                   <span className="flex-shrink-0 text-lg font-bold text-ice-50">
                     {row.total}
@@ -268,7 +310,8 @@ export default async function LeagueStandingsPage({
                   )}
                 </div>
               </details>
-            ))}
+              );
+            })}
           </div>
         )}
 

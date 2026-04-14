@@ -35,19 +35,22 @@ export default async function DraftPage({
     .eq("league_id", leagueId)
     .order("draft_position", { ascending: true, nullsFirst: false });
 
+  const isCommissioner = league.commissioner_id === user.id;
+
   return (
     <>
       <NavBar
         displayName={profile?.display_name ?? user.email ?? "Player"}
         leagueId={leagueId}
         draftStatus={league.draft_status}
+        isCommissioner={isCommissioner}
       />
       <main className="mx-auto max-w-6xl px-2 py-6 sm:px-4">
         <DraftRoom
           league={league}
           teams={(teams ?? []) as Team[]}
           currentUserId={user.id}
-          isCommissioner={league.commissioner_id === user.id}
+          isCommissioner={isCommissioner}
         />
       </main>
     </>
