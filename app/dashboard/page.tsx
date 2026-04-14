@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +33,8 @@ export default async function DashboardPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const canRefreshNhlData = isAppOwner(user.email);
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -125,15 +128,17 @@ export default async function DashboardPage({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <form
-              action="/api/admin/reseed"
-              method="post"
-              title="Refreshes player rosters + season stats from the NHL API. The data is shared across every user — you only need to do this once for the whole pool, and the nightly cron handles it automatically."
-            >
-              <Button type="submit" variant="secondary">
-                ↻ Refresh NHL data
-              </Button>
-            </form>
+            {canRefreshNhlData && (
+              <form
+                action="/api/admin/reseed"
+                method="post"
+                title="Refreshes player rosters + season stats from the NHL API. The data is shared across every user — you only need to do this once for the whole pool, and the nightly cron handles it automatically."
+              >
+                <Button type="submit" variant="secondary">
+                  ↻ Refresh NHL data
+                </Button>
+              </form>
+            )}
             <Link href="/leagues/join">
               <Button variant="secondary">Join league</Button>
             </Link>

@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { teamOnTheClock, pickMeta } from "@/lib/draft";
+import { isAppOwner } from "@/lib/auth";
 import type { League, RosterEntry, Team } from "@/lib/types";
 
 async function assertCommissioner(leagueId: string) {
@@ -440,6 +441,7 @@ export default async function AdminPage({
   const { leagueId } = await params;
   const { reset_error, reset_success, delete_error } = await searchParams;
   const { league, user } = await assertCommissioner(leagueId);
+  const canRefreshNhlData = isAppOwner(user.email);
 
   const supabase = await createClient();
   const { data: profile } = await supabase
@@ -579,21 +581,32 @@ export default async function AdminPage({
               />
             </dl>
             <div className="flex flex-wrap gap-2">
-              <form action="/api/admin/reseed" method="post">
-                <Button type="submit">↻ Refresh NHL data now</Button>
-              </form>
+              {canRefreshNhlData && (
+                <form action="/api/admin/reseed" method="post">
+                  <Button type="submit">↻ Refresh NHL data now</Button>
+                </form>
+              )}
               <Link href="/debug/nhl">
                 <Button variant="secondary">Debug NHL endpoints</Button>
               </Link>
             </div>
-            <p className="mt-2 text-xs text-ice-500">
-              Refresh takes ~30–60 seconds. It pulls every NHL team
-              roster + this season&rsquo;s point totals + injuries.
-              The data is <strong>shared across every user</strong> —
-              you only need to tap this once for the whole pool, and
-              the nightly 6am cron handles it automatically. Other
-              users don&rsquo;t need to refresh on their end.
-            </p>
+            {canRefreshNhlData ? (
+              <p className="mt-2 text-xs text-ice-500">
+                Refresh takes ~30–60 seconds. It pulls every NHL team
+                roster + this season&rsquo;s point totals + injuries.
+                The data is <strong>shared across every user</strong> —
+                you only need to tap this once for the whole pool, and
+                the nightly 6am cron handles it automatically. Other
+                users don&rsquo;t need to refresh on their end.
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-ice-500">
+                The data above is shared across every user. The nightly
+                6am cron refreshes it automatically; the app owner can
+                also force a refresh at any time. You don&rsquo;t need
+                to do anything to keep your view current.
+              </p>
+            )}
           </CardContent>
         </Card>
 
