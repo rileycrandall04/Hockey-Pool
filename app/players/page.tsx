@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { NavBar } from "@/components/nav-bar";
 import { Card, CardContent } from "@/components/ui/card";
+import { DailyTicker } from "@/components/daily-ticker";
 import { InjuryBadge } from "@/components/injury-badge";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +73,7 @@ export default async function PlayersIndexPage({
   return (
     <>
       <NavBar displayName={profile?.display_name ?? user.email ?? "Player"} />
+      <DailyTicker />
       <main className="mx-auto max-w-5xl px-4 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-ice-50">Players</h1>

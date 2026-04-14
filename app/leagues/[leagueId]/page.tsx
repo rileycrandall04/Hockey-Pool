@@ -5,6 +5,7 @@ import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DailyTicker } from "@/components/daily-ticker";
 import { scoreTeam } from "@/lib/scoring";
 import type { League, RosterEntry, Team } from "@/lib/types";
 
@@ -192,6 +193,7 @@ export default async function LeagueStandingsPage({
         leagueId={leagueId}
         draftStatus={league.draft_status}
       />
+      <DailyTicker />
       <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>

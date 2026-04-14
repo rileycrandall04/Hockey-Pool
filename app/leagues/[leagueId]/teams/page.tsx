@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { DailyTicker } from "@/components/daily-ticker";
 import { scoreTeam } from "@/lib/scoring";
 import type { League, RosterEntry, Team } from "@/lib/types";
 
@@ -112,6 +113,7 @@ export default async function LeagueTeamsPage({
         leagueId={leagueId}
         draftStatus={league.draft_status}
       />
+      <DailyTicker />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-ice-50">Teams</h1>
