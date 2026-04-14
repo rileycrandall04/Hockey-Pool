@@ -124,8 +124,12 @@ export default async function DashboardPage({
               Draft, manage, and track every Stanley Cup pool you&rsquo;re in.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <form action="/api/admin/reseed" method="post">
+          <div className="flex flex-wrap items-center gap-2">
+            <form
+              action="/api/admin/reseed"
+              method="post"
+              title="Refreshes player rosters + season stats from the NHL API. The data is shared across every user — you only need to do this once for the whole pool, and the nightly cron handles it automatically."
+            >
               <Button type="submit" variant="secondary">
                 ↻ Refresh NHL data
               </Button>

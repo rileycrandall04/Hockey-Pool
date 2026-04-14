@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,8 @@ export function DraftRoom({
   );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // "granted" | "denied" | "default" | "unsupported"
+  const [notifyPermission, setNotifyPermission] = useState<string>("default");
 
   // ---- initial data load --------------------------------------------------
   useEffect(() => {
@@ -213,6 +215,37 @@ export function DraftRoom({
     };
   }, [supabase, league.id]);
 
+  // ---- turn notifications -------------------------------------------------
+  // On mount, snapshot the current notification permission so we can show
+  // the right opt-in / on / off state in the UI.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (typeof Notification === "undefined") {
+      setNotifyPermission("unsupported");
+    } else {
+      setNotifyPermission(Notification.permission);
+    }
+  }, []);
+
+  const requestNotifyPermission = useCallback(async () => {
+    if (typeof Notification === "undefined") {
+      setMessage("Browser notifications aren't supported on this device.");
+      return;
+    }
+    const result = await Notification.requestPermission();
+    setNotifyPermission(result);
+    if (result === "granted") {
+      // Fire a confirmation ping so the user knows it's wired up.
+      try {
+        new Notification("🏒 Notifications on", {
+          body: "We'll buzz you when it's your pick.",
+          tag: `draft-confirm-${league.id}`,
+        });
+      } catch {
+        // Some browsers reject the immediate call — that's fine.
+      }
+    }
+  }, [league.id]);
   // ---- derived state ------------------------------------------------------
   const pickedPlayerIds = useMemo(
     () => new Set(picks.map((p) => p.player_id)),
@@ -227,6 +260,37 @@ export function DraftRoom({
       ? teamOnTheClock(teams, currentPickIndex)
       : null;
   const isMyTurn = onClockTeam?.owner_id === currentUserId;
+
+  // Fire a vibration + browser notification on the false→true
+  // transition. Keeping the previous value in a ref avoids re-firing
+  // on every re-render while it's already our turn.
+  const wasMyTurnRef = useRef(false);
+  useEffect(() => {
+    const wasMyTurn = wasMyTurnRef.current;
+    wasMyTurnRef.current = isMyTurn;
+    if (wasMyTurn || !isMyTurn || draftOver) return;
+    if (league.draft_status !== "in_progress") return;
+
+    // Vibration: Android browsers only, no-op everywhere else.
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate([200, 100, 200, 100, 400]);
+    }
+
+    // Browser notification: only if the user opted in.
+    if (
+      typeof Notification !== "undefined" &&
+      Notification.permission === "granted"
+    ) {
+      try {
+        new Notification("🏒 You're on the clock!", {
+          body: `It's your pick in ${league.name}.`,
+          tag: `draft-${league.id}`,
+        });
+      } catch {
+        // Throw is non-fatal; the toast banner below still flags it.
+      }
+    }
+  }, [isMyTurn, draftOver, league.id, league.name, league.draft_status]);
 
   const filteredPlayers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -423,6 +487,33 @@ export function DraftRoom({
       {message && (
         <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
           {message}
+        </div>
+      )}
+
+      {notifyPermission === "default" && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-puck-border bg-puck-card px-3 py-2 text-sm">
+          <span className="text-ice-300">
+            🔔 Get a buzz + notification when it&rsquo;s your pick.
+          </span>
+          <button
+            type="button"
+            onClick={requestNotifyPermission}
+            className="rounded-md bg-ice-500 px-3 py-1 text-xs font-medium text-white hover:bg-ice-600"
+          >
+            Enable notifications
+          </button>
+        </div>
+      )}
+      {notifyPermission === "granted" && (
+        <div className="rounded-md border border-puck-border bg-puck-card px-3 py-2 text-xs text-ice-400">
+          🔔 Turn alerts on. We&rsquo;ll vibrate + notify when you&rsquo;re on the clock.
+        </div>
+      )}
+      {notifyPermission === "denied" && (
+        <div className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+          🔕 Notifications are blocked for this site. Re-enable them in
+          your browser&rsquo;s site settings to get turn alerts.
+          (Vibration on Android still works without permission.)
         </div>
       )}
 

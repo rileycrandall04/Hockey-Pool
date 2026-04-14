@@ -589,6 +589,10 @@ export default async function AdminPage({
             <p className="mt-2 text-xs text-ice-500">
               Refresh takes ~30–60 seconds. It pulls every NHL team
               roster + this season&rsquo;s point totals + injuries.
+              The data is <strong>shared across every user</strong> —
+              you only need to tap this once for the whole pool, and
+              the nightly 6am cron handles it automatically. Other
+              users don&rsquo;t need to refresh on their end.
             </p>
           </CardContent>
         </Card>
