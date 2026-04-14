@@ -37,7 +37,11 @@ export default async function DraftPage({
 
   return (
     <>
-      <NavBar displayName={profile?.display_name ?? user.email ?? "Player"} />
+      <NavBar
+        displayName={profile?.display_name ?? user.email ?? "Player"}
+        leagueId={leagueId}
+        draftStatus={league.draft_status}
+      />
       <main className="mx-auto max-w-6xl px-4 py-6">
         <DraftRoom
           league={league}

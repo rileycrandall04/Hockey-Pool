@@ -187,7 +187,11 @@ export default async function LeagueStandingsPage({
 
   return (
     <>
-      <NavBar displayName={profile?.display_name ?? user.email ?? "Player"} />
+      <NavBar
+        displayName={profile?.display_name ?? user.email ?? "Player"}
+        leagueId={leagueId}
+        draftStatus={league.draft_status}
+      />
       <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
