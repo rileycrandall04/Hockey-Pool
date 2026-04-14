@@ -320,7 +320,17 @@ export function DraftRoom({
   };
 
   const handleStartDraft = async () => {
-    await post("/api/draft/start", { league_id: league.id });
+    const result = await post<{ league: League; teams: Team[] }>(
+      "/api/draft/start",
+      { league_id: league.id },
+    );
+    if (!result?.league) return;
+    // Optimistically flip to the live draft view immediately. Realtime
+    // UPDATE events will eventually arrive too, but the local update
+    // makes sure the commissioner sees the page transition the moment
+    // the API responds — even if Realtime is slow or not propagating.
+    setLeague(result.league);
+    if (result.teams) setTeams(result.teams);
   };
 
   const handleAutoPick = async () => {

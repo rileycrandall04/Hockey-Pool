@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       .eq("id", order[i].id);
   }
 
-  await svc
+  const { data: updatedLeague, error: updateError } = await svc
     .from("leagues")
     .update({
       draft_status: "in_progress",
@@ -67,7 +67,28 @@ export async function POST(request: Request) {
       draft_current_team: order[0].id,
       draft_round: 1,
     })
-    .eq("id", league_id);
+    .eq("id", league_id)
+    .select("*")
+    .single();
+  if (updateError || !updatedLeague) {
+    return NextResponse.json(
+      { error: updateError?.message ?? "Failed to start draft" },
+      { status: 500 },
+    );
+  }
 
-  return NextResponse.json({ ok: true });
+  // Re-read the teams with the freshly assigned draft_position so the
+  // client can update its local state immediately, without waiting for
+  // a Realtime UPDATE event to round-trip from Postgres.
+  const { data: orderedTeams } = await svc
+    .from("teams")
+    .select("*")
+    .eq("league_id", league_id)
+    .order("draft_position", { ascending: true, nullsFirst: false });
+
+  return NextResponse.json({
+    ok: true,
+    league: updatedLeague,
+    teams: orderedTeams ?? order,
+  });
 }
