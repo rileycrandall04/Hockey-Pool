@@ -33,29 +33,31 @@ export interface SyncInjuriesResult {
  * ------------
  *
  *   Phase 1: fetch from NHL API (rate-limited)
- *     - Concurrency 2 with a 150ms pause between batches
- *     - One retry on 429 with a 1.5s backoff
+ *     - FULLY SEQUENTIAL — concurrency 1 with an 800ms pause after
+ *       every request. The NHL public API rate-limits aggressively
+ *       on burst traffic; even concurrency=2 with 150ms pauses got
+ *       ~30% 429 rejections in production. ~1.25 req/sec steady
+ *       state has tested clean.
+ *     - One retry on 429 with a 3s backoff (give the API time to
+ *       cool down)
  *     - 404 -> "no injury data" (prospects / AHL / inactive)
  *     - All results collected into an in-memory `pendingUpdates` array
- *     - Hard time budget: stop fetching at 45s elapsed
+ *     - Hard time budget: stop fetching at 50s elapsed
  *
- *   Phase 2: write back to Supabase (parallel)
- *     - All accumulated updates fired in parallel chunks of 10
- *     - This is the critical optimization vs the previous version,
- *       which was running 150 sequential UPDATEs serialized inside
- *       the fetch loop and stacking ~20s of DB latency on top of
- *       the ~30s of NHL API time, causing 504 timeouts at 60s.
+ *   Phase 2: write back to Supabase (parallel chunks)
+ *     - All accumulated updates fired in parallel chunks of 10 so DB
+ *       latency is amortized
  *
  * Rotation
  * --------
  *
- * The SELECT orders by injury_updated_at ASC NULLS FIRST so each
- * run picks the staleest players first. EVERY successful check
- * stamps injury_updated_at = now() so subsequent runs rotate
- * through different slices of the pool. Over 5-6 daily cron runs
- * we cycle through every active player.
+ * The SELECT orders by injury_updated_at ASC NULLS FIRST so each run
+ * picks the staleest players first. EVERY successful check stamps
+ * injury_updated_at = now() so subsequent runs rotate through different
+ * slices of the pool. With limit=40 and a daily cron, an 800-player
+ * pool cycles in ~20 days.
  */
-export async function syncInjuries(limit = 150): Promise<SyncInjuriesResult> {
+export async function syncInjuries(limit = 40): Promise<SyncInjuriesResult> {
   const start = Date.now();
   const svc = createServiceClient();
 
@@ -83,13 +85,15 @@ export async function syncInjuries(limit = 150): Promise<SyncInjuriesResult> {
     return result;
   }
 
-  // Conservative pacing for the NHL public API.
-  const concurrency = 2;
-  const pauseBetweenBatchesMs = 150;
-  const retryDelayMs = 1500;
+  // Pacing tuned for the NHL public API's burst rate-limit. Concurrency
+  // > 1 gets us 429ed within ~80 requests; staying at 1 with an 800ms
+  // pause after each call (~1.25 req/sec steady state) is the sweet
+  // spot in our production testing.
+  const pauseBetweenRequestsMs = 800;
+  const retryDelayMs = 3000;
   // Stop fetching at this elapsed time so the write phase can still
   // finish inside the 60s serverless function timeout.
-  const fetchBudgetMs = 45_000;
+  const fetchBudgetMs = 50_000;
 
   type PendingUpdate = {
     id: number;
@@ -109,70 +113,57 @@ export async function syncInjuries(limit = 150): Promise<SyncInjuriesResult> {
   };
 
   // -------------------------------------------------------------------
-  // Phase 1: fetch
+  // Phase 1: fetch (one player at a time, paced)
   // -------------------------------------------------------------------
-  for (let i = 0; i < activePlayers.length; i += concurrency) {
+  for (let i = 0; i < activePlayers.length; i++) {
     if (Date.now() - start > fetchBudgetMs) {
       result.truncated = true;
       break;
     }
 
-    const batch = activePlayers.slice(i, i + concurrency);
-    const responses = await Promise.all(
-      batch.map(async (p) => ({
-        id: p.id as number,
-        was: (p.injury_status as string | null) ?? null,
-        info: await fetchWithRetry(p.id as number),
-      })),
-    );
+    const p = activePlayers[i];
+    const id = p.id as number;
+    const was = (p.injury_status as string | null) ?? null;
+    const info = await fetchWithRetry(id);
 
-    for (const r of responses) {
-      result.checked += 1;
+    result.checked += 1;
 
-      // 404 = no landing record; treat as "healthy".
-      if (
-        r.info.source === "error" &&
-        (r.info.error?.includes("404") ?? false)
-      ) {
-        pendingUpdates.push({
-          id: r.id,
-          injury_status: null,
-          injury_description: null,
-          classification: r.was !== null ? "cleared" : "unchanged",
-        });
-        continue;
+    // 404 = no landing record; treat as "healthy".
+    if (info.source === "error" && (info.error?.includes("404") ?? false)) {
+      pendingUpdates.push({
+        id,
+        injury_status: null,
+        injury_description: null,
+        classification: was !== null ? "cleared" : "unchanged",
+      });
+    } else if (info.source === "error") {
+      result.errors += 1;
+      if (sampleErrorSet.size < 5) {
+        const generic = (info.error ?? "unknown error").replace(
+          /\/player\/\d+\/landing/,
+          "/player/{id}/landing",
+        );
+        sampleErrorSet.add(generic);
       }
-
-      if (r.info.source === "error") {
-        result.errors += 1;
-        if (sampleErrorSet.size < 5) {
-          const generic = (r.info.error ?? "unknown error").replace(
-            /\/player\/\d+\/landing/,
-            "/player/{id}/landing",
-          );
-          sampleErrorSet.add(generic);
-        }
-        continue;
-      }
-
-      const newStatus = r.info.status;
-      const newDescription = r.info.description;
+    } else {
+      const newStatus = info.status;
+      const newDescription = info.description;
       let classification: PendingUpdate["classification"];
-      if (newStatus === r.was) classification = "unchanged";
+      if (newStatus === was) classification = "unchanged";
       else if (newStatus) classification = "flagged";
       else classification = "cleared";
 
       pendingUpdates.push({
-        id: r.id,
+        id,
         injury_status: newStatus,
         injury_description: newDescription,
         classification,
       });
     }
 
-    // Pause between batches — but skip the pause on the last iteration.
-    if (i + concurrency < activePlayers.length) {
-      await sleep(pauseBetweenBatchesMs);
+    // Pace the API. Skip the pause on the last iteration.
+    if (i < activePlayers.length - 1) {
+      await sleep(pauseBetweenRequestsMs);
     }
   }
 

@@ -10,11 +10,21 @@ import type { Position } from "./types";
 
 const BASE = process.env.NHL_API_BASE ?? "https://api-web.nhle.com/v1";
 
+// Identify ourselves with a real User-Agent. Node's default fetch UA
+// is sometimes treated as bot traffic and rate-limited harder than
+// browser-shaped requests; a descriptive UA signals "real app" and
+// often gets more lenient treatment from public APIs.
+const USER_AGENT =
+  "stanley-cup-pool/1.0 (+https://hockey-pool-zeta.vercel.app)";
+
 async function nhlFetch<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     // Cache briefly so cron retries don't hammer the API.
     next: { revalidate: 60 },
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      "User-Agent": USER_AGENT,
+    },
   });
   if (!res.ok) {
     throw new Error(`NHL API ${path} failed: ${res.status} ${res.statusText}`);
