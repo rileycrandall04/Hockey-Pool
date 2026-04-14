@@ -7,6 +7,13 @@ export interface SyncInjuriesResult {
   cleared: number;
   unchanged: number;
   errors: number;
+  /**
+   * Up to 5 unique error messages from the failed fetches. Useful
+   * when a large fraction of the batch errors out and we want to
+   * see what the NHL API is actually telling us without trawling
+   * Vercel logs from a phone.
+   */
+  sample_errors: string[];
   duration_ms: number;
 }
 
@@ -40,8 +47,10 @@ export async function syncInjuries(limit = 200): Promise<SyncInjuriesResult> {
     cleared: 0,
     unchanged: 0,
     errors: 0,
+    sample_errors: [],
     duration_ms: 0,
   };
+  const sampleErrorSet = new Set<string>();
 
   if (!activePlayers || activePlayers.length === 0) {
     result.duration_ms = Date.now() - start;
@@ -65,6 +74,18 @@ export async function syncInjuries(limit = 200): Promise<SyncInjuriesResult> {
       result.checked += 1;
       if (r.info.source === "error") {
         result.errors += 1;
+        if (sampleErrorSet.size < 5) {
+          // Strip the player-specific path so we count duplicates of
+          // "404 Not Found" together regardless of which player ID
+          // produced it. Keep the first 5 distinct messages.
+          const generic = (r.info.error ?? "unknown error").replace(
+            /\/player\/\d+\/landing/,
+            "/player/{id}/landing",
+          );
+          if (!sampleErrorSet.has(generic)) {
+            sampleErrorSet.add(generic);
+          }
+        }
         continue;
       }
       const newStatus = r.info.status;
@@ -94,6 +115,7 @@ export async function syncInjuries(limit = 200): Promise<SyncInjuriesResult> {
     }
   }
 
+  result.sample_errors = [...sampleErrorSet];
   result.duration_ms = Date.now() - start;
   return result;
 }

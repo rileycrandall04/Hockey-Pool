@@ -23,12 +23,19 @@ export default async function DashboardPage({
     seeded?: string;
     seed_error?: string;
     seed_warning?: string;
+    sync_errors?: string;
     left?: string;
     league_deleted?: string;
   }>;
 }) {
-  const { seeded, seed_error, seed_warning, left, league_deleted } =
-    await searchParams;
+  const {
+    seeded,
+    seed_error,
+    seed_warning,
+    sync_errors,
+    left,
+    league_deleted,
+  } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -85,6 +92,20 @@ export default async function DashboardPage({
         {seed_warning && (
           <div className="mb-4 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
             ⚠️ {seed_warning}
+          </div>
+        )}
+        {sync_errors && (
+          <div className="mb-4 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-xs text-yellow-200">
+            <div className="mb-1 font-semibold uppercase tracking-wider text-yellow-300">
+              Sample sync errors
+            </div>
+            <ul className="list-disc space-y-0.5 pl-4 font-mono">
+              {sync_errors.split(" || ").map((msg, i) => (
+                <li key={i} className="break-all">
+                  {msg}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
         {seed_error && (

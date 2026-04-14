@@ -55,6 +55,12 @@ export async function POST(request: Request) {
       "seeded",
       `Injury sync · ${parts.join(" · ")} (${(result.duration_ms / 1000).toFixed(1)}s)`,
     );
+    if (result.sample_errors.length > 0) {
+      url.searchParams.set(
+        "sync_errors",
+        result.sample_errors.join(" || "),
+      );
+    }
     return NextResponse.redirect(url, { status: 303 });
   } catch (err) {
     const url = new URL("/dashboard", request.url);
