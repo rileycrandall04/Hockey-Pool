@@ -299,37 +299,73 @@ export interface NhlSeasonStat {
   gamesPlayed: number;
 }
 
+export interface TeamStatsResult {
+  rows: NhlSeasonStat[];
+  source: "season" | "now" | "none";
+  error?: string;
+}
+
+function parseSkaters(data: NhlClubStatsResponse): NhlSeasonStat[] {
+  const skaters = data.skaters ?? [];
+  return skaters.map((s) => ({
+    playerId: s.playerId,
+    goals: s.goals ?? 0,
+    assists: s.assists ?? 0,
+    points: s.points ?? ((s.goals ?? 0) + (s.assists ?? 0)),
+    gamesPlayed: s.gamesPlayed ?? 0,
+  }));
+}
+
 /**
- * Fetch every player's regular-season stats for a team in one request.
+ * Fetch every skater's regular-season stats for a team.
  *
- *   abbrev: team abbreviation, e.g. "TOR"
- *   season: NHL season string, e.g. "20242025" (no dash)
+ * Strategy:
+ *   1. Try the explicit season endpoint:
+ *        /club-stats/{abbrev}/{season}/2     (gameType 2 = regular season)
+ *      This is the documented path on the public NHL API.
+ *   2. If that returns 0 skaters or errors, fall back to the "current"
+ *      alias which doesn't require us to compute a season string:
+ *        /club-stats/{abbrev}/now
+ *      The "now" endpoint sometimes works for teams the season-specific
+ *      one doesn't, especially around offseason / playoff transitions.
+ *   3. If both fail, return source="none" with the error message so
+ *      callers (the seeder, the debug page) can show it to the user
+ *      instead of silently dropping the team's data.
  *
- * Endpoint: /club-stats/{abbrev}/{season}/2  (gameType 2 = regular season)
- *
- * Returns an empty array if the endpoint fails — the caller is expected
- * to fall back to whatever season_points it already had stored.
+ * Returns the rows + which source was used + the last error if any.
  */
 export async function fetchTeamSeasonStats(
   abbrev: string,
   season: string,
-): Promise<NhlSeasonStat[]> {
+): Promise<TeamStatsResult> {
+  let lastError: string | undefined;
+
+  // Attempt 1: explicit season + gameType
   try {
     const data = await nhlFetch<NhlClubStatsResponse>(
       `/club-stats/${abbrev}/${season}/2`,
     );
-    const skaters = data.skaters ?? [];
-    return skaters.map((s) => ({
-      playerId: s.playerId,
-      goals: s.goals ?? 0,
-      assists: s.assists ?? 0,
-      points:
-        s.points ?? ((s.goals ?? 0) + (s.assists ?? 0)),
-      gamesPlayed: s.gamesPlayed ?? 0,
-    }));
-  } catch {
-    return [];
+    const rows = parseSkaters(data);
+    if (rows.length > 0) return { rows, source: "season" };
+    lastError = `season endpoint returned 0 skaters`;
+  } catch (err) {
+    lastError = err instanceof Error ? err.message : String(err);
   }
+
+  // Attempt 2: "now" alias
+  try {
+    const data = await nhlFetch<NhlClubStatsResponse>(
+      `/club-stats/${abbrev}/now`,
+    );
+    const rows = parseSkaters(data);
+    if (rows.length > 0) return { rows, source: "now" };
+    lastError = `now endpoint returned 0 skaters (previous: ${lastError})`;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    lastError = `${msg} (previous: ${lastError})`;
+  }
+
+  return { rows: [], source: "none", error: lastError };
 }
 
 /**

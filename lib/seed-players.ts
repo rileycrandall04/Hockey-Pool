@@ -48,21 +48,35 @@ export async function seedPlayers(abbrevs?: string[]) {
   const season = currentSeason();
   let totalPlayers = 0;
   let playersWithSeasonStats = 0;
-  const teamsWithoutStats: string[] = [];
+
+  type PerTeamStatus = {
+    abbrev: string;
+    roster_count: number;
+    stats_count: number;
+    source: "season" | "now" | "none";
+    error?: string;
+  };
+  const perTeam: PerTeamStatus[] = [];
 
   for (const t of teamsToInsert) {
-    const [roster, seasonStats] = await Promise.all([
+    const [roster, statsResult] = await Promise.all([
       fetchTeamRoster(t.abbrev),
       fetchTeamSeasonStats(t.abbrev, season),
     ]);
     const teamId = teamIdByAbbrev.get(t.abbrev);
     if (!teamId) continue;
 
-    if (seasonStats.length === 0 && roster.length > 0) {
-      teamsWithoutStats.push(t.abbrev);
-    }
+    perTeam.push({
+      abbrev: t.abbrev,
+      roster_count: roster.length,
+      stats_count: statsResult.rows.length,
+      source: statsResult.source,
+      error: statsResult.error,
+    });
 
-    const seasonByPlayer = new Map(seasonStats.map((s) => [s.playerId, s]));
+    const seasonByPlayer = new Map(
+      statsResult.rows.map((s) => [s.playerId, s]),
+    );
 
     const rows = roster.map((p) => {
       const s = seasonByPlayer.get(p.id);
@@ -101,11 +115,16 @@ export async function seedPlayers(abbrevs?: string[]) {
     totalPlayers += rows.length;
   }
 
+  const teamsWithoutStats = perTeam
+    .filter((t) => t.source === "none" && t.roster_count > 0)
+    .map((t) => t.abbrev);
+
   return {
     teams: teamsToInsert.length,
     players: totalPlayers,
     players_with_season_stats: playersWithSeasonStats,
     season_used: season,
     teams_without_stats: teamsWithoutStats,
+    per_team: perTeam,
   };
 }

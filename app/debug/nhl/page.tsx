@@ -18,20 +18,15 @@ import {
 } from "@/lib/nhl-api";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /**
  * Live NHL endpoint debug page.
  *
  * Hits each of the public NHL API endpoints we depend on and shows a
- * human-readable summary of what came back. Useful for verifying that:
- *   - The season string we compute is the right one for "right now"
- *   - The /club-stats/{abbrev}/{season}/2 endpoint actually returns
- *     skater rows for the current season
- *   - The injury and standings endpoints are reachable
- *
- * Auth: any signed-in user. No commissioner gate because this is
- * read-only and useful for any league member to confirm data is fresh.
+ * human-readable summary of what came back. Includes a per-team
+ * matrix that runs the season-stats fetcher against ALL 32 NHL teams
+ * in parallel so we can spot patterns when only some teams fail.
  */
 export default async function DebugNhlPage() {
   const supabase = await createClient();
@@ -42,60 +37,142 @@ export default async function DebugNhlPage() {
 
   const season = currentSeason();
 
-  // Run every fetch in parallel so the page loads in one network burst
-  const [allTeams, torRoster, torSeason, eliminated, mcDavidInjury] =
+  // First: get the full team list so we know which 32 abbrevs to test
+  const allTeamsResult = await fetchAllTeams().catch((e) => ({
+    error: e instanceof Error ? e.message : "fail",
+  }));
+  const allTeams = Array.isArray(allTeamsResult) ? allTeamsResult : [];
+
+  // Run the secondary fetches in parallel
+  const [eliminated, mcDavidInjury, torRoster, allTeamStats] =
     await Promise.all([
-      fetchAllTeams().catch((e) => ({ error: e instanceof Error ? e.message : "fail" })),
-      fetchTeamRoster("TOR").catch((e) => ({ error: e instanceof Error ? e.message : "fail" })),
-      fetchTeamSeasonStats("TOR", season).catch(
-        (e) => ({ error: e instanceof Error ? e.message : "fail" }),
-      ),
-      fetchEliminatedTeams().catch(
-        () => new Set<string>(),
-      ),
-      // McDavid's NHL ID — a known stable test target
+      fetchEliminatedTeams().catch(() => new Set<string>()),
       fetchPlayerInjury(8478402).catch((e) => ({
         error: e instanceof Error ? e.message : "fail",
       })),
+      fetchTeamRoster("TOR").catch((e) => ({
+        error: e instanceof Error ? e.message : "fail",
+      })),
+      // Run season-stats fetcher for every team in parallel.
+      Promise.all(
+        allTeams.map(async (t) => ({
+          abbrev: t.abbrev,
+          result: await fetchTeamSeasonStats(t.abbrev, season),
+        })),
+      ),
     ]);
+
+  const okCount = allTeamStats.filter((t) => t.result.rows.length > 0).length;
+  const seasonOk = allTeamStats.filter((t) => t.result.source === "season").length;
+  const nowOk = allTeamStats.filter((t) => t.result.source === "now").length;
+  const noneCount = allTeamStats.filter((t) => t.result.source === "none").length;
 
   return (
     <>
       <NavBar displayName={user.email ?? "Player"} />
-      <main className="mx-auto max-w-3xl px-6 py-10 space-y-6">
+      <main className="mx-auto max-w-4xl px-6 py-10 space-y-6">
         <div>
           <Link href="/dashboard" className="text-sm text-ice-400 hover:underline">
             ← Dashboard
           </Link>
           <h1 className="text-3xl font-bold text-ice-50">NHL endpoint check</h1>
           <p className="text-sm text-ice-300">
-            Live result of every NHL API call this app makes. If anything
-            below shows zero rows or an error, that&rsquo;s why the
-            corresponding feature is empty.
+            Live result of every NHL API call this app makes. Each row
+            below is a real request fired the moment you loaded this
+            page.
           </p>
         </div>
 
         <Section title="Season string we'll use">
           <div className="font-mono text-ice-100">{season}</div>
           <p className="mt-1 text-xs text-ice-400">
-            This is the value passed to{" "}
+            Passed to{" "}
             <span className="font-mono">/club-stats/{`{team}`}/{season}/2</span>.
-            For Apr–Sep we&rsquo;re in the latter half of the previous
-            season; for Oct–Dec we&rsquo;re in the new one.
           </p>
         </Section>
 
         <Section title="Standings (/standings/now)">
-          {Array.isArray(allTeams) ? (
+          {Array.isArray(allTeamsResult) ? (
             <div>
-              ✅ {allTeams.length} teams returned.{" "}
+              ✅ {allTeamsResult.length} teams returned.{" "}
               <span className="text-ice-400">
-                First few: {allTeams.slice(0, 5).map((t) => t.abbrev).join(", ")}…
+                Sample: {allTeamsResult.slice(0, 5).map((t) => t.abbrev).join(", ")}…
               </span>
             </div>
           ) : (
-            <div className="text-red-300">❌ {(allTeams as { error: string }).error}</div>
+            <div className="text-red-300">
+              ❌ {(allTeamsResult as { error: string }).error}
+            </div>
           )}
+        </Section>
+
+        <Section title="Per-team season stats">
+          <div className="mb-3 text-sm text-ice-300">
+            <span className="font-semibold text-green-400">{okCount}</span> /{" "}
+            {allTeamStats.length} teams returned data.{" "}
+            <span className="text-ice-400">
+              ({seasonOk} via /club-stats/.../{season}/2,{" "}
+              {nowOk} via /club-stats/.../now,{" "}
+              {noneCount} failed)
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-left text-ice-400">
+                <tr className="border-b border-puck-border">
+                  <th className="px-2 py-2">Team</th>
+                  <th className="px-2 py-2 text-right">Skaters</th>
+                  <th className="px-2 py-2">Source</th>
+                  <th className="px-2 py-2">Error (if any)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allTeamStats.map(({ abbrev, result }) => {
+                  const tone =
+                    result.source === "none"
+                      ? "text-red-300"
+                      : result.source === "now"
+                        ? "text-yellow-300"
+                        : "text-green-300";
+                  return (
+                    <tr
+                      key={abbrev}
+                      className="border-b border-puck-border last:border-0"
+                    >
+                      <td className="px-2 py-1.5 font-mono text-ice-100">
+                        {abbrev}
+                      </td>
+                      <td className="px-2 py-1.5 text-right text-ice-200">
+                        {result.rows.length}
+                      </td>
+                      <td className={`px-2 py-1.5 ${tone}`}>{result.source}</td>
+                      <td
+                        className="px-2 py-1.5 text-ice-400"
+                        title={result.error ?? ""}
+                      >
+                        {result.error
+                          ? result.error.slice(0, 90) +
+                            (result.error.length > 90 ? "…" : "")
+                          : ""}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-ice-400">
+            Source legend: <span className="text-green-300">season</span> = the
+            documented{" "}
+            <span className="font-mono">/club-stats/{`{abbrev}`}/{season}/2</span>{" "}
+            endpoint returned data.{" "}
+            <span className="text-yellow-300">now</span> = the season-specific
+            URL came back empty so we fell back to{" "}
+            <span className="font-mono">/club-stats/{`{abbrev}`}/now</span>.{" "}
+            <span className="text-red-300">none</span> = both endpoints failed
+            or returned 0 skaters; hover the error column for details.
+          </p>
         </Section>
 
         <Section title="Toronto roster (/roster/TOR/current)">
@@ -104,10 +181,7 @@ export default async function DebugNhlPage() {
               ✅ {torRoster.length} players returned.{" "}
               <span className="text-ice-400">
                 Sample:{" "}
-                {torRoster
-                  .slice(0, 3)
-                  .map((p) => p.full_name)
-                  .join(", ")}
+                {torRoster.slice(0, 3).map((p) => p.full_name).join(", ")}
               </span>
             </div>
           ) : (
@@ -117,81 +191,14 @@ export default async function DebugNhlPage() {
           )}
         </Section>
 
-        <Section title={`Toronto season stats (/club-stats/TOR/${season}/2)`}>
-          {Array.isArray(torSeason) ? (
-            torSeason.length === 0 ? (
-              <div className="text-yellow-300">
-                ⚠️ Endpoint returned 0 skaters. The season string{" "}
-                <span className="font-mono">{season}</span> may be
-                wrong, or the API path may have changed.
-              </div>
-            ) : (
-              <div>
-                ✅ {torSeason.length} skater rows returned.
-                <table className="mt-2 w-full text-xs">
-                  <thead>
-                    <tr className="text-left text-ice-400">
-                      <th className="px-2 py-1">Player ID</th>
-                      <th className="px-2 py-1 text-right">G</th>
-                      <th className="px-2 py-1 text-right">A</th>
-                      <th className="px-2 py-1 text-right">P</th>
-                      <th className="px-2 py-1 text-right">GP</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {torSeason
-                      .slice()
-                      .sort((a, b) => b.points - a.points)
-                      .slice(0, 5)
-                      .map((s) => (
-                        <tr
-                          key={s.playerId}
-                          className="border-t border-puck-border"
-                        >
-                          <td className="px-2 py-1 font-mono text-ice-300">
-                            {s.playerId}
-                          </td>
-                          <td className="px-2 py-1 text-right text-ice-200">
-                            {s.goals}
-                          </td>
-                          <td className="px-2 py-1 text-right text-ice-200">
-                            {s.assists}
-                          </td>
-                          <td className="px-2 py-1 text-right font-semibold text-ice-50">
-                            {s.points}
-                          </td>
-                          <td className="px-2 py-1 text-right text-ice-300">
-                            {s.gamesPlayed}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-                <p className="mt-2 text-xs text-ice-400">
-                  Top 5 Toronto skaters by points. If these point totals
-                  match what you see on nhl.com today, the data is current.
-                </p>
-              </div>
-            )
-          ) : (
-            <div className="text-red-300">
-              ❌ {(torSeason as { error: string }).error}
-            </div>
-          )}
-        </Section>
-
-        <Section title="Eliminated teams (/standings/now → clinchIndicator='e')">
+        <Section title="Eliminated teams (clinchIndicator='e')">
           {eliminated instanceof Set ? (
             eliminated.size === 0 ? (
               <div className="text-ice-300">
-                None reported. (Common until very late in the regular
-                season; during the playoffs themselves use the
-                commissioner override.)
+                None reported by /standings/now.
               </div>
             ) : (
-              <div>
-                ✅ {[...eliminated].join(", ")}
-              </div>
+              <div>✅ {[...eliminated].join(", ")}</div>
             )
           ) : (
             <div className="text-red-300">unknown</div>
@@ -206,11 +213,6 @@ export default async function DebugNhlPage() {
               <span className="font-mono text-ice-100">
                 {JSON.stringify(mcDavidInjury)}
               </span>
-              <p className="mt-1 text-xs text-ice-400">
-                If status is null, McDavid is healthy as far as the API
-                knows. If you see an error here, the player landing
-                endpoint isn&rsquo;t reachable.
-              </p>
             </div>
           ) : (
             <div className="text-red-300">
