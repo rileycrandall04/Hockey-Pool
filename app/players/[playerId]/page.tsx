@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { NavBar } from "@/components/nav-bar";
-import { Button } from "@/components/ui/button";
-import { Input, Label } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -16,66 +13,6 @@ import { InjuryBadge } from "@/components/injury-badge";
 export const dynamic = "force-dynamic";
 
 /**
- * Set or clear a player's injury_status. Allowed for any user who
- * commissions at least one league — injury status is a global
- * column shared by every league, and the existing /admin injury
- * override form already has the same rule.
- *
- * Pass an empty status field to clear the flag.
- */
-async function flagInjuryAction(formData: FormData) {
-  "use server";
-  const playerId = Number(formData.get("player_id"));
-  const status = String(formData.get("status") ?? "").trim() || null;
-  const description =
-    String(formData.get("description") ?? "").trim() || null;
-
-  if (!Number.isFinite(playerId)) return;
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  // Allow if the user commissions at least one league.
-  const { count: commCount } = await supabase
-    .from("leagues")
-    .select("id", { count: "exact", head: true })
-    .eq("commissioner_id", user.id);
-  if ((commCount ?? 0) === 0) {
-    redirect(
-      `/players/${playerId}?injury_error=${encodeURIComponent("Only league commissioners can flag injuries.")}`,
-    );
-  }
-
-  const svc = createServiceClient();
-  const { error } = await svc
-    .from("players")
-    .update({
-      injury_status: status,
-      injury_description: status
-        ? description ?? "(commissioner-flagged)"
-        : null,
-      injury_updated_at: new Date().toISOString(),
-    })
-    .eq("id", playerId);
-
-  if (error) {
-    redirect(
-      `/players/${playerId}?injury_error=${encodeURIComponent(error.message)}`,
-    );
-  }
-
-  revalidatePath(`/players/${playerId}`);
-  redirect(
-    `/players/${playerId}?injury_success=${encodeURIComponent(
-      status ? `Flagged as: ${status}` : "Injury cleared.",
-    )}`,
-  );
-}
-
-/**
  * Global player detail page.
  *
  * Shows everything we know about an NHL player: identity, current team,
@@ -85,16 +22,10 @@ async function flagInjuryAction(formData: FormData) {
  */
 export default async function PlayerPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ playerId: string }>;
-  searchParams: Promise<{
-    injury_success?: string;
-    injury_error?: string;
-  }>;
 }) {
   const { playerId } = await params;
-  const { injury_success, injury_error } = await searchParams;
   const id = Number(playerId);
   if (!Number.isFinite(id)) notFound();
 
@@ -109,14 +40,6 @@ export default async function PlayerPage({
     .select("display_name")
     .eq("id", user.id)
     .single();
-
-  // Show the injury override form if the user is a commissioner of at
-  // least one league. (Injury status is global, not per-league.)
-  const { count: commCount } = await supabase
-    .from("leagues")
-    .select("id", { count: "exact", head: true })
-    .eq("commissioner_id", user.id);
-  const canFlagInjury = (commCount ?? 0) > 0;
 
   const { data: player } = await supabase
     .from("players")
@@ -230,74 +153,12 @@ export default async function PlayerPage({
           </CardContent>
         </Card>
 
-        {canFlagInjury && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Injury override</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-3 text-xs text-ice-400">
-                The auto NHL injury feed is unreliable. As a commissioner
-                you can manually flag this player as injured (or clear
-                the flag). This applies to <strong>every league</strong>{" "}
-                that has them rostered. Leave the status blank to clear.
-              </p>
-              {injury_success && (
-                <div className="mb-3 rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-200">
-                  ✅ {injury_success}
-                </div>
-              )}
-              {injury_error && (
-                <div className="mb-3 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-                  ❌ {injury_error}
-                </div>
-              )}
-              <form action={flagInjuryAction} className="space-y-3">
-                <input type="hidden" name="player_id" value={id} />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="status">
-                      Status (e.g. &ldquo;Day-to-day&rdquo;)
-                    </Label>
-                    <Input
-                      id="status"
-                      name="status"
-                      defaultValue={player.injury_status ?? ""}
-                      placeholder="Leave blank to clear"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="description">
-                      Description (optional)
-                    </Label>
-                    <Input
-                      id="description"
-                      name="description"
-                      defaultValue={
-                        player.injury_description &&
-                        player.injury_description !== "(commissioner-flagged)"
-                          ? player.injury_description
-                          : ""
-                      }
-                      placeholder="Lower body, week-to-week"
-                    />
-                  </div>
-                </div>
-                <Button type="submit">Save</Button>
-              </form>
-              {player.injury_status && (
-                <form action={flagInjuryAction} className="mt-2">
-                  <input type="hidden" name="player_id" value={id} />
-                  <input type="hidden" name="status" value="" />
-                  <input type="hidden" name="description" value="" />
-                  <Button type="submit" variant="ghost">
-                    Clear flag
-                  </Button>
-                </form>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        <p className="text-xs text-ice-500">
+          Injury status above is from the global NHL feed. Per-league
+          commissioner overrides are set from each league&rsquo;s admin
+          page and only show inside that league&rsquo;s draft room,
+          standings, and roster views.
+        </p>
       </main>
     </>
   );

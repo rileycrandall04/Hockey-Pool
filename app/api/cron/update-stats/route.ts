@@ -5,8 +5,8 @@ import {
   fetchGameStats,
   fetchGameRecap,
   fetchEliminatedTeams,
-  fetchPlayerInjury,
 } from "@/lib/nhl-api";
+import { syncInjuries } from "@/lib/sync-injuries";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -201,63 +201,13 @@ export async function POST(request: Request) {
   }
 
   // -------------------------------------------------------------------
-  // 4. Injury refresh (best-effort, slow)
+  // 4. Injury refresh (best-effort, slow). Reuses the same helper the
+  // app-owner manual sync route calls.
   // -------------------------------------------------------------------
   if (!skipInjuries) {
     try {
-      // Only check active players (skip eliminated teams + already-inactive)
-      const { data: activePlayers } = await svc
-        .from("players")
-        .select("id")
-        .eq("active", true);
-
-      const ids = (activePlayers ?? []).map((p) => p.id as number);
-      // Cap to avoid blowing past maxDuration. 200 player landings ~= 30s.
-      const chunkIds = ids.slice(0, 200);
-
-      const injuryUpdates: Array<{
-        id: number;
-        injury_status: string | null;
-        injury_description: string | null;
-        injury_updated_at: string;
-      }> = [];
-
-      // Fan out 10 at a time
-      const concurrency = 10;
-      for (let i = 0; i < chunkIds.length; i += concurrency) {
-        const batch = chunkIds.slice(i, i + concurrency);
-        const results = await Promise.all(
-          batch.map(async (id) => ({
-            id,
-            info: await fetchPlayerInjury(id),
-          })),
-        );
-        for (const r of results) {
-          injuryUpdates.push({
-            id: r.id,
-            injury_status: r.info.status,
-            injury_description: r.info.description,
-            injury_updated_at: new Date().toISOString(),
-          });
-        }
-      }
-
-      if (injuryUpdates.length > 0) {
-        // Upsert is convenient but we only want to overwrite the injury
-        // fields, not the rest of the player row. Run individual updates
-        // for each player. Cheap enough at 200 rows.
-        for (const u of injuryUpdates) {
-          await svc
-            .from("players")
-            .update({
-              injury_status: u.injury_status,
-              injury_description: u.injury_description,
-              injury_updated_at: u.injury_updated_at,
-            })
-            .eq("id", u.id);
-        }
-        summary.injuries_checked = injuryUpdates.length;
-      }
+      const injuryResult = await syncInjuries();
+      summary.injuries_checked = injuryResult.checked;
     } catch (err) {
       console.error("Failed to refresh injuries", err);
     }

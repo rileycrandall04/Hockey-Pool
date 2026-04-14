@@ -143,15 +143,26 @@ export default async function DashboardPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {canRefreshNhlData && (
-              <form
-                action="/api/admin/reseed"
-                method="post"
-                title="Refreshes player rosters + season stats from the NHL API. The data is shared across every user — you only need to do this once for the whole pool, and the nightly cron handles it automatically."
-              >
-                <Button type="submit" variant="secondary">
-                  ↻ Refresh NHL data
-                </Button>
-              </form>
+              <>
+                <form
+                  action="/api/admin/reseed"
+                  method="post"
+                  title="Refreshes player rosters + season stats from the NHL API. Shared across every user."
+                >
+                  <Button type="submit" variant="secondary">
+                    ↻ Refresh NHL data
+                  </Button>
+                </form>
+                <form
+                  action="/api/admin/sync-injuries"
+                  method="post"
+                  title="Re-pulls injury status from the NHL API for every active player. Takes ~30-60s. Per-league overrides set by commissioners are preserved."
+                >
+                  <Button type="submit" variant="secondary">
+                    ↻ Sync injuries
+                  </Button>
+                </form>
+              </>
             )}
             <Link href="/leagues/join">
               <Button variant="secondary">Join league</Button>

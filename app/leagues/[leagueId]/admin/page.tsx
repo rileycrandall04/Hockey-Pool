@@ -399,9 +399,13 @@ async function toggleTeamEliminationAction(formData: FormData) {
 }
 
 /**
- * Manually mark a single player as injured/healthy. Useful when the
- * automatic NHL injury feed misses someone, or for game-time
- * scratches that haven't shown up yet.
+ * Manually mark a single player as injured/healthy FOR THIS LEAGUE
+ * ONLY. Writes to league_player_injuries (added in 0004), which the
+ * v_team_rosters view LEFT JOINs and prefers over the global
+ * players.injury_status column. Other leagues are unaffected.
+ *
+ * Setting an empty status DELETES the override row, which restores
+ * the global NHL feed value for this league.
  */
 async function toggleInjuryAction(formData: FormData) {
   "use server";
@@ -410,21 +414,35 @@ async function toggleInjuryAction(formData: FormData) {
   const playerId = parseInt(playerIdRaw, 10);
   const status = String(formData.get("status") ?? "").trim() || null;
 
-  await assertCommissioner(leagueId);
+  const { user } = await assertCommissioner(leagueId);
   if (!Number.isFinite(playerId)) return;
 
   const svc = createServiceClient();
-  await svc
-    .from("players")
-    .update({
-      injury_status: status,
-      injury_description: status ? "(commissioner-flagged)" : null,
-      injury_updated_at: new Date().toISOString(),
-    })
-    .eq("id", playerId);
+  if (status === null) {
+    // Clear: drop the override so the global value takes over.
+    await svc
+      .from("league_player_injuries")
+      .delete()
+      .eq("league_id", leagueId)
+      .eq("player_id", playerId);
+  } else {
+    await svc.from("league_player_injuries").upsert(
+      {
+        league_id: leagueId,
+        player_id: playerId,
+        injury_status: status,
+        injury_description: "(commissioner-flagged)",
+        created_by: user.id,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "league_id,player_id" },
+    );
+  }
 
   revalidatePath(`/leagues/${leagueId}/admin`);
   revalidatePath(`/leagues/${leagueId}/draft`);
+  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}/teams`);
 }
 
 export default async function AdminPage({
@@ -593,6 +611,13 @@ export default async function AdminPage({
               {canRefreshNhlData && (
                 <form action="/api/admin/reseed" method="post">
                   <Button type="submit">↻ Refresh NHL data now</Button>
+                </form>
+              )}
+              {canRefreshNhlData && (
+                <form action="/api/admin/sync-injuries" method="post">
+                  <Button type="submit" variant="secondary">
+                    ↻ Sync injuries
+                  </Button>
                 </form>
               )}
               {canRefreshNhlData && (

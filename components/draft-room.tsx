@@ -63,7 +63,11 @@ export function DraftRoom({
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const [{ data: playerRows }, { data: pickRows }] = await Promise.all([
+      const [
+        { data: playerRows },
+        { data: pickRows },
+        { data: overrideRows },
+      ] = await Promise.all([
         supabase
           .from("players")
           .select(
@@ -76,9 +80,31 @@ export function DraftRoom({
           .from("draft_picks")
           .select("*")
           .eq("league_id", league.id),
+        // Per-league commissioner injury overrides: applied on top of
+        // the global players.injury_status when rendering this league's
+        // draft room.
+        supabase
+          .from("league_player_injuries")
+          .select("player_id, injury_status, injury_description")
+          .eq("league_id", league.id),
       ]);
 
       if (cancelled) return;
+
+      const overrides = new Map<
+        number,
+        { injury_status: string | null; injury_description: string | null }
+      >();
+      for (const o of (overrideRows ?? []) as Array<{
+        player_id: number;
+        injury_status: string | null;
+        injury_description: string | null;
+      }>) {
+        overrides.set(o.player_id, {
+          injury_status: o.injury_status,
+          injury_description: o.injury_description,
+        });
+      }
 
       setPicks((pickRows ?? []) as PickRow[]);
       const normalized: DraftablePlayer[] = (playerRows ?? []).map(
@@ -121,6 +147,8 @@ export function DraftRoom({
           const statRow = Array.isArray(p.player_stats)
             ? p.player_stats[0]
             : p.player_stats;
+          // Per-league override wins over the global NHL feed value.
+          const override = overrides.get(p.id);
           return {
             id: p.id,
             full_name: p.full_name,
@@ -133,8 +161,9 @@ export function DraftRoom({
             season_assists: p.season_assists ?? 0,
             season_points: p.season_points ?? 0,
             season_games_played: p.season_games_played ?? 0,
-            injury_status: p.injury_status,
-            injury_description: p.injury_description,
+            injury_status: override?.injury_status ?? p.injury_status,
+            injury_description:
+              override?.injury_description ?? p.injury_description,
             nhl_abbrev: teamRow?.abbrev ?? null,
             goals: statRow?.goals ?? 0,
             assists: statRow?.assists ?? 0,
