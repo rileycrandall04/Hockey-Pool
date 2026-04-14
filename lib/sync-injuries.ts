@@ -19,19 +19,33 @@ export interface SyncInjuriesResult {
 
 /**
  * Best-effort batch refresh of the GLOBAL injury_status column for
- * every active player. This is the NHL-feed source of truth — per-
- * league commissioner overrides live in league_player_injuries and
- * are not touched by this function.
+ * active players. This is the NHL-feed source of truth — per-league
+ * commissioner overrides live in league_player_injuries and are not
+ * touched by this function.
  *
- * Capped at `limit` players per call to fit comfortably under the
- * Vercel serverless function timeout. The default 200 takes about
- * 30-45 seconds for a fully populated pool.
+ * Pacing: the NHL public API rate-limits aggressively (429 Too Many
+ * Requests after ~60 concurrent hits). We avoid that by running 2
+ * concurrent requests at a time with a 200ms pause between batches,
+ * which gives us ~10 requests/sec steady state. A 429 is retried once
+ * after 2s; if it still fails, we skip that player and the next cron
+ * run will pick them up.
+ *
+ * Rotation: each run checks the `limit` players with the oldest (or
+ * null) injury_updated_at first, then stamps their injury_updated_at
+ * to now() so subsequent runs rotate through the rest of the pool.
+ * Over a few daily cron runs every active player eventually gets
+ * refreshed.
+ *
+ * 404 handling: `/player/{id}/landing` returns 404 for prospect/AHL
+ * players who appear on roster endpoints but don't have a full NHL
+ * profile. We treat these as "healthy / no injury data" rather than
+ * errors, so the error counter reflects real problems only.
  *
  * Used by:
  *   - /api/cron/update-stats           (nightly, 6am ET)
  *   - /api/admin/sync-injuries         (manual, app owner only)
  */
-export async function syncInjuries(limit = 200): Promise<SyncInjuriesResult> {
+export async function syncInjuries(limit = 150): Promise<SyncInjuriesResult> {
   const start = Date.now();
   const svc = createServiceClient();
 
@@ -39,6 +53,9 @@ export async function syncInjuries(limit = 200): Promise<SyncInjuriesResult> {
     .from("players")
     .select("id, injury_status")
     .eq("active", true)
+    // Stalest first (nulls = never checked) so each run rotates
+    // through a different slice of the pool.
+    .order("injury_updated_at", { ascending: true, nullsFirst: true })
     .limit(limit);
 
   const result: SyncInjuriesResult = {
@@ -57,45 +74,73 @@ export async function syncInjuries(limit = 200): Promise<SyncInjuriesResult> {
     return result;
   }
 
-  // Fan out 10 fetches at a time. The NHL public API tolerates this
-  // comfortably; higher concurrency starts hitting tail latency.
-  const concurrency = 10;
+  // Low-concurrency pacing. With 150 players this schedule takes
+  // ~30s under normal conditions.
+  const concurrency = 2;
+  const pauseBetweenBatchesMs = 200;
+  const retryDelayMs = 2000;
+
+  const fetchWithRetry = async (playerId: number) => {
+    let info = await fetchPlayerInjury(playerId);
+    if (info.source === "error" && info.error?.includes("429")) {
+      // One retry after a generous backoff. If the API is hammered
+      // we're better off moving on than piling up more retries.
+      await sleep(retryDelayMs);
+      info = await fetchPlayerInjury(playerId);
+    }
+    return info;
+  };
+
   for (let i = 0; i < activePlayers.length; i += concurrency) {
     const batch = activePlayers.slice(i, i + concurrency);
     const responses = await Promise.all(
       batch.map(async (p) => ({
         id: p.id as number,
         was: (p.injury_status as string | null) ?? null,
-        info: await fetchPlayerInjury(p.id as number),
+        info: await fetchWithRetry(p.id as number),
       })),
     );
 
     for (const r of responses) {
       result.checked += 1;
+
+      // 404 = player has no landing record (prospect / AHL / inactive).
+      // Treat as "healthy"; clear any stale flag and update the
+      // timestamp so they rotate out of the next run's top slice.
+      if (
+        r.info.source === "error" &&
+        (r.info.error?.includes("404") ?? false)
+      ) {
+        await svc
+          .from("players")
+          .update({
+            injury_status: null,
+            injury_description: null,
+            injury_updated_at: new Date().toISOString(),
+          })
+          .eq("id", r.id);
+        if (r.was !== null) result.cleared += 1;
+        else result.unchanged += 1;
+        continue;
+      }
+
       if (r.info.source === "error") {
         result.errors += 1;
         if (sampleErrorSet.size < 5) {
-          // Strip the player-specific path so we count duplicates of
-          // "404 Not Found" together regardless of which player ID
-          // produced it. Keep the first 5 distinct messages.
           const generic = (r.info.error ?? "unknown error").replace(
             /\/player\/\d+\/landing/,
             "/player/{id}/landing",
           );
-          if (!sampleErrorSet.has(generic)) {
-            sampleErrorSet.add(generic);
-          }
+          sampleErrorSet.add(generic);
         }
         continue;
       }
+
       const newStatus = r.info.status;
       const newDescription = r.info.description;
 
-      if (newStatus === r.was) {
-        result.unchanged += 1;
-        continue;
-      }
-
+      // Always bump injury_updated_at on a successful check so
+      // rotation keeps moving even when the status didn't change.
       const { error } = await svc
         .from("players")
         .update({
@@ -107,15 +152,26 @@ export async function syncInjuries(limit = 200): Promise<SyncInjuriesResult> {
 
       if (error) {
         result.errors += 1;
+      } else if (newStatus === r.was) {
+        result.unchanged += 1;
       } else if (newStatus) {
         result.flagged += 1;
       } else {
         result.cleared += 1;
       }
     }
+
+    // Pause between batches — don't sleep after the last one.
+    if (i + concurrency < activePlayers.length) {
+      await sleep(pauseBetweenBatchesMs);
+    }
   }
 
   result.sample_errors = [...sampleErrorSet];
   result.duration_ms = Date.now() - start;
   return result;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
