@@ -95,14 +95,19 @@ export default async function DashboardPage({
           </Card>
         )}
 
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold text-ice-50">Your leagues</h1>
             <p className="text-sm text-ice-300">
               Draft, manage, and track every Stanley Cup pool you&rsquo;re in.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <form action="/api/admin/reseed" method="post">
+              <Button type="submit" variant="ghost" size="sm">
+                Refresh NHL data
+              </Button>
+            </form>
             <Link href="/leagues/join">
               <Button variant="secondary">Join league</Button>
             </Link>
