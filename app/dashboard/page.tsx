@@ -167,7 +167,7 @@ export default async function DashboardPage({
                     {l.commissioner_id === user.id && " · Commissioner"}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-wrap gap-2">
+                <CardContent className="flex flex-wrap items-center gap-2">
                   <Link href={`/leagues/${l.id}`}>
                     <Button size="sm">Standings</Button>
                   </Link>
@@ -189,6 +189,22 @@ export default async function DashboardPage({
                         Admin
                       </Button>
                     </Link>
+                  )}
+                  <span className="ml-auto" />
+                  {l.commissioner_id === user.id ? (
+                    <Link href={`/leagues/${l.id}/admin#delete-league`}>
+                      <Button size="sm" variant="danger">
+                        Delete
+                      </Button>
+                    </Link>
+                  ) : (
+                    l.team && (
+                      <Link href={`/leagues/${l.id}#leave-league`}>
+                        <Button size="sm" variant="danger">
+                          Leave
+                        </Button>
+                      </Link>
+                    )
                   )}
                 </CardContent>
               </Card>

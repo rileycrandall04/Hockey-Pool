@@ -122,6 +122,9 @@ async function removeAdjustmentAction(formData: FormData) {
  *
  * Safe to call during an in-progress OR completed draft. Rolling back
  * from a completed state flips the league back to in_progress.
+ *
+ * Always redirects with either a success or error flash so the
+ * commissioner gets visible feedback that the action ran.
  */
 async function rollbackPicksAction(formData: FormData) {
   "use server";
@@ -132,22 +135,42 @@ async function rollbackPicksAction(formData: FormData) {
   const { league } = await assertCommissioner(leagueId);
   const svc = createServiceClient();
 
-  const { data: latest } = await svc
+  const { data: latest, error: latestError } = await svc
     .from("draft_picks")
     .select("id, pick_number")
     .eq("league_id", leagueId)
     .order("pick_number", { ascending: false })
     .limit(count);
 
+  if (latestError) {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(
+        `Lookup failed: ${latestError.message}`,
+      )}`,
+    );
+  }
+
   if (!latest || latest.length === 0) {
-    // Nothing to roll back. Silently no-op — the admin page will just
-    // re-render unchanged.
-    revalidatePath(`/leagues/${leagueId}/admin`);
-    return;
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(
+        "No picks to roll back.",
+      )}`,
+    );
   }
 
   const idsToDelete = latest.map((p) => p.id);
-  await svc.from("draft_picks").delete().in("id", idsToDelete);
+  const { error: deleteError } = await svc
+    .from("draft_picks")
+    .delete()
+    .in("id", idsToDelete);
+
+  if (deleteError) {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(
+        `Delete failed: ${deleteError.message}`,
+      )}`,
+    );
+  }
 
   // Recompute who's on the clock after the rollback.
   const { data: teams } = await svc
@@ -170,7 +193,7 @@ async function rollbackPicksAction(formData: FormData) {
       ? teamOnTheClock(teamList, newPickIndex)
       : null;
 
-  await svc
+  const { error: updateError } = await svc
     .from("leagues")
     .update({
       // Flip back to in_progress if the rollback uncompleted the draft.
@@ -182,9 +205,23 @@ async function rollbackPicksAction(formData: FormData) {
     })
     .eq("id", leagueId);
 
+  if (updateError) {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(
+        `League update failed: ${updateError.message}`,
+      )}`,
+    );
+  }
+
   revalidatePath(`/leagues/${leagueId}/admin`);
   revalidatePath(`/leagues/${leagueId}`);
   revalidatePath(`/leagues/${leagueId}/draft`);
+
+  redirect(
+    `/leagues/${leagueId}/admin?reset_success=${encodeURIComponent(
+      `Rolled back ${idsToDelete.length} pick${idsToDelete.length === 1 ? "" : "s"}.`,
+    )}`,
+  );
 }
 
 /**
@@ -194,6 +231,9 @@ async function rollbackPicksAction(formData: FormData) {
  *
  * Guarded by requiring the admin to type "RESET" into a confirmation
  * field so a rogue tap can't wipe a live draft.
+ *
+ * Every step is checked and surfaced via reset_success / reset_error
+ * query params so silent failures are impossible.
  */
 async function resetDraftAction(formData: FormData) {
   "use server";
@@ -208,19 +248,73 @@ async function resetDraftAction(formData: FormData) {
   await assertCommissioner(leagueId);
   const svc = createServiceClient();
 
-  await svc.from("draft_picks").delete().eq("league_id", leagueId);
-  await svc
+  // Count first so we can report what we're about to delete.
+  const { count: pickCount, error: countError } = await svc
+    .from("draft_picks")
+    .select("id", { count: "exact", head: true })
+    .eq("league_id", leagueId);
+  if (countError) {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(
+        `Count failed: ${countError.message}`,
+      )}`,
+    );
+  }
+
+  const { error: deleteError } = await svc
+    .from("draft_picks")
+    .delete()
+    .eq("league_id", leagueId);
+  if (deleteError) {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(
+        `Delete failed: ${deleteError.message}`,
+      )}`,
+    );
+  }
+
+  const { error: updateError } = await svc
     .from("leagues")
     .update({
       draft_status: "pending",
       draft_current_team: null,
       draft_round: 1,
+      draft_started_at: null,
     })
     .eq("id", leagueId);
+  if (updateError) {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(
+        `League update failed: ${updateError.message}`,
+      )}`,
+    );
+  }
+
+  // Also clear team draft_position so the next start_draft re-randomizes
+  // cleanly. Not strictly necessary (start_draft reassigns positions),
+  // but it makes the "teams" panel honest while in pending state.
+  const { error: teamsError } = await svc
+    .from("teams")
+    .update({ draft_position: null })
+    .eq("league_id", leagueId);
+  if (teamsError) {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(
+        `Team reset failed: ${teamsError.message}`,
+      )}`,
+    );
+  }
 
   revalidatePath(`/leagues/${leagueId}/admin`);
   revalidatePath(`/leagues/${leagueId}`);
   revalidatePath(`/leagues/${leagueId}/draft`);
+  revalidatePath(`/dashboard`);
+
+  redirect(
+    `/leagues/${leagueId}/admin?reset_success=${encodeURIComponent(
+      `Draft reset. Removed ${pickCount ?? 0} pick${pickCount === 1 ? "" : "s"} and returned all players to the pool.`,
+    )}`,
+  );
 }
 
 /**
@@ -337,10 +431,14 @@ export default async function AdminPage({
   searchParams,
 }: {
   params: Promise<{ leagueId: string }>;
-  searchParams: Promise<{ reset_error?: string; delete_error?: string }>;
+  searchParams: Promise<{
+    reset_error?: string;
+    reset_success?: string;
+    delete_error?: string;
+  }>;
 }) {
   const { leagueId } = await params;
-  const { reset_error, delete_error } = await searchParams;
+  const { reset_error, reset_success, delete_error } = await searchParams;
   const { league, user } = await assertCommissioner(leagueId);
 
   const supabase = await createClient();
@@ -509,9 +607,14 @@ export default async function AdminPage({
               {currentPickCount}/{totalPicks} picks made
             </div>
 
+            {reset_success && (
+              <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-300">
+                ✅ {reset_success}
+              </div>
+            )}
             {reset_error && (
               <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-                {reset_error}
+                ❌ {reset_error}
               </div>
             )}
 
@@ -584,7 +687,10 @@ export default async function AdminPage({
               </form>
             </div>
 
-            <div className="rounded-md border border-red-500/40 bg-red-500/10 p-4">
+            <div
+              id="delete-league"
+              className="rounded-md border border-red-500/40 bg-red-500/10 p-4 scroll-mt-24"
+            >
               <h3 className="mb-2 font-semibold text-red-300">
                 Delete entire league
               </h3>

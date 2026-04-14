@@ -275,7 +275,10 @@ export default async function LeagueStandingsPage({
         )}
 
         {canLeave && (
-          <Card className="mt-6 border-red-500/30 bg-red-500/5">
+          <Card
+            id="leave-league"
+            className="mt-6 scroll-mt-24 border-red-500/30 bg-red-500/5"
+          >
             <CardHeader>
               <CardTitle className="text-red-300">Leave league</CardTitle>
             </CardHeader>
