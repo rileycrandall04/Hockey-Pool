@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { seedPlayers } from "@/lib/seed-players";
+import { isAppOwner } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,12 +11,15 @@ export const maxDuration = 60;
  *
  * Guards:
  *   - Caller must be a signed-in user.
+ *   - Caller's email must match APP_OWNER_EMAIL (or APP_OWNER_EMAIL is
+ *     unset, the open-mode fallback used during initial deployment).
  *   - The players table must currently be empty (first-run).
  *
  * After the first successful seed, this endpoint refuses further calls.
  * To re-seed later (e.g., to switch from "all teams" to the 16 playoff
- * teams), use /api/cron/sync-players with the CRON_SECRET, or truncate
- * the players table in Supabase first.
+ * teams), use the Refresh NHL data button on the dashboard / admin
+ * page (which calls /api/admin/reseed under the same owner gate), or
+ * /api/cron/sync-players with the CRON_SECRET.
  *
  * This is the same POST handler wired to a regular HTML form on the
  * dashboard, so it redirects on success/failure to keep things snappy
@@ -30,6 +34,13 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL("/login", request.url), { status: 303 });
   }
 
+  if (!isAppOwner(user.email)) {
+    return redirectWithError(
+      request,
+      "Only the app owner can seed the player pool.",
+    );
+  }
+
   const svc = createServiceClient();
   const { count, error: countError } = await svc
     .from("players")
@@ -40,7 +51,7 @@ export async function POST(request: Request) {
   if ((count ?? 0) > 0) {
     return redirectWithError(
       request,
-      "Player pool already seeded. Use the cron endpoint to refresh.",
+      "Player pool already seeded. Use the Refresh NHL data button to update it.",
     );
   }
 

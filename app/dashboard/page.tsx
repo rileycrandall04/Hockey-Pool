@@ -100,7 +100,7 @@ export default async function DashboardPage({
             🗑️ {league_deleted}
           </div>
         )}
-        {poolEmpty && !seeded && (
+        {poolEmpty && !seeded && canRefreshNhlData && (
           <Card className="mb-6 border-ice-500/60 bg-ice-500/5">
             <CardHeader>
               <CardTitle>One-time setup: seed the player pool</CardTitle>
@@ -117,6 +117,20 @@ export default async function DashboardPage({
                 <Button type="submit">Seed player pool</Button>
               </form>
             </CardContent>
+          </Card>
+        )}
+        {poolEmpty && !seeded && !canRefreshNhlData && (
+          <Card className="mb-6 border-puck-border bg-puck-card">
+            <CardHeader>
+              <CardTitle>Waiting for setup</CardTitle>
+              <CardDescription>
+                The NHL player pool hasn&rsquo;t been seeded yet. The
+                app owner needs to do this once before drafts can run
+                — ask them to load the dashboard and tap{" "}
+                <em>Seed player pool</em>. After that you&rsquo;ll be
+                able to draft normally.
+              </CardDescription>
+            </CardHeader>
           </Card>
         )}
 

@@ -547,14 +547,19 @@ export default async function AdminPage({
           </CardHeader>
           <CardContent>
             <p className="mb-4 text-xs text-ice-400">
-              All data below is pulled live from the NHL public API. If
-              the &ldquo;with current-season stats&rdquo; count is much
-              lower than the player count, the season-stats endpoint
-              probably failed for some teams &mdash; tap{" "}
-              <Link href="/debug/nhl" className="text-ice-200 underline">
-                debug NHL endpoints
-              </Link>{" "}
-              to see exactly what came back.
+              All data below is pulled from the NHL public API by the
+              nightly cron and on-demand by the app owner.{" "}
+              {canRefreshNhlData && (
+                <>
+                  If the &ldquo;with current-season stats&rdquo; count is
+                  much lower than the player count, the season-stats
+                  endpoint probably failed for some teams &mdash; tap{" "}
+                  <Link href="/debug/nhl" className="text-ice-200 underline">
+                    debug NHL endpoints
+                  </Link>{" "}
+                  to see exactly what came back.
+                </>
+              )}
             </p>
             <dl className="mb-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
               <Stat label="Players in pool" value={totalPlayerCount ?? 0} />
@@ -586,9 +591,11 @@ export default async function AdminPage({
                   <Button type="submit">↻ Refresh NHL data now</Button>
                 </form>
               )}
-              <Link href="/debug/nhl">
-                <Button variant="secondary">Debug NHL endpoints</Button>
-              </Link>
+              {canRefreshNhlData && (
+                <Link href="/debug/nhl">
+                  <Button variant="secondary">Debug NHL endpoints</Button>
+                </Link>
+              )}
             </div>
             {canRefreshNhlData ? (
               <p className="mt-2 text-xs text-ice-500">

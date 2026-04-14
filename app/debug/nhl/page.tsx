@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
 import {
   Card,
@@ -27,6 +28,10 @@ export const maxDuration = 60;
  * human-readable summary of what came back. Includes a per-team
  * matrix that runs the season-stats fetcher against ALL 32 NHL teams
  * in parallel so we can spot patterns when only some teams fail.
+ *
+ * Locked to the configured app owner because each page load fires
+ * ~32+ external NHL API requests — not something random pool members
+ * should be able to spam.
  */
 export default async function DebugNhlPage() {
   const supabase = await createClient();
@@ -34,6 +39,7 @@ export default async function DebugNhlPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  if (!isAppOwner(user.email)) redirect("/dashboard");
 
   const season = currentSeason();
 
