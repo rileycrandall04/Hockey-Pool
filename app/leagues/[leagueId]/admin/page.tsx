@@ -224,6 +224,46 @@ async function resetDraftAction(formData: FormData) {
 }
 
 /**
+ * Permanently delete the league.
+ *
+ * Cascades to every teams, draft_picks, and score_adjustments row for
+ * the league via the existing FK ON DELETE CASCADE. nhl_teams,
+ * players, and player_stats are global and untouched.
+ *
+ * Gated by typing "DELETE" into a confirmation field — same pattern
+ * as the reset draft action, but a different keyword so a fat-finger
+ * tap on Reset can't accidentally trigger Delete.
+ *
+ * After deletion redirects to /dashboard with a success flash. The
+ * commissioner is the only person allowed to call this.
+ */
+async function deleteLeagueAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id"));
+  const confirm = String(formData.get("confirm") ?? "").trim();
+
+  if (confirm !== "DELETE") {
+    redirect(
+      `/leagues/${leagueId}/admin?delete_error=${encodeURIComponent("Type DELETE to confirm.")}`,
+    );
+  }
+
+  const { league } = await assertCommissioner(leagueId);
+  const svc = createServiceClient();
+
+  const { error } = await svc.from("leagues").delete().eq("id", leagueId);
+  if (error) {
+    redirect(
+      `/leagues/${leagueId}/admin?delete_error=${encodeURIComponent(error.message)}`,
+    );
+  }
+
+  redirect(
+    `/dashboard?league_deleted=${encodeURIComponent(`Deleted "${league.name}".`)}`,
+  );
+}
+
+/**
  * Manually mark an NHL team as eliminated (or un-eliminate).
  * When eliminated, the team's undrafted players are flipped to inactive
  * so they drop out of the draft pool. Already-drafted players are
@@ -297,10 +337,10 @@ export default async function AdminPage({
   searchParams,
 }: {
   params: Promise<{ leagueId: string }>;
-  searchParams: Promise<{ reset_error?: string }>;
+  searchParams: Promise<{ reset_error?: string; delete_error?: string }>;
 }) {
   const { leagueId } = await params;
-  const { reset_error } = await searchParams;
+  const { reset_error, delete_error } = await searchParams;
   const { league, user } = await assertCommissioner(leagueId);
 
   const supabase = await createClient();
@@ -540,6 +580,43 @@ export default async function AdminPage({
                 </div>
                 <Button type="submit" variant="danger">
                   Reset draft
+                </Button>
+              </form>
+            </div>
+
+            <div className="rounded-md border border-red-500/40 bg-red-500/10 p-4">
+              <h3 className="mb-2 font-semibold text-red-300">
+                Delete entire league
+              </h3>
+              <p className="mb-3 text-xs text-ice-400">
+                Permanently removes <strong>{league.name}</strong>:
+                every team, every roster, every adjustment. Other
+                members will see the league disappear from their
+                dashboards on their next page load. There is no undo.
+              </p>
+              {delete_error && (
+                <div className="mb-3 rounded-md border border-red-500/60 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                  {delete_error}
+                </div>
+              )}
+              <form
+                action={deleteLeagueAction}
+                className="flex flex-wrap items-end gap-2"
+              >
+                <input type="hidden" name="league_id" value={leagueId} />
+                <div className="space-y-1">
+                  <Label htmlFor="delete_confirm">
+                    Type <span className="font-mono">DELETE</span> to confirm
+                  </Label>
+                  <Input
+                    id="delete_confirm"
+                    name="confirm"
+                    placeholder="DELETE"
+                    className="max-w-[180px] font-mono"
+                  />
+                </div>
+                <Button type="submit" variant="danger">
+                  Delete league
                 </Button>
               </form>
             </div>

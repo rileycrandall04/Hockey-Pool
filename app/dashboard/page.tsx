@@ -21,9 +21,12 @@ export default async function DashboardPage({
     seeded?: string;
     seed_error?: string;
     seed_warning?: string;
+    left?: string;
+    league_deleted?: string;
   }>;
 }) {
-  const { seeded, seed_error, seed_warning } = await searchParams;
+  const { seeded, seed_error, seed_warning, left, league_deleted } =
+    await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -82,6 +85,16 @@ export default async function DashboardPage({
         {seed_error && (
           <div className="mb-6 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             ❌ Seed failed: {seed_error}
+          </div>
+        )}
+        {left && (
+          <div className="mb-6 rounded-md border border-ice-500/40 bg-ice-500/10 px-4 py-3 text-sm text-ice-200">
+            👋 {left}
+          </div>
+        )}
+        {league_deleted && (
+          <div className="mb-6 rounded-md border border-ice-500/40 bg-ice-500/10 px-4 py-3 text-sm text-ice-200">
+            🗑️ {league_deleted}
           </div>
         )}
         {poolEmpty && !seeded && (
