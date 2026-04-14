@@ -491,22 +491,31 @@ export function DraftRoom({
       )}
 
       {notifyPermission === "default" && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-puck-border bg-puck-card px-3 py-2 text-sm">
-          <span className="text-ice-300">
-            🔔 Get a buzz + notification when it&rsquo;s your pick.
-          </span>
-          <button
-            type="button"
-            onClick={requestNotifyPermission}
-            className="rounded-md bg-ice-500 px-3 py-1 text-xs font-medium text-white hover:bg-ice-600"
-          >
-            Enable notifications
-          </button>
+        <div className="rounded-md border border-puck-border bg-puck-card px-3 py-2 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-ice-300">
+              🔔 Get a buzz + notification when it&rsquo;s your pick.
+            </span>
+            <button
+              type="button"
+              onClick={requestNotifyPermission}
+              className="rounded-md bg-ice-500 px-3 py-1 text-xs font-medium text-white hover:bg-ice-600"
+            >
+              Enable notifications
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-ice-500">
+            Heads up: this only works while the draft room is open in
+            a browser tab — keep the tab alive (don&rsquo;t fully close
+            the browser) for the duration of the draft.
+          </p>
         </div>
       )}
       {notifyPermission === "granted" && (
         <div className="rounded-md border border-puck-border bg-puck-card px-3 py-2 text-xs text-ice-400">
-          🔔 Turn alerts on. We&rsquo;ll vibrate + notify when you&rsquo;re on the clock.
+          🔔 Turn alerts on. We&rsquo;ll vibrate + notify when you&rsquo;re
+          on the clock — <strong>only while this tab is open</strong>.
+          Fully closing the browser stops alerts.
         </div>
       )}
       {notifyPermission === "denied" && (
@@ -514,6 +523,7 @@ export function DraftRoom({
           🔕 Notifications are blocked for this site. Re-enable them in
           your browser&rsquo;s site settings to get turn alerts.
           (Vibration on Android still works without permission.)
+          Either way, alerts only fire while the draft room tab is open.
         </div>
       )}
 
