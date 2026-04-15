@@ -2,6 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+
+// Force dynamic rendering so the bell toggle state (and any other
+// additions) refreshes with the latest deploy, not a cached shell.
+export const dynamic = "force-dynamic";
 import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";

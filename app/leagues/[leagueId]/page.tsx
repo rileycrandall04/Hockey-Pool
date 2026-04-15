@@ -2,6 +2,12 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+
+// Force dynamic rendering so Next.js never serves a cached version
+// of this page that's missing the just-deployed watch toggle (or
+// any other header additions). Auth + Supabase queries make this
+// effectively dynamic anyway, but being explicit guarantees it.
+export const dynamic = "force-dynamic";
 import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";
