@@ -245,6 +245,20 @@ export function DraftRoom({
   }, [supabase, league.id]);
 
   // ---- turn notifications -------------------------------------------------
+  // Two layers:
+  //
+  //   1. In-tab fallback: navigator.vibrate + new Notification, fires on
+  //      the isMyTurn transition. Only works while the draft room tab
+  //      is open in the foreground or background.
+  //
+  //   2. Real Web Push (with a service worker). Registered when the user
+  //      taps "Enable push notifications" — subscribes via pushManager
+  //      and POSTs the subscription to /api/push/subscribe. After that,
+  //      the /api/draft/pick route server-side triggers an OS push to
+  //      every subscribed device, which works even if the browser is
+  //      fully closed and the phone is locked (iOS requires Add to Home
+  //      Screen first).
+  //
   // On mount, snapshot the current notification permission so we can show
   // the right opt-in / on / off state in the UI.
   useEffect(() => {
@@ -257,22 +271,75 @@ export function DraftRoom({
   }, []);
 
   const requestNotifyPermission = useCallback(async () => {
+    if (typeof window === "undefined") return;
     if (typeof Notification === "undefined") {
       setMessage("Browser notifications aren't supported on this device.");
       return;
     }
-    const result = await Notification.requestPermission();
-    setNotifyPermission(result);
-    if (result === "granted") {
-      // Fire a confirmation ping so the user knows it's wired up.
-      try {
-        new Notification("🏒 Notifications on", {
-          body: "We'll buzz you when it's your pick.",
-          tag: `draft-confirm-${league.id}`,
-        });
-      } catch {
-        // Some browsers reject the immediate call — that's fine.
+
+    // Step 1: OS-level permission prompt.
+    const permission = await Notification.requestPermission();
+    setNotifyPermission(permission);
+    if (permission !== "granted") return;
+
+    // Step 2: try to register the service worker + subscribe for
+    // push. This is what makes notifications work with the browser
+    // closed. If anything here fails, we fall back to the in-tab
+    // Notification API only — the user still gets alerts while the
+    // tab is open, which is better than nothing.
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        throw new Error("Push API not supported on this device");
       }
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        throw new Error("VAPID public key not configured");
+      }
+
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+
+      // Re-use any existing subscription on this device.
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          // The PushManager type expects a BufferSource-compatible
+          // value. TS gets confused about Uint8Array<ArrayBufferLike>
+          // vs Uint8Array<ArrayBuffer>, so cast through unknown.
+          applicationServerKey: urlBase64ToUint8Array(
+            vapidPublicKey,
+          ) as unknown as BufferSource,
+        });
+      }
+
+      const res = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription.toJSON()),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+    } catch (err) {
+      // Non-fatal: keep the granted OS permission so the in-tab
+      // fallback still works. Just flash a note explaining the
+      // limitation.
+      const msg = err instanceof Error ? err.message : String(err);
+      setMessage(
+        `Push subscription failed: ${msg}. Alerts will still work while this tab is open.`,
+      );
+    }
+
+    // Step 3: fire a confirmation ping so the user knows it's wired up.
+    try {
+      new Notification("🏒 Notifications on", {
+        body: "We'll buzz you when it's your pick.",
+        tag: `draft-confirm-${league.id}`,
+      });
+    } catch {
+      // Some browsers reject the immediate call — that's fine.
     }
   }, [league.id]);
   // ---- derived state ------------------------------------------------------
@@ -737,4 +804,22 @@ export function DraftRoom({
       </div>
     </div>
   );
+}
+
+/**
+ * Convert a base64url-encoded VAPID public key string into the
+ * Uint8Array format that pushManager.subscribe() expects as its
+ * applicationServerKey. Standard helper from the MDN push docs.
+ */
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const rawData = atob(base64);
+  const output = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    output[i] = rawData.charCodeAt(i);
+  }
+  return output;
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { teamOnTheClock, pickMeta } from "@/lib/draft";
+import { sendPushToUser } from "@/lib/push";
 import type { Team } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -149,6 +150,25 @@ export async function POST(request: Request) {
       draft_status: nextOnClock ? "in_progress" : "complete",
     })
     .eq("id", league_id);
+
+  // Fire a push notification to the new on-clock team's owner. We
+  // await it rather than fire-and-forget because Vercel serverless
+  // functions can terminate after the response returns and cancel
+  // any background work. ~200-500ms per subscription isn't enough
+  // to notice on top of the draft pick round-trip.
+  if (nextOnClock?.owner_id && nextOnClock.owner_id !== user.id) {
+    try {
+      await sendPushToUser(nextOnClock.owner_id, {
+        title: "🏒 You're on the clock!",
+        body: `It's your pick in ${league.name}`,
+        url: `/leagues/${league_id}/draft`,
+        tag: `draft-${league_id}`,
+      });
+    } catch (err) {
+      // Non-fatal: push is best-effort. Log and continue.
+      console.error("sendPushToUser failed", err);
+    }
+  }
 
   return NextResponse.json({
     ok: true,

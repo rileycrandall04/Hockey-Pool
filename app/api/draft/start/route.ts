@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { randomizeDraftOrder } from "@/lib/draft";
+import { sendPushToUser } from "@/lib/push";
 
 export async function POST(request: Request) {
   const { league_id } = (await request.json()) as { league_id?: string };
@@ -85,6 +86,22 @@ export async function POST(request: Request) {
     .select("*")
     .eq("league_id", league_id)
     .order("draft_position", { ascending: true, nullsFirst: false });
+
+  // Fire a push to the first on-clock team's owner so they know the
+  // draft just started and it's their turn.
+  const firstOnClock = order[0];
+  if (firstOnClock?.owner_id && firstOnClock.owner_id !== user.id) {
+    try {
+      await sendPushToUser(firstOnClock.owner_id, {
+        title: "🏒 Draft started — you're on the clock!",
+        body: `First pick in ${league.name}`,
+        url: `/leagues/${league_id}/draft`,
+        tag: `draft-${league_id}`,
+      });
+    } catch (err) {
+      console.error("sendPushToUser failed on start", err);
+    }
+  }
 
   return NextResponse.json({
     ok: true,
