@@ -493,6 +493,274 @@ export async function fetchPlayerLandingRaw(
   }
 }
 
+// ----- playoff bracket + per-series schedule ----------------------------
+
+// The NHL API payload shapes below are a best-effort match to the
+// community-documented responses. Every field is optional because the
+// public endpoints have quietly changed names over the years (e.g.
+// `topSeedTeam.abbrev` used to be `teamAbbrev.default`). The parser
+// below tolerates any of the known spellings.
+interface NhlBracketTeamRaw {
+  id?: number;
+  abbrev?: string;
+  teamAbbrev?: { default?: string } | string;
+  name?: { default?: string } | string;
+  commonName?: { default?: string } | string;
+  placeName?: { default?: string } | string;
+  logo?: string;
+  darkLogo?: string;
+}
+
+interface NhlBracketSeriesRaw {
+  seriesUrl?: string;
+  seriesTitle?: string;
+  seriesAbbrev?: string;
+  seriesLetter?: string;
+  playoffRound?: number;
+  roundLabel?: string;
+  topSeedTeam?: NhlBracketTeamRaw;
+  topSeedWins?: number;
+  topSeedRank?: number;
+  bottomSeedTeam?: NhlBracketTeamRaw;
+  bottomSeedWins?: number;
+  bottomSeedRank?: number;
+  winningTeamId?: number | null;
+  losingTeamId?: number | null;
+  neededToWin?: number;
+}
+
+interface NhlBracketResponse {
+  series?: NhlBracketSeriesRaw[];
+  bracketLogo?: string;
+}
+
+interface NhlBroadcastRaw {
+  id?: number;
+  market?: string;
+  countryCode?: string;
+  network?: string;
+  sequenceNumber?: number;
+}
+
+interface NhlSeriesScheduleGameRaw {
+  id?: number;
+  season?: number;
+  gameType?: number;
+  gameDate?: string;
+  venue?: { default?: string } | string;
+  neutralSite?: boolean;
+  startTimeUTC?: string;
+  easternUTCOffset?: string;
+  venueUTCOffset?: string;
+  gameState?: string;
+  gameScheduleState?: string;
+  tvBroadcasts?: NhlBroadcastRaw[];
+  awayTeam?: {
+    id?: number;
+    abbrev?: string;
+    score?: number;
+  };
+  homeTeam?: {
+    id?: number;
+    abbrev?: string;
+    score?: number;
+  };
+  seriesStatus?: {
+    gameNumberOfSeries?: number;
+  };
+}
+
+interface NhlSeriesScheduleResponse {
+  seriesTitle?: string;
+  seriesLogo?: string;
+  seriesAbbrev?: string;
+  games?: NhlSeriesScheduleGameRaw[];
+}
+
+export interface BracketSeries {
+  seriesLetter: string;
+  round: number;
+  title: string | null;
+  abbrev: string | null;
+  topSeedAbbrev: string | null;
+  topSeedName: string | null;
+  topSeedLogo: string | null;
+  topSeedWins: number;
+  bottomSeedAbbrev: string | null;
+  bottomSeedName: string | null;
+  bottomSeedLogo: string | null;
+  bottomSeedWins: number;
+  winningTeamAbbrev: string | null;
+  neededToWin: number;
+}
+
+export interface BracketGame {
+  gameId: number;
+  seriesLetter: string;
+  gameNumber: number | null;
+  startTimeUtc: string | null;
+  gameDate: string | null;
+  venue: string | null;
+  awayAbbrev: string | null;
+  homeAbbrev: string | null;
+  awayScore: number | null;
+  homeScore: number | null;
+  gameState: string | null;
+  tvBroadcasts: Array<{
+    network: string;
+    market: string | null;
+    countryCode: string | null;
+  }>;
+}
+
+function pickString(
+  value: { default?: string } | string | undefined,
+): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value || null;
+  return value.default ?? null;
+}
+
+function pickTeamAbbrev(team: NhlBracketTeamRaw | undefined): string | null {
+  if (!team) return null;
+  if (team.abbrev) return team.abbrev;
+  return pickString(team.teamAbbrev);
+}
+
+function pickTeamName(team: NhlBracketTeamRaw | undefined): string | null {
+  if (!team) return null;
+  return (
+    pickString(team.commonName) ??
+    pickString(team.name) ??
+    pickString(team.placeName)
+  );
+}
+
+/**
+ * Fetch the current Stanley Cup playoff bracket from the NHL public
+ * API and normalize it into a flat list of series. Each series row
+ * includes the two seeded teams, logos, and the running series score.
+ *
+ * Returns an empty array (not an error) when the bracket endpoint
+ * fails or the playoffs haven't started yet — callers should treat
+ * an empty result as "hide the bracket UI".
+ *
+ * `yearOrSeason` accepts either a 4-digit playoff year ("2025") or
+ * an 8-digit season code ("20242025"). The NHL endpoint takes the
+ * 4-digit playoff year (the year the Cup is awarded).
+ */
+export async function fetchPlayoffBracket(
+  yearOrSeason: string,
+): Promise<BracketSeries[]> {
+  const year =
+    yearOrSeason.length === 8
+      ? yearOrSeason.slice(4)
+      : yearOrSeason;
+  let data: NhlBracketResponse;
+  try {
+    data = await nhlFetch<NhlBracketResponse>(`/playoff-bracket/${year}`);
+  } catch {
+    return [];
+  }
+
+  const out: BracketSeries[] = [];
+  for (const s of data.series ?? []) {
+    // The NHL uses a single letter (A..P) per series. If it's
+    // missing we can't key the row, so drop it.
+    const letter = s.seriesLetter?.trim().toUpperCase();
+    if (!letter) continue;
+    const winnerId = s.winningTeamId ?? null;
+    const topId = s.topSeedTeam?.id ?? null;
+    const bottomId = s.bottomSeedTeam?.id ?? null;
+    const winnerAbbrev =
+      winnerId != null
+        ? winnerId === topId
+          ? pickTeamAbbrev(s.topSeedTeam)
+          : winnerId === bottomId
+            ? pickTeamAbbrev(s.bottomSeedTeam)
+            : null
+        : null;
+    out.push({
+      seriesLetter: letter,
+      round: s.playoffRound ?? 1,
+      title: s.seriesTitle ?? s.roundLabel ?? null,
+      abbrev: s.seriesAbbrev ?? null,
+      topSeedAbbrev: pickTeamAbbrev(s.topSeedTeam),
+      topSeedName: pickTeamName(s.topSeedTeam),
+      topSeedLogo: s.topSeedTeam?.logo ?? s.topSeedTeam?.darkLogo ?? null,
+      topSeedWins: s.topSeedWins ?? 0,
+      bottomSeedAbbrev: pickTeamAbbrev(s.bottomSeedTeam),
+      bottomSeedName: pickTeamName(s.bottomSeedTeam),
+      bottomSeedLogo:
+        s.bottomSeedTeam?.logo ?? s.bottomSeedTeam?.darkLogo ?? null,
+      bottomSeedWins: s.bottomSeedWins ?? 0,
+      winningTeamAbbrev: winnerAbbrev,
+      neededToWin: s.neededToWin ?? 4,
+    });
+  }
+  return out;
+}
+
+/**
+ * Fetch the schedule for a single playoff series: the list of games
+ * (past + future) with dates, start times, venues, scores, state,
+ * and TV broadcasts. Returns an empty array on failure.
+ *
+ * `season` must be the 8-digit form ("20242025").
+ */
+export async function fetchPlayoffSeriesSchedule(
+  season: string,
+  seriesLetter: string,
+): Promise<BracketGame[]> {
+  const letter = seriesLetter.trim().toLowerCase();
+  if (!letter) return [];
+  let data: NhlSeriesScheduleResponse;
+  try {
+    data = await nhlFetch<NhlSeriesScheduleResponse>(
+      `/schedule/playoff-series/${season}/${letter}`,
+    );
+  } catch {
+    return [];
+  }
+
+  const out: BracketGame[] = [];
+  for (const g of data.games ?? []) {
+    if (!g.id) continue;
+    const broadcasts = (g.tvBroadcasts ?? [])
+      .filter((b): b is NhlBroadcastRaw => !!b && !!b.network)
+      .map((b) => ({
+        network: b.network!,
+        market: b.market ?? null,
+        countryCode: b.countryCode ?? null,
+      }));
+    out.push({
+      gameId: g.id,
+      seriesLetter: letter.toUpperCase(),
+      gameNumber: g.seriesStatus?.gameNumberOfSeries ?? null,
+      startTimeUtc: g.startTimeUTC ?? null,
+      gameDate: g.gameDate ?? null,
+      venue: pickString(g.venue),
+      awayAbbrev: g.awayTeam?.abbrev ?? null,
+      homeAbbrev: g.homeTeam?.abbrev ?? null,
+      awayScore: g.awayTeam?.score ?? null,
+      homeScore: g.homeTeam?.score ?? null,
+      gameState: g.gameState ?? null,
+      tvBroadcasts: broadcasts,
+    });
+  }
+  return out;
+}
+
+/**
+ * Convert an 8-digit season code ("20242025") into the 4-digit playoff
+ * year the /playoff-bracket endpoint expects (the year the Cup is
+ * awarded). Exported so the cron route and tests can share the logic.
+ */
+export function playoffYearForSeason(season: string): string {
+  if (season.length === 8) return season.slice(4);
+  return season;
+}
+
 // ----- playoff elimination detection ------------------------------------
 
 /**

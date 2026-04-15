@@ -1,5 +1,9 @@
 import { describe, test, expect } from "vitest";
-import { currentSeason, normalizePosition } from "../lib/nhl-api";
+import {
+  currentSeason,
+  normalizePosition,
+  playoffYearForSeason,
+} from "../lib/nhl-api";
 
 describe("currentSeason", () => {
   // The NHL season runs Oct -> Jun. Anything in Oct/Nov/Dec is the
@@ -46,5 +50,19 @@ describe("normalizePosition", () => {
   test("falls back to 'F' for unknown codes", () => {
     expect(normalizePosition("XYZ")).toBe("F");
     expect(normalizePosition("")).toBe("F");
+  });
+});
+
+describe("playoffYearForSeason", () => {
+  // /playoff-bracket/{year} expects the calendar year the Cup is
+  // awarded (the back half of an NHL season). Our currentSeason()
+  // helper returns the 8-digit season code so we strip the front.
+  test("8-digit season returns the second half", () => {
+    expect(playoffYearForSeason("20242025")).toBe("2025");
+    expect(playoffYearForSeason("20252026")).toBe("2026");
+  });
+
+  test("already-4-digit input passes through", () => {
+    expect(playoffYearForSeason("2025")).toBe("2025");
   });
 });

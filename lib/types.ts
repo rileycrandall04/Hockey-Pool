@@ -105,3 +105,45 @@ export interface RosterEntry {
   fantasy_points: number;
   games_played: number;
 }
+
+export interface PlayoffSeries {
+  series_letter: string;
+  season: string;
+  round: number;
+  series_title: string | null;
+  series_abbrev: string | null;
+  top_seed_abbrev: string | null;
+  top_seed_name: string | null;
+  top_seed_logo: string | null;
+  top_seed_wins: number;
+  bottom_seed_abbrev: string | null;
+  bottom_seed_name: string | null;
+  bottom_seed_logo: string | null;
+  bottom_seed_wins: number;
+  winning_team_abbrev: string | null;
+  needed_to_win: number;
+  sort_order: number;
+  updated_at: string;
+}
+
+export interface PlayoffBroadcast {
+  network: string;
+  market: string | null;
+  countryCode: string | null;
+}
+
+export interface PlayoffGame {
+  game_id: number;
+  series_letter: string;
+  game_number: number | null;
+  start_time_utc: string | null;
+  game_date: string | null;
+  venue: string | null;
+  away_abbrev: string | null;
+  home_abbrev: string | null;
+  away_score: number | null;
+  home_score: number | null;
+  game_state: string | null;
+  tv_broadcasts: PlayoffBroadcast[];
+  updated_at: string;
+}

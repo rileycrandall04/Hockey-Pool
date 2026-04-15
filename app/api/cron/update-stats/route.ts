@@ -8,6 +8,7 @@ import {
 } from "@/lib/nhl-api";
 import { syncInjuries } from "@/lib/sync-injuries";
 import { snapshotAllLeagues } from "@/lib/snapshot-standings";
+import { syncPlayoffBracket } from "@/lib/sync-bracket";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,7 +18,7 @@ export const maxDuration = 60;
  *
  * Runs daily at 06:00 America/New_York (10:00 UTC) via Vercel Cron.
  *
- * Five jobs in one route:
+ * Six jobs in one route:
  *   1. Pull every finished NHL game from the previous date, aggregate
  *      per-player goals / assists / OT goals, and increment the totals
  *      in `player_stats`.
@@ -30,6 +31,11 @@ export const maxDuration = 60;
  *   4. Best-effort refresh injury status for every active player on
  *      a playoff team. Injured players get a red-cross badge in the
  *      draft room.
+ *   5. Snapshot each league's standings so the overnight up/down/fire
+ *      indicators have a baseline to compare against.
+ *   6. Refresh the Stanley Cup playoff bracket (series + per-series
+ *      schedule with dates, start times, and TV broadcasts). Powers
+ *      the bracket card on each league landing page.
  *
  * Body (optional):
  *   - date: "YYYY-MM-DD" to run for a specific date (default: yesterday ET)
@@ -54,6 +60,9 @@ export async function POST(request: Request) {
     eliminated: 0,
     injuries_checked: 0,
     snapshots_written: 0,
+    bracket_series: 0,
+    bracket_games: 0,
+    bracket_errors: [] as string[],
   };
 
   // -------------------------------------------------------------------
@@ -225,6 +234,23 @@ export async function POST(request: Request) {
     summary.snapshots_written = snapResult.teams;
   } catch (err) {
     console.error("Failed to write standings snapshots", err);
+  }
+
+  // -------------------------------------------------------------------
+  // 6. Playoff bracket + per-series schedules. Powers the bracket
+  // card on each league landing page (matchups, series scores,
+  // upcoming game dates/times, TV broadcasts).
+  // -------------------------------------------------------------------
+  try {
+    const bracketResult = await syncPlayoffBracket();
+    summary.bracket_series = bracketResult.series_upserted;
+    summary.bracket_games = bracketResult.games_upserted;
+    summary.bracket_errors = bracketResult.errors;
+  } catch (err) {
+    console.error("Failed to sync playoff bracket", err);
+    summary.bracket_errors.push(
+      err instanceof Error ? err.message : String(err),
+    );
   }
 
   return NextResponse.json(summary);

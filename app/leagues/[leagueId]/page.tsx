@@ -7,9 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CopyJoinCodeButton } from "@/components/copy-join-code-button";
 import { DailyTicker } from "@/components/daily-ticker";
+import { PlayoffBracket } from "@/components/playoff-bracket";
 import { scoreTeam } from "@/lib/scoring";
 import { getOvernightDeltas } from "@/lib/snapshot-standings";
-import type { League, RosterEntry, Team } from "@/lib/types";
+import type {
+  League,
+  PlayoffGame,
+  PlayoffSeries,
+  RosterEntry,
+  Team,
+} from "@/lib/types";
 
 export default async function LeagueStandingsPage({
   params,
@@ -52,6 +59,22 @@ export default async function LeagueStandingsPage({
     .from("score_adjustments")
     .select("team_id, delta_points")
     .eq("league_id", leagueId);
+
+  // Bracket data is global (not league-scoped). It's refreshed nightly
+  // by the stats cron; we just read whatever's in the table. If the
+  // cron hasn't populated it yet (pre-playoffs) the component renders
+  // nothing.
+  const { data: bracketSeriesRows } = await supabase
+    .from("playoff_series")
+    .select("*")
+    .order("round", { ascending: true })
+    .order("sort_order", { ascending: true });
+  const { data: bracketGameRows } = await supabase
+    .from("playoff_games")
+    .select("*")
+    .order("start_time_utc", { ascending: true });
+  const bracketSeries = (bracketSeriesRows ?? []) as PlayoffSeries[];
+  const bracketGames = (bracketGameRows ?? []) as PlayoffGame[];
 
   const adjByTeam = new Map<string, number>();
   for (const a of adjustments ?? []) {
@@ -146,6 +169,8 @@ export default async function LeagueStandingsPage({
             </Link>
           )}
         </div>
+
+        <PlayoffBracket series={bracketSeries} games={bracketGames} />
 
         {standings.length === 0 ? (
           <Card>
