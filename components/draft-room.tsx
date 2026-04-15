@@ -380,6 +380,59 @@ export function DraftRoom({
       // Some browsers reject the immediate call — that's fine.
     }
   }, [league.id, vapidPublicKey]);
+
+  // Send a test push to the current user's subscribed devices. This
+  // is the primary diagnostic for "is my iPhone actually receiving
+  // pushes from the server?" — iOS PWAs silently drop pushes in all
+  // kinds of unhelpful ways (app not added to home screen, phone in
+  // focus mode, Safari background notification permission revoked,
+  // subscription endpoint invalidated, etc.), and without a test
+  // button the only way to find out is to run a real draft.
+  //
+  // The server returns { sent, dead, errors } which we flash verbatim
+  // so the user can report the exact numbers if something's off.
+  const sendTestPush = useCallback(async () => {
+    setMessage(null);
+    try {
+      const res = await fetch("/api/push/test", { method: "POST" });
+      const json = (await res.json().catch(() => null)) as
+        | {
+            ok: boolean;
+            sent?: number;
+            dead?: number;
+            errors?: number;
+            error?: string;
+          }
+        | null;
+      if (!res.ok || !json?.ok) {
+        setMessage(
+          `Test push failed: ${json?.error ?? `HTTP ${res.status}`}`,
+        );
+        return;
+      }
+      const sent = json.sent ?? 0;
+      const dead = json.dead ?? 0;
+      const errors = json.errors ?? 0;
+      if (sent === 0) {
+        setMessage(
+          `Test push: 0 devices reached${
+            dead ? ` (${dead} stale subscription${dead === 1 ? "" : "s"} removed)` : ""
+          }. Re-subscribe this device from the banner above.`,
+        );
+      } else {
+        setMessage(
+          `Test push sent to ${sent} device${sent === 1 ? "" : "s"}` +
+            (dead ? `, ${dead} stale removed` : "") +
+            (errors ? `, ${errors} error${errors === 1 ? "" : "s"}` : "") +
+            ". If your phone didn't buzz within ~10s, check OS notification settings.",
+        );
+      }
+    } catch (err) {
+      setMessage(
+        `Test push failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }, []);
   // ---- derived state ------------------------------------------------------
   const pickedPlayerIds = useMemo(
     () => new Set(picks.map((p) => p.player_id)),
@@ -664,9 +717,18 @@ export function DraftRoom({
         </div>
       )}
       {notifyPermission === "granted" && pushSubscribed && (
-        <div className="rounded-md border border-puck-border bg-puck-card px-3 py-2 text-xs text-ice-400">
-          🔔 Push alerts on. We&rsquo;ll vibrate + notify when you&rsquo;re
-          on the clock, even if the browser is closed.
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-puck-border bg-puck-card px-3 py-2 text-xs text-ice-400">
+          <span>
+            🔔 Push alerts on. We&rsquo;ll vibrate + notify when you&rsquo;re
+            on the clock, even if the browser is closed.
+          </span>
+          <button
+            type="button"
+            onClick={sendTestPush}
+            className="rounded-md border border-ice-500/50 bg-ice-500/10 px-2 py-1 text-[11px] font-medium text-ice-100 hover:bg-ice-500/20"
+          >
+            Test push
+          </button>
         </div>
       )}
       {notifyPermission === "denied" && (
@@ -675,6 +737,22 @@ export function DraftRoom({
           your browser&rsquo;s site settings to get turn alerts.
           (Vibration on Android still works without permission.)
         </div>
+      )}
+
+      {/* Picks ticker — horizontally scrollable history of the draft,
+          default-scrolled to the right so the most recent pick is
+          visible. Not auto-moving. */}
+      <DraftPicksTicker picks={picks} teams={teams} players={players} />
+
+      {/* Best available — only when it's the user's turn. Shortcut
+          to draft one of the top remaining players without scrolling
+          the main table. */}
+      {isMyTurn && !draftOver && (
+        <BestAvailableBox
+          players={filteredPlayers.slice(0, 5)}
+          onDraft={handlePick}
+          disabled={busy}
+        />
       )}
 
       <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
@@ -856,6 +934,187 @@ export function DraftRoom({
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Horizontally scrollable draft picks ticker. Default state is
+ * scrolled all the way to the right so the most recent pick is
+ * visible; the user can swipe/drag left to see history. Not
+ * auto-moving — scrolling is user-driven only.
+ *
+ * Each chip shows round.pick, team name, player name, and position.
+ * When a new pick lands, we auto-scroll back to the right ONLY if
+ * the user was already at (or near) the right edge. If they've
+ * scrolled left to read history, we leave them alone.
+ */
+function DraftPicksTicker({
+  picks,
+  teams,
+  players,
+}: {
+  picks: PickRow[];
+  teams: Team[];
+  players: DraftablePlayer[];
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stayAtEndRef = useRef(true);
+
+  const teamById = useMemo(
+    () => new Map(teams.map((t) => [t.id, t])),
+    [teams],
+  );
+  const playerById = useMemo(
+    () => new Map(players.map((p) => [p.id, p])),
+    [players],
+  );
+
+  const sorted = useMemo(
+    () => [...picks].sort((a, b) => a.pick_number - b.pick_number),
+    [picks],
+  );
+
+  // Track whether the user has scrolled away from the right edge. If
+  // they have, don't snap them back when new picks arrive.
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atEnd =
+      el.scrollLeft + el.clientWidth >= el.scrollWidth - 16;
+    stayAtEndRef.current = atEnd;
+  };
+
+  // On mount and on new picks, jump to the right edge if the user is
+  // "at end" (which they are by default on first render).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (stayAtEndRef.current) {
+      el.scrollLeft = el.scrollWidth;
+    }
+  }, [sorted.length]);
+
+  if (sorted.length === 0) {
+    return (
+      <div className="rounded-md border border-puck-border bg-puck-card px-3 py-2 text-[11px] text-ice-400">
+        No picks yet — waiting for the first one.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-puck-border bg-puck-card">
+      <div className="flex items-center justify-between px-3 pt-1.5 text-[10px] uppercase tracking-wider text-ice-400">
+        <span>Draft picks · newest →</span>
+        <span className="text-ice-500">{sorted.length} made</span>
+      </div>
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="flex gap-2 overflow-x-auto px-3 pb-2 pt-1"
+      >
+        {sorted.map((pick) => {
+          const team = teamById.get(pick.team_id);
+          const player = playerById.get(pick.player_id);
+          const isLatest = pick.pick_number === sorted[sorted.length - 1].pick_number;
+          return (
+            <div
+              key={pick.id}
+              className={
+                "flex min-w-[160px] max-w-[200px] flex-shrink-0 flex-col gap-0.5 rounded-md border px-2.5 py-1.5 " +
+                (isLatest
+                  ? "border-ice-500 bg-ice-500/10"
+                  : "border-puck-border bg-puck-bg")
+              }
+            >
+              <div className="flex items-baseline justify-between gap-2 text-[9px] uppercase tracking-wider text-ice-500">
+                <span>
+                  R{pick.round}.{pick.pick_number}
+                </span>
+                <span className="truncate">{team?.name ?? ""}</span>
+              </div>
+              <div className="truncate text-xs font-semibold text-ice-50">
+                {player?.full_name ?? `#${pick.player_id}`}
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-ice-400">
+                {player && (
+                  <>
+                    <span className="rounded bg-puck-border px-1 text-[9px] text-ice-200">
+                      {player.position}
+                    </span>
+                    <span>{player.nhl_abbrev ?? "—"}</span>
+                    <span className="ml-auto font-mono text-ice-300">
+                      {player.season_points}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Highlighted "Best available" box shown to the user who is on the
+ * clock. Lists the top 5 undrafted players (already filtered +
+ * sorted upstream by season points) with a prominent Draft button
+ * for each so they can pick without scrolling the main table.
+ */
+function BestAvailableBox({
+  players,
+  onDraft,
+  disabled,
+}: {
+  players: DraftablePlayer[];
+  onDraft: (playerId: number) => void | Promise<void>;
+  disabled: boolean;
+}) {
+  if (players.length === 0) return null;
+  return (
+    <div className="rounded-md border-2 border-ice-500 bg-ice-500/10 px-3 py-2 shadow-lg shadow-ice-500/10">
+      <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-ice-100">
+        ✨ Best available — tap to draft
+      </div>
+      <ul className="space-y-1">
+        {players.map((p) => (
+          <li
+            key={p.id}
+            className="flex items-center gap-2 rounded px-1 py-1 hover:bg-ice-500/10"
+          >
+            <span
+              className={
+                p.position === "D"
+                  ? "rounded bg-ice-500/25 px-1 text-[9px] font-semibold text-ice-100"
+                  : "rounded bg-puck-border px-1 text-[9px] text-ice-200"
+              }
+            >
+              {p.position}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ice-50">
+              {p.full_name}
+            </span>
+            <span className="flex-shrink-0 text-[10px] text-ice-400">
+              {p.nhl_abbrev ?? "—"}
+            </span>
+            <span className="flex-shrink-0 font-mono text-xs font-bold text-ice-50">
+              {p.season_points}
+            </span>
+            <button
+              type="button"
+              onClick={() => onDraft(p.id)}
+              disabled={disabled}
+              aria-label={`Draft ${p.full_name}`}
+              className="flex-shrink-0 rounded bg-ice-500 px-2 py-1 text-[10px] font-semibold text-white hover:bg-ice-600 disabled:cursor-not-allowed disabled:bg-ice-800 disabled:text-ice-300"
+            >
+              Draft
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
