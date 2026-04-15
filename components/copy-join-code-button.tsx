@@ -8,10 +8,10 @@ interface CopyJoinCodeButtonProps {
 }
 
 /**
- * Small button commissioners can click to copy a league's join code
- * to the clipboard. Shows a short-lived "Copied!" confirmation and
- * falls back to document.execCommand("copy") when the async Clipboard
- * API isn't available (insecure context, older browsers).
+ * Small button to copy a league's join code to the clipboard. Shows
+ * a short-lived "Copied!" confirmation and falls back to
+ * document.execCommand("copy") when the async Clipboard API isn't
+ * available (insecure context, older browsers).
  */
 export function CopyJoinCodeButton({
   code,

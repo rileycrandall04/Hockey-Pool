@@ -133,9 +133,7 @@ export default async function LeagueStandingsPage({
               <span className="rounded bg-puck-card px-1.5 py-0.5 font-mono text-ice-100">
                 {league.join_code}
               </span>
-              {isCommissioner && (
-                <CopyJoinCodeButton code={league.join_code} />
-              )}
+              <CopyJoinCodeButton code={league.join_code} />
             </span>
             <span aria-hidden="true">&middot;</span>
             <span>Draft: {league.draft_status.replace("_", " ")}</span>
