@@ -203,6 +203,11 @@ async function rollbackPicksAction(formData: FormData) {
       draft_round: nextOnClock
         ? pickMeta(newPickIndex, teamList.length).round
         : 1,
+      // Restart the stall-watch clock for whoever the rollback
+      // landed on, and clear the notified marker so the new clock
+      // can trigger a fresh alert.
+      draft_on_clock_since: nextOnClock ? new Date().toISOString() : null,
+      draft_stale_notified_for: null,
     })
     .eq("id", leagueId);
 
@@ -281,6 +286,8 @@ async function resetDraftAction(formData: FormData) {
       draft_current_team: null,
       draft_round: 1,
       draft_started_at: null,
+      draft_on_clock_since: null,
+      draft_stale_notified_for: null,
     })
     .eq("id", leagueId);
   if (updateError) {

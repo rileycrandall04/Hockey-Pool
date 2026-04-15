@@ -60,13 +60,19 @@ export async function POST(request: Request) {
       .eq("id", order[i].id);
   }
 
+  const now = new Date().toISOString();
   const { data: updatedLeague, error: updateError } = await svc
     .from("leagues")
     .update({
       draft_status: "in_progress",
-      draft_started_at: new Date().toISOString(),
+      draft_started_at: now,
       draft_current_team: order[0].id,
       draft_round: 1,
+      // The stall-watch cron reads this column to compute how long
+      // the current team has been on the clock. Starting the draft
+      // is the first "clock started" event.
+      draft_on_clock_since: now,
+      draft_stale_notified_for: null,
     })
     .eq("id", league_id)
     .select("*")

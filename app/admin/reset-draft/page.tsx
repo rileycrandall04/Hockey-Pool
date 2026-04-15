@@ -131,6 +131,8 @@ async function resetDraftAsOwnerAction(formData: FormData) {
       draft_current_team: null,
       draft_round: 1,
       draft_started_at: null,
+      draft_on_clock_since: null,
+      draft_stale_notified_for: null,
     })
     .eq("id", leagueId);
   if (leagueUpdateError) {

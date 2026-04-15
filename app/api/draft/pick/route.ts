@@ -148,6 +148,12 @@ export async function POST(request: Request) {
         ? pickMeta(nextIndex, teams!.length).round
         : league.draft_round,
       draft_status: nextOnClock ? "in_progress" : "complete",
+      // Advance the stall-watch clock: the new on-clock team just
+      // started their pick window, and we clear the "already
+      // notified" marker so the fresh team is eligible for a stall
+      // alert when their 15 minutes run out.
+      draft_on_clock_since: nextOnClock ? new Date().toISOString() : null,
+      draft_stale_notified_for: null,
     })
     .eq("id", league_id);
 

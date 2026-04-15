@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
@@ -15,6 +16,50 @@ import { RowMenu } from "@/components/row-menu";
 import type { League, Team } from "@/lib/types";
 
 type LeagueWithTeam = League & { team: Team | null };
+
+/**
+ * Server action that flips draft stall alerts on/off for the
+ * current user + a given league. Used by the 🔔/🔕 button on each
+ * league row — action=watch inserts, action=unwatch deletes.
+ *
+ * The insert goes through the regular supabase client (authenticated
+ * session) so the RLS policy added in migration 0009 enforces that
+ * users can only write their own rows.
+ */
+async function toggleDraftWatchAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  const action = String(formData.get("action") ?? "");
+  if (!leagueId) return;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  if (action === "watch") {
+    await supabase
+      .from("draft_watches")
+      .upsert(
+        {
+          user_id: user.id,
+          league_id: leagueId,
+          stale_minutes: 15,
+        },
+        { onConflict: "user_id,league_id" },
+      );
+  } else if (action === "unwatch") {
+    await supabase
+      .from("draft_watches")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("league_id", leagueId);
+  }
+
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
+}
 
 export default async function DashboardPage({
   searchParams,
@@ -78,6 +123,16 @@ export default async function DashboardPage({
     .from("players")
     .select("id", { count: "exact", head: true });
   const poolEmpty = (playerCount ?? 0) === 0;
+
+  // Which of the user's leagues are they already watching for draft
+  // stalls? Powers the 🔔/🔕 toggle next to each league row below.
+  const { data: watchRows } = await supabase
+    .from("draft_watches")
+    .select("league_id")
+    .eq("user_id", user.id);
+  const watchedLeagueIds = new Set(
+    (watchRows ?? []).map((r) => r.league_id as string),
+  );
 
   return (
     <>
@@ -175,6 +230,11 @@ export default async function DashboardPage({
             {leagues.map((l) => {
               const isCommish = l.commissioner_id === user.id;
               const hasAction = isCommish || Boolean(l.team);
+              const watching = watchedLeagueIds.has(l.id);
+              // Alerts are only meaningful before a draft finishes.
+              const canWatch =
+                l.draft_status === "pending" ||
+                l.draft_status === "in_progress";
               return (
                 <li
                   key={l.id}
@@ -191,8 +251,43 @@ export default async function DashboardPage({
                       Season {l.season} &middot;{" "}
                       {l.draft_status.replace("_", " ")}
                       {isCommish && " · commissioner"}
+                      {watching && " · 🔔 stall alerts on"}
                     </span>
                   </Link>
+                  {canWatch && (
+                    <form
+                      action={toggleDraftWatchAction}
+                      className="flex-shrink-0"
+                    >
+                      <input type="hidden" name="league_id" value={l.id} />
+                      <input
+                        type="hidden"
+                        name="action"
+                        value={watching ? "unwatch" : "watch"}
+                      />
+                      <button
+                        type="submit"
+                        title={
+                          watching
+                            ? "Stop draft stall alerts for this league"
+                            : "Get a push notification when a team has been on the clock for 15+ min"
+                        }
+                        aria-label={
+                          watching
+                            ? "Unwatch draft stalls"
+                            : "Watch draft stalls"
+                        }
+                        className={
+                          "flex h-9 w-9 items-center justify-center rounded-md border text-base transition-colors " +
+                          (watching
+                            ? "border-ice-400 bg-ice-500/20 text-ice-50 hover:bg-ice-500/30"
+                            : "border-puck-border bg-puck-bg text-ice-400 hover:bg-puck-border hover:text-ice-100")
+                        }
+                      >
+                        {watching ? "🔔" : "🔕"}
+                      </button>
+                    </form>
+                  )}
                   {hasAction && (
                     <div className="flex-shrink-0 pr-2">
                       <RowMenu>
@@ -222,6 +317,15 @@ export default async function DashboardPage({
               );
             })}
           </ul>
+        )}
+
+        {leagues.length > 0 && (
+          <p className="mt-3 text-[11px] text-ice-500">
+            Tap the bell next to a league to get a push notification when
+            a team has been on the clock for 15+ minutes. You must have
+            push enabled (tap <strong>Enable notifications</strong> once
+            from the draft room on each device).
+          </p>
         )}
       </main>
     </>
