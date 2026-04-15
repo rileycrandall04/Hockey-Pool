@@ -28,11 +28,13 @@ const ROUND_LABELS: Record<number, string> = {
  *   - Next game: date, time (local to the viewer via Intl), and TV
  *     broadcast networks. "Series complete" if one team has clinched.
  *
- * Renders nothing when there are zero series — e.g. during the
- * regular season or before the cron has ever run.
+ * Before the cron has ever run we still render the card with an
+ * empty-state skeleton (15 TBD slots across the 4 rounds) so the
+ * landing page shows the bracket shell immediately instead of a
+ * gap that later fills in.
  */
 export function PlayoffBracket({ series, games }: PlayoffBracketProps) {
-  if (!series || series.length === 0) return null;
+  const isEmpty = !series || series.length === 0;
 
   // Group games by series letter so each series card can pick out
   // its own game list in O(1).
@@ -44,11 +46,20 @@ export function PlayoffBracket({ series, games }: PlayoffBracketProps) {
   }
 
   // Group series by round so the UI can render section headings.
-  const rounds = new Map<number, PlayoffSeries[]>();
-  for (const s of series) {
-    const arr = rounds.get(s.round) ?? [];
-    arr.push(s);
-    rounds.set(s.round, arr);
+  // When there's no data we use a synthetic skeleton that mirrors
+  // the real bracket shape (8 / 4 / 2 / 1 series).
+  const rounds = new Map<number, PlayoffSeries[] | PlaceholderSeries[]>();
+  if (isEmpty) {
+    rounds.set(1, buildPlaceholderRound(1, 8));
+    rounds.set(2, buildPlaceholderRound(2, 4));
+    rounds.set(3, buildPlaceholderRound(3, 2));
+    rounds.set(4, buildPlaceholderRound(4, 1));
+  } else {
+    for (const s of series) {
+      const arr = (rounds.get(s.round) ?? []) as PlayoffSeries[];
+      arr.push(s);
+      rounds.set(s.round, arr);
+    }
   }
   const roundKeys = [...rounds.keys()].sort((a, b) => a - b);
 
@@ -62,33 +73,96 @@ export function PlayoffBracket({ series, games }: PlayoffBracketProps) {
           <span className="font-semibold text-ice-100">Playoff bracket</span>
         </span>
         <span className="text-[10px] uppercase tracking-wider text-ice-500">
-          Updated nightly
+          {isEmpty ? "Populates 6am ET" : "Updated nightly"}
         </span>
       </summary>
       <div className="space-y-4 border-t border-puck-border px-3 py-3">
+        {isEmpty && (
+          <p className="rounded border border-dashed border-puck-border/80 bg-puck-bg/40 px-2 py-1.5 text-[11px] text-ice-400">
+            Waiting for the next nightly update. Matchups, series
+            scores, and broadcast info will appear here after the
+            6am ET sync runs.
+          </p>
+        )}
         {roundKeys.map((round) => {
-          const roundSeries = (rounds.get(round) ?? []).sort(
-            (a, b) => a.sort_order - b.sort_order,
-          );
+          const roundSeries = rounds.get(round) ?? [];
+          const sorted = isEmpty
+            ? (roundSeries as PlaceholderSeries[])
+            : [...(roundSeries as PlayoffSeries[])].sort(
+                (a, b) => a.sort_order - b.sort_order,
+              );
           return (
             <section key={round}>
               <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-ice-400">
                 {ROUND_LABELS[round] ?? `Round ${round}`}
               </h3>
               <div className="grid gap-2 sm:grid-cols-2">
-                {roundSeries.map((s) => (
-                  <SeriesCard
-                    key={s.series_letter}
-                    series={s}
-                    games={gamesBySeries.get(s.series_letter) ?? []}
-                  />
-                ))}
+                {sorted.map((s) =>
+                  isPlaceholder(s) ? (
+                    <PlaceholderSeriesCard key={s.key} />
+                  ) : (
+                    <SeriesCard
+                      key={s.series_letter}
+                      series={s}
+                      games={gamesBySeries.get(s.series_letter) ?? []}
+                    />
+                  ),
+                )}
               </div>
             </section>
           );
         })}
       </div>
     </details>
+  );
+}
+
+interface PlaceholderSeries {
+  key: string;
+  __placeholder: true;
+}
+
+function buildPlaceholderRound(
+  round: number,
+  count: number,
+): PlaceholderSeries[] {
+  return Array.from({ length: count }, (_, i) => ({
+    key: `r${round}-${i}`,
+    __placeholder: true as const,
+  }));
+}
+
+function isPlaceholder(
+  s: PlayoffSeries | PlaceholderSeries,
+): s is PlaceholderSeries {
+  return (s as PlaceholderSeries).__placeholder === true;
+}
+
+function PlaceholderSeriesCard() {
+  return (
+    <div className="rounded-md border border-dashed border-puck-border/60 bg-puck-bg/30 p-2 text-xs">
+      <div className="space-y-1">
+        <PlaceholderTeamRow />
+        <PlaceholderTeamRow />
+      </div>
+      <div className="mt-2 border-t border-puck-border/50 pt-1.5 text-[10px] text-ice-500">
+        Awaiting data
+      </div>
+    </div>
+  );
+}
+
+function PlaceholderTeamRow() {
+  return (
+    <div className="flex items-center justify-between gap-2 opacity-60">
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="inline-block h-6 w-6 flex-shrink-0 rounded bg-puck-border/40" />
+        <span className="text-ice-500">TBD</span>
+      </span>
+      <span className="flex-shrink-0 font-mono text-[11px] text-ice-600">
+        —
+      </span>
+    </div>
   );
 }
 
