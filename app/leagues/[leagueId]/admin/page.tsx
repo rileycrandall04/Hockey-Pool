@@ -546,6 +546,7 @@ export default async function AdminPage({
         leagueId={leagueId}
         draftStatus={league.draft_status}
         isCommissioner={true}
+        isOwner={isAppOwner(user.email)}
       />
       <main className="mx-auto max-w-5xl px-6 py-10 space-y-6">
         <div>

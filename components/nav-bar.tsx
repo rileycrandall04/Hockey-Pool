@@ -225,6 +225,12 @@ export function NavBar({
                   >
                     Injury sweep
                   </MenuLink>
+                  <MenuLink
+                    href="/admin/reset-draft"
+                    active={isActive("/admin/reset-draft")}
+                  >
+                    Reset draft
+                  </MenuLink>
                 </div>
               )}
               {showLeave && leagueId && (

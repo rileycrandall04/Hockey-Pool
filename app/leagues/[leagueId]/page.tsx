@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -115,6 +116,7 @@ export default async function LeagueStandingsPage({
         leagueId={leagueId}
         draftStatus={league.draft_status}
         isCommissioner={isCommissioner}
+        isOwner={isAppOwner(user.email)}
       />
       <DailyTicker />
       <main className="mx-auto max-w-4xl px-3 py-6 sm:px-6 sm:py-8">

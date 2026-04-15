@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
 import { DraftRoom } from "@/components/draft-room";
 import type { League, Team } from "@/lib/types";
@@ -56,6 +57,7 @@ export default async function DraftPage({
         leagueId={leagueId}
         draftStatus={league.draft_status}
         isCommissioner={isCommissioner}
+        isOwner={isAppOwner(user.email)}
       />
       <main className="mx-auto max-w-6xl px-2 py-6 sm:px-4">
         <DraftRoom
