@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
@@ -13,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { InjuryBadge } from "@/components/injury-badge";
+import { BackButton } from "@/components/back-button";
 import { getCurrentLeagueContext } from "@/lib/current-league";
 
 export const dynamic = "force-dynamic";
@@ -165,8 +165,8 @@ export default async function PlayerPage({
         isOwner={canEditInjury}
       />
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8 space-y-6">
-        <Link
-          href={
+        <BackButton
+          fallbackHref={
             leagueCtx.leagueId
               ? `/leagues/${leagueCtx.leagueId}`
               : "/dashboard"
@@ -174,7 +174,7 @@ export default async function PlayerPage({
           className="text-sm text-ice-400 hover:underline"
         >
           ← Back
-        </Link>
+        </BackButton>
 
         <div className="flex items-start gap-4">
           {player.headshot_url && (
