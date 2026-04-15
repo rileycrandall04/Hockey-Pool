@@ -37,6 +37,18 @@ export default async function DraftPage({
 
   const isCommissioner = league.commissioner_id === user.id;
 
+  // Read the VAPID public key server-side and hand it to the client
+  // component as a prop. This is intentionally NOT read from
+  // process.env inside the client component — doing that would
+  // inline the value at `next build` time, meaning an existing build
+  // never picks up a newly-added env var until the project is
+  // rebuilt with build cache disabled. Reading on the server means
+  // a new deploy or even a new request picks up the current value.
+  const vapidPublicKey =
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ??
+    process.env.VAPID_PUBLIC_KEY ??
+    null;
+
   return (
     <>
       <NavBar
@@ -51,6 +63,7 @@ export default async function DraftPage({
           teams={(teams ?? []) as Team[]}
           currentUserId={user.id}
           isCommissioner={isCommissioner}
+          vapidPublicKey={vapidPublicKey}
         />
       </main>
     </>

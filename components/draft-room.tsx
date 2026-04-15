@@ -37,6 +37,15 @@ interface Props {
   teams: Team[];
   currentUserId: string;
   isCommissioner: boolean;
+  /**
+   * VAPID public key for Web Push subscription. Passed in as a
+   * server-rendered prop (NOT read from process.env at build time)
+   * so a freshly-set env var in Vercel takes effect on the next
+   * request without needing a full rebuild. Null when the env var
+   * isn't configured — the UI then renders a helpful error instead
+   * of trying and failing mid-subscribe.
+   */
+  vapidPublicKey: string | null;
 }
 
 export function DraftRoom({
@@ -44,6 +53,7 @@ export function DraftRoom({
   teams: initialTeams,
   currentUserId,
   isCommissioner,
+  vapidPublicKey,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [league, setLeague] = useState<League>(initialLeague);
@@ -315,9 +325,12 @@ export function DraftRoom({
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
         throw new Error("Push API not supported on this device");
       }
-      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidPublicKey) {
-        throw new Error("VAPID public key not configured");
+        throw new Error(
+          "VAPID public key not configured on the server. " +
+            "Set NEXT_PUBLIC_VAPID_PUBLIC_KEY (or VAPID_PUBLIC_KEY) " +
+            "in Vercel project env vars and redeploy.",
+        );
       }
 
       const registration = await navigator.serviceWorker.register("/sw.js");
@@ -366,7 +379,7 @@ export function DraftRoom({
     } catch {
       // Some browsers reject the immediate call — that's fine.
     }
-  }, [league.id]);
+  }, [league.id, vapidPublicKey]);
   // ---- derived state ------------------------------------------------------
   const pickedPlayerIds = useMemo(
     () => new Set(picks.map((p) => p.player_id)),
