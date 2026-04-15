@@ -64,12 +64,23 @@ export default async function LoginPage({
               Log in
             </Button>
           </form>
-          <p className="mt-4 text-sm text-ice-300">
-            No account?{" "}
-            <Link href="/signup" className="text-ice-400 hover:underline">
-              Sign up
-            </Link>
-          </p>
+          <div className="mt-4 flex flex-col gap-1 text-sm text-ice-300">
+            <p>
+              No account?{" "}
+              <Link href="/signup" className="text-ice-400 hover:underline">
+                Sign up
+              </Link>
+            </p>
+            <p>
+              Forgot your password?{" "}
+              <Link
+                href="/forgot-password"
+                className="text-ice-400 hover:underline"
+              >
+                Reset it
+              </Link>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </main>

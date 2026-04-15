@@ -584,6 +584,20 @@ export function DraftRoom({
     if (result.teams) setTeams(result.teams);
   };
 
+  /**
+   * Pre-draft random order preview. Hits /api/draft/randomize (see
+   * its doc comment for RLS + validity constraints) and patches the
+   * local teams list with the returned permutation so the preview
+   * updates instantly. Safe to call multiple times — each click is
+   * an independent re-roll.
+   */
+  const handleRandomizeOrder = async () => {
+    const result = await post<{ teams: Team[] }>("/api/draft/randomize", {
+      league_id: league.id,
+    });
+    if (result?.teams) setTeams(result.teams);
+  };
+
   const handleAutoPick = async () => {
     if (!onClockTeam) return;
     const result = await post<{ inserted?: PickRow }>("/api/draft/autopick", {
@@ -595,6 +609,20 @@ export function DraftRoom({
 
   // ---- render -------------------------------------------------------------
   if (league.draft_status === "pending") {
+    // Does every team have a draft_position yet? If so we're
+    // showing the commissioner-previewed order. Otherwise we show
+    // the teams in join order with a "not yet randomized" note.
+    const hasPreviewOrder =
+      teams.length > 0 &&
+      teams.every(
+        (t) => typeof t.draft_position === "number" && t.draft_position > 0,
+      );
+    const orderedPendingTeams = hasPreviewOrder
+      ? [...teams].sort(
+          (a, b) => (a.draft_position ?? 0) - (b.draft_position ?? 0),
+        )
+      : teams;
+
     return (
       <div className="space-y-6">
         <Card>
@@ -610,15 +638,55 @@ export function DraftRoom({
               </span>{" "}
               with your pool.
             </p>
-            <ul className="space-y-1 text-sm text-ice-200">
-              {teams.map((t) => (
-                <li key={t.id}>• {t.name}</li>
-              ))}
-            </ul>
+            <div>
+              <div className="mb-1 flex items-baseline justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-ice-400">
+                  Draft order
+                </h3>
+                <span className="text-[10px] text-ice-500">
+                  {hasPreviewOrder
+                    ? "randomized · snake"
+                    : "not yet randomized"}
+                </span>
+              </div>
+              <ol className="space-y-1 text-sm text-ice-200">
+                {orderedPendingTeams.map((t, i) => (
+                  <li
+                    key={t.id}
+                    className="flex items-baseline gap-2 rounded border border-puck-border bg-puck-bg/50 px-2 py-1"
+                  >
+                    <span className="w-5 flex-shrink-0 text-right font-mono text-[11px] text-ice-400">
+                      {hasPreviewOrder ? `${i + 1}.` : "—"}
+                    </span>
+                    <span className="truncate">{t.name}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
             {isCommissioner && (
-              <Button onClick={handleStartDraft} disabled={busy || teams.length < 2}>
-                Start draft
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={handleRandomizeOrder}
+                  disabled={busy || teams.length < 2}
+                  variant="secondary"
+                >
+                  {hasPreviewOrder
+                    ? "Re-randomize order"
+                    : "Randomize draft order"}
+                </Button>
+                <Button
+                  onClick={handleStartDraft}
+                  disabled={busy || teams.length < 2}
+                >
+                  Start draft
+                </Button>
+              </div>
+            )}
+            {isCommissioner && (
+              <p className="text-[10px] text-ice-500">
+                Randomizing is a preview — re-roll as many times as you
+                want. The order locks in when you tap Start draft.
+              </p>
             )}
             {!isCommissioner && (
               <p className="text-xs text-ice-400">

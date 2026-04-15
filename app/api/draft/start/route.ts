@@ -52,12 +52,27 @@ export async function POST(request: Request) {
     );
   }
 
-  const order = randomizeDraftOrder(teams);
-  for (let i = 0; i < order.length; i++) {
-    await svc
-      .from("teams")
-      .update({ draft_position: i + 1 })
-      .eq("id", order[i].id);
+  // If the commissioner already previewed an order via
+  // /api/draft/randomize, every team will have a non-null
+  // draft_position and we lock that in. Otherwise randomize now so
+  // the "just start the draft" flow still works without a preview
+  // step. Either way, `order` is the final list sorted by
+  // draft_position ascending.
+  const hasPreview = teams.every(
+    (t) => typeof t.draft_position === "number" && t.draft_position > 0,
+  );
+  const order = hasPreview
+    ? [...teams].sort(
+        (a, b) => (a.draft_position ?? 0) - (b.draft_position ?? 0),
+      )
+    : randomizeDraftOrder(teams);
+  if (!hasPreview) {
+    for (let i = 0; i < order.length; i++) {
+      await svc
+        .from("teams")
+        .update({ draft_position: i + 1 })
+        .eq("id", order[i].id);
+    }
   }
 
   const now = new Date().toISOString();
