@@ -26,6 +26,12 @@ interface NavBarProps {
    * /leagues/{leagueId}/admin.
    */
   isCommissioner?: boolean;
+  /**
+   * Set when the viewing user matches APP_OWNER_EMAIL. Adds owner-
+   * only tools (currently: Injury sweep) to a dedicated section
+   * near the bottom of the dropdown.
+   */
+  isOwner?: boolean;
 }
 
 /**
@@ -49,6 +55,7 @@ export function NavBar({
   leagueId,
   draftStatus,
   isCommissioner = false,
+  isOwner = false,
 }: NavBarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -210,6 +217,16 @@ export function NavBar({
                   </MenuLink>
                 ))}
               </div>
+              {isOwner && (
+                <div className="border-t border-puck-border py-1">
+                  <MenuLink
+                    href="/admin/injury-sweep"
+                    active={isActive("/admin/injury-sweep")}
+                  >
+                    Injury sweep
+                  </MenuLink>
+                </div>
+              )}
               {showLeave && leagueId && (
                 <div className="border-t border-puck-border py-1">
                   <Link

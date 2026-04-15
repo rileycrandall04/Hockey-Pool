@@ -81,7 +81,10 @@ export default async function DashboardPage({
 
   return (
     <>
-      <NavBar displayName={profile?.display_name ?? user.email ?? "Player"} />
+      <NavBar
+        displayName={profile?.display_name ?? user.email ?? "Player"}
+        isOwner={canRefreshNhlData}
+      />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
         {/* Flash banners */}
         {seeded && (

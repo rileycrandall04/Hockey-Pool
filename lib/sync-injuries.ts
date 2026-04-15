@@ -20,6 +20,13 @@ export interface SyncInjuriesResult {
    * the injury_updated_at rotation.
    */
   truncated: boolean;
+  /**
+   * When the caller passes a `sinceIso` filter, this is the count of
+   * active players whose injury_updated_at is still NULL or older
+   * than `sinceIso` AFTER this run completes. Used by the full-sweep
+   * UI as the "are we done yet" signal.
+   */
+  remaining: number | null;
   duration_ms: number;
 }
 
@@ -57,16 +64,29 @@ export interface SyncInjuriesResult {
  * slices of the pool. With limit=40 and a daily cron, an 800-player
  * pool cycles in ~20 days.
  */
-export async function syncInjuries(limit = 40): Promise<SyncInjuriesResult> {
+export async function syncInjuries(
+  limit = 40,
+  sinceIso?: string,
+): Promise<SyncInjuriesResult> {
   const start = Date.now();
   const svc = createServiceClient();
 
-  const { data: activePlayers } = await svc
+  // Base candidate query: oldest first. When the caller is in "full
+  // sweep" mode, additionally restrict to players we haven't checked
+  // since `sinceIso` so consecutive sweep iterations don't re-cover
+  // players who were just refreshed.
+  let candidateQuery = svc
     .from("players")
     .select("id, injury_status")
     .eq("active", true)
     .order("injury_updated_at", { ascending: true, nullsFirst: true })
     .limit(limit);
+  if (sinceIso) {
+    candidateQuery = candidateQuery.or(
+      `injury_updated_at.is.null,injury_updated_at.lt.${sinceIso}`,
+    );
+  }
+  const { data: activePlayers } = await candidateQuery;
 
   const result: SyncInjuriesResult = {
     checked: 0,
@@ -76,11 +96,13 @@ export async function syncInjuries(limit = 40): Promise<SyncInjuriesResult> {
     errors: 0,
     sample_errors: [],
     truncated: false,
+    remaining: null,
     duration_ms: 0,
   };
   const sampleErrorSet = new Set<string>();
 
   if (!activePlayers || activePlayers.length === 0) {
+    if (sinceIso) result.remaining = 0;
     result.duration_ms = Date.now() - start;
     return result;
   }
@@ -197,6 +219,18 @@ export async function syncInjuries(limit = 40): Promise<SyncInjuriesResult> {
       else if (u.classification === "cleared") result.cleared += 1;
       else result.unchanged += 1;
     }
+  }
+
+  // If we were called as part of a sweep, count how many players are
+  // still older than `sinceIso` so the caller can decide whether to
+  // run another iteration.
+  if (sinceIso) {
+    const { count } = await svc
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .eq("active", true)
+      .or(`injury_updated_at.is.null,injury_updated_at.lt.${sinceIso}`);
+    result.remaining = count ?? 0;
   }
 
   result.sample_errors = [...sampleErrorSet];
