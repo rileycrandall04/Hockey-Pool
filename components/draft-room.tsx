@@ -58,6 +58,12 @@ export function DraftRoom({
   const [message, setMessage] = useState<string | null>(null);
   // "granted" | "denied" | "default" | "unsupported"
   const [notifyPermission, setNotifyPermission] = useState<string>("default");
+  // Whether the browser currently has an active push subscription for
+  // this origin/device. Separate from notifyPermission because the
+  // user can have "granted" permission but no live subscription (e.g.,
+  // they tapped Allow on the OS prompt but the subscription fetch
+  // failed afterwards due to a missing VAPID key).
+  const [pushSubscribed, setPushSubscribed] = useState<boolean>(false);
 
   // ---- initial data load --------------------------------------------------
   useEffect(() => {
@@ -260,14 +266,32 @@ export function DraftRoom({
   //      Screen first).
   //
   // On mount, snapshot the current notification permission so we can show
-  // the right opt-in / on / off state in the UI.
+  // the right opt-in / on / off state in the UI. Also check for an
+  // existing push subscription — permission alone isn't enough; we
+  // need both Notification.permission === "granted" AND an active
+  // pushManager subscription to actually deliver closed-browser pushes.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (typeof Notification === "undefined") {
       setNotifyPermission("unsupported");
-    } else {
-      setNotifyPermission(Notification.permission);
+      return;
     }
+    setNotifyPermission(Notification.permission);
+
+    // Check for an existing service worker push subscription.
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      return;
+    }
+    (async () => {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (!reg) return;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) setPushSubscribed(true);
+      } catch {
+        // ignore; we'll just fall back to showing the Enable button
+      }
+    })();
   }, []);
 
   const requestNotifyPermission = useCallback(async () => {
@@ -322,6 +346,7 @@ export function DraftRoom({
         const txt = await res.text();
         throw new Error(txt || `HTTP ${res.status}`);
       }
+      setPushSubscribed(true);
     } catch (err) {
       // Non-fatal: keep the granted OS permission so the in-tab
       // fallback still works. Just flash a note explaining the
@@ -586,32 +611,49 @@ export function DraftRoom({
         </div>
       )}
 
-      {notifyPermission === "default" && (
+      {/*
+        Banner state machine:
+
+          permission=default                → Enable (first-time opt-in)
+          permission=granted && !subscribed → Enable (retry push subscribe;
+                                              happens when the OS prompt
+                                              was accepted but the actual
+                                              pushManager.subscribe call
+                                              failed, e.g., missing VAPID
+                                              key on an earlier build)
+          permission=granted && subscribed  → "alerts on" confirmation
+          permission=denied                 → help text for re-enabling
+          permission=unsupported            → nothing
+      */}
+      {(notifyPermission === "default" ||
+        (notifyPermission === "granted" && !pushSubscribed)) && (
         <div className="rounded-md border border-puck-border bg-puck-card px-3 py-2 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-ice-300">
-              🔔 Get a buzz + notification when it&rsquo;s your pick.
+              🔔{" "}
+              {notifyPermission === "granted"
+                ? "Finish enabling draft alerts — tap to subscribe this device."
+                : "Get a buzz + notification when it's your pick."}
             </span>
             <button
               type="button"
               onClick={requestNotifyPermission}
               className="rounded-md bg-ice-500 px-3 py-1 text-xs font-medium text-white hover:bg-ice-600"
             >
-              Enable notifications
+              {notifyPermission === "granted" ? "Subscribe" : "Enable notifications"}
             </button>
           </div>
           <p className="mt-1 text-xs text-ice-500">
-            Heads up: this only works while the draft room is open in
-            a browser tab — keep the tab alive (don&rsquo;t fully close
-            the browser) for the duration of the draft.
+            Subscribed devices receive a push notification when it&rsquo;s
+            your turn — even with the browser closed and the phone
+            locked. iOS users must Add to Home Screen first.
           </p>
         </div>
       )}
-      {notifyPermission === "granted" && (
+      {notifyPermission === "granted" && pushSubscribed && (
         <div className="rounded-md border border-puck-border bg-puck-card px-3 py-2 text-xs text-ice-400">
-          🔔 Turn alerts on. We&rsquo;ll vibrate + notify when you&rsquo;re
-          on the clock — <strong>only while this tab is open</strong>.
-          Fully closing the browser stops alerts.
+          🔔 Push alerts on. We&rsquo;ll vibrate + notify when you&rsquo;re
+          on the clock, even if the browser is closed.
         </div>
       )}
       {notifyPermission === "denied" && (
@@ -619,7 +661,6 @@ export function DraftRoom({
           🔕 Notifications are blocked for this site. Re-enable them in
           your browser&rsquo;s site settings to get turn alerts.
           (Vibration on Android still works without permission.)
-          Either way, alerts only fire while the draft room tab is open.
         </div>
       )}
 
