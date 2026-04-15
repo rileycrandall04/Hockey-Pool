@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
@@ -17,6 +18,48 @@ import type {
   RosterEntry,
   Team,
 } from "@/lib/types";
+
+/**
+ * Server action that flips draft stall alerts on/off for the
+ * current user + this league. Same logic as the dashboard toggle
+ * (migration 0009's draft_watches table), lifted here so users can
+ * opt in directly from the league they're viewing instead of
+ * navigating out to the global dashboard first.
+ */
+async function toggleDraftWatchAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  const action = String(formData.get("action") ?? "");
+  if (!leagueId) return;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  if (action === "watch") {
+    await supabase
+      .from("draft_watches")
+      .upsert(
+        {
+          user_id: user.id,
+          league_id: leagueId,
+          stale_minutes: 15,
+        },
+        { onConflict: "user_id,league_id" },
+      );
+  } else if (action === "unwatch") {
+    await supabase
+      .from("draft_watches")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("league_id", leagueId);
+  }
+
+  revalidatePath(`/leagues/${leagueId}`);
+  redirect(`/leagues/${leagueId}`);
+}
 
 export default async function LeagueStandingsPage({
   params,
@@ -75,6 +118,20 @@ export default async function LeagueStandingsPage({
     .order("start_time_utc", { ascending: true });
   const bracketSeries = (bracketSeriesRows ?? []) as PlayoffSeries[];
   const bracketGames = (bracketGameRows ?? []) as PlayoffGame[];
+
+  // Is the current user watching this league for draft stall alerts?
+  // Only relevant while the draft is still live; the bell button is
+  // hidden on completed drafts since stall alerts can't fire anyway.
+  const { data: watchRow } = await supabase
+    .from("draft_watches")
+    .select("league_id")
+    .eq("user_id", user.id)
+    .eq("league_id", leagueId)
+    .maybeSingle();
+  const watchingDraft = Boolean(watchRow);
+  const canWatchDraft =
+    league.draft_status === "pending" ||
+    league.draft_status === "in_progress";
 
   const adjByTeam = new Map<string, number>();
   for (const a of adjustments ?? []) {
@@ -161,13 +218,37 @@ export default async function LeagueStandingsPage({
             <span aria-hidden="true">&middot;</span>
             <span>Draft: {league.draft_status.replace("_", " ")}</span>
           </p>
-          {league.draft_status !== "complete" && (
-            <Link href={`/leagues/${league.id}/draft`}>
-              <Button size="sm" variant="secondary">
-                Draft room
-              </Button>
-            </Link>
-          )}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {league.draft_status !== "complete" && (
+              <Link href={`/leagues/${league.id}/draft`}>
+                <Button size="sm" variant="secondary">
+                  Draft room
+                </Button>
+              </Link>
+            )}
+            {canWatchDraft && (
+              <form action={toggleDraftWatchAction}>
+                <input type="hidden" name="league_id" value={league.id} />
+                <input
+                  type="hidden"
+                  name="action"
+                  value={watchingDraft ? "unwatch" : "watch"}
+                />
+                <Button
+                  size="sm"
+                  variant={watchingDraft ? "primary" : "secondary"}
+                  type="submit"
+                  title={
+                    watchingDraft
+                      ? "Stop getting push alerts when the draft stalls"
+                      : "Get a push notification when a team has been on the clock for 15+ min"
+                  }
+                >
+                  {watchingDraft ? "🔔 Watching" : "🔕 Watch draft"}
+                </Button>
+              </form>
+            )}
+          </div>
         </div>
 
         <TonightsGames
