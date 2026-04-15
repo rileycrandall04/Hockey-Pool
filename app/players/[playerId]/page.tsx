@@ -81,6 +81,95 @@ async function setGlobalInjuryAction(formData: FormData) {
 }
 
 /**
+ * App-owner-only server action that upserts the GLOBAL `player_stats`
+ * row for this player. Used to manually correct playoff totals when
+ * a nightly data pull is incomplete or the NHL API returns wrong
+ * numbers. Writes the absolute values for goals, assists, OT goals,
+ * and games played — fantasy_points is a generated column and
+ * recomputes automatically.
+ *
+ * Safe to run alongside the nightly cron: the cron only applies
+ * deltas from the previous day's games, so a manual edit won't be
+ * clobbered as long as the edit doesn't pre-emptively count a game
+ * the cron will later re-ingest.
+ */
+async function setPlayoffStatsAction(formData: FormData) {
+  "use server";
+  const playerId = Number(formData.get("player_id"));
+  if (!Number.isFinite(playerId)) return;
+
+  const parseNonNegInt = (name: string): number | string => {
+    const raw = String(formData.get(name) ?? "").trim();
+    if (raw === "") return 0;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+      return `${name.replace("_", " ")} must be a non-negative integer`;
+    }
+    return n;
+  };
+
+  const goals = parseNonNegInt("goals");
+  const assists = parseNonNegInt("assists");
+  const otGoals = parseNonNegInt("ot_goals");
+  const gamesPlayed = parseNonNegInt("games_played");
+  for (const v of [goals, assists, otGoals, gamesPlayed]) {
+    if (typeof v === "string") {
+      redirect(
+        `/players/${playerId}?stats_error=${encodeURIComponent(v)}`,
+      );
+    }
+  }
+
+  // OT goals can't exceed total goals — the data model treats OT
+  // goals as a subset of goals (an OT goal is also a goal) so any
+  // row where ot_goals > goals is nonsensical and would give the
+  // player negative "regular" goals downstream.
+  if ((otGoals as number) > (goals as number)) {
+    redirect(
+      `/players/${playerId}?stats_error=${encodeURIComponent("OT goals cannot exceed total goals (an OT goal also counts as a regular goal).")}`,
+    );
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  if (!isAppOwner(user.email)) {
+    redirect(
+      `/players/${playerId}?stats_error=${encodeURIComponent("Only the app owner can edit player stats.")}`,
+    );
+  }
+
+  const svc = createServiceClient();
+  const { error } = await svc.from("player_stats").upsert(
+    {
+      player_id: playerId,
+      goals: goals as number,
+      assists: assists as number,
+      ot_goals: otGoals as number,
+      games_played: gamesPlayed as number,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "player_id" },
+  );
+
+  if (error) {
+    redirect(
+      `/players/${playerId}?stats_error=${encodeURIComponent(error.message)}`,
+    );
+  }
+
+  revalidatePath(`/players/${playerId}`);
+  redirect(
+    `/players/${playerId}?stats_success=${encodeURIComponent(
+      `Updated: ${goals}G ${assists}A ${otGoals}OT · ${gamesPlayed} GP`,
+    )}`,
+  );
+}
+
+/**
  * Global player detail page.
  *
  * Shows everything we know about an NHL player: identity, current team,
@@ -99,10 +188,17 @@ export default async function PlayerPage({
   searchParams: Promise<{
     injury_success?: string;
     injury_error?: string;
+    stats_success?: string;
+    stats_error?: string;
   }>;
 }) {
   const { playerId } = await params;
-  const { injury_success, injury_error } = await searchParams;
+  const {
+    injury_success,
+    injury_error,
+    stats_success,
+    stats_error,
+  } = await searchParams;
   const id = Number(playerId);
   if (!Number.isFinite(id)) notFound();
 
@@ -244,6 +340,94 @@ export default async function PlayerPage({
             </p>
           </CardContent>
         </Card>
+
+        {canEditInjury && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Edit playoff stats</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-3 text-xs text-ice-400">
+                Manually override this player&rsquo;s{" "}
+                <strong>global</strong> playoff totals. Use when a
+                nightly sync is incomplete or the NHL feed is wrong.
+                Changes propagate to every league&rsquo;s standings and
+                rosters. Pool points (G + A + OT×2) recompute automatically.
+              </p>
+
+              {stats_success && (
+                <div className="mb-3 rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+                  ✅ {stats_success}
+                </div>
+              )}
+              {stats_error && (
+                <div className="mb-3 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                  ❌ {stats_error}
+                </div>
+              )}
+
+              <form action={setPlayoffStatsAction} className="space-y-3">
+                <input type="hidden" name="player_id" value={id} />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="goals">Goals</Label>
+                    <Input
+                      id="goals"
+                      name="goals"
+                      type="number"
+                      min={0}
+                      step={1}
+                      inputMode="numeric"
+                      defaultValue={playoffGoals}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="assists">Assists</Label>
+                    <Input
+                      id="assists"
+                      name="assists"
+                      type="number"
+                      min={0}
+                      step={1}
+                      inputMode="numeric"
+                      defaultValue={playoffAssists}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="ot_goals">OT Goals</Label>
+                    <Input
+                      id="ot_goals"
+                      name="ot_goals"
+                      type="number"
+                      min={0}
+                      step={1}
+                      inputMode="numeric"
+                      defaultValue={playoffOt}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="games_played">Games Played</Label>
+                    <Input
+                      id="games_played"
+                      name="games_played"
+                      type="number"
+                      min={0}
+                      step={1}
+                      inputMode="numeric"
+                      defaultValue={playoffGames}
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-ice-500">
+                  OT goals count inside the Goals total — entering
+                  &ldquo;3 G / 1 OT&rdquo; means 3 goals where 1 was
+                  scored in overtime.
+                </p>
+                <Button type="submit">Save stats</Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
 
         {canEditInjury && (
           <Card>
