@@ -147,3 +147,15 @@ export interface PlayoffGame {
   tv_broadcasts: PlayoffBroadcast[];
   updated_at: string;
 }
+
+export interface ManualGameStat {
+  id: string;
+  game_id: number;
+  player_id: number;
+  goals: number;
+  assists: number;
+  ot_goals: number;
+  entered_by: string | null;
+  created_at: string;
+  updated_at: string;
+}

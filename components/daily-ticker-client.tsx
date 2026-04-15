@@ -1,11 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { DailyRecap } from "@/lib/types";
 
 interface Props {
   date: string;
   games: DailyRecap[];
+  /**
+   * When true, the expanded scorers panel renders an "Edit stats →"
+   * link that drops the app owner into /games/[id]/edit so they can
+   * add/correct per-game manual stats. Gated at the server component
+   * level so non-owners never see the link.
+   */
+  isOwner?: boolean;
 }
 
 /**
@@ -23,7 +31,7 @@ interface Props {
  * - With fewer than 3 games the animation is disabled because the
  *   duplicated content wouldn't overflow the viewport meaningfully.
  */
-export function DailyTickerClient({ date, games }: Props) {
+export function DailyTickerClient({ date, games, isOwner = false }: Props) {
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
   const selectedGame =
     selectedGameId != null
@@ -111,6 +119,16 @@ export function DailyTickerClient({ date, games }: Props) {
               </ul>
             ) : (
               <p className="text-ice-500">No scoring summary for this game.</p>
+            )}
+            {isOwner && (
+              <div className="mt-2 flex justify-end">
+                <Link
+                  href={`/games/${selectedGame.game_id}/edit`}
+                  className="text-[11px] font-medium text-ice-300 underline-offset-2 hover:text-ice-100 hover:underline"
+                >
+                  Edit stats →
+                </Link>
+              </div>
             )}
           </div>
         )}
