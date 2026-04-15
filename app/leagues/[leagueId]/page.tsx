@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CopyJoinCodeButton } from "@/components/copy-join-code-button";
 import { DailyTicker } from "@/components/daily-ticker";
-import { PlayoffBracket } from "@/components/playoff-bracket";
+import { TonightsGames } from "@/components/tonights-games";
 import { scoreTeam } from "@/lib/scoring";
 import { getOvernightDeltas } from "@/lib/snapshot-standings";
 import type {
@@ -61,9 +61,9 @@ export default async function LeagueStandingsPage({
     .eq("league_id", leagueId);
 
   // Bracket data is global (not league-scoped). It's refreshed nightly
-  // by the stats cron; we just read whatever's in the table. If the
-  // cron hasn't populated it yet (pre-playoffs) the component renders
-  // nothing.
+  // by the stats cron. On the league home we only surface the compact
+  // "tonight's games" card; the full bracket tree lives at
+  // /leagues/{id}/bracket so the standings stays the focus here.
   const { data: bracketSeriesRows } = await supabase
     .from("playoff_series")
     .select("*")
@@ -170,7 +170,11 @@ export default async function LeagueStandingsPage({
           )}
         </div>
 
-        <PlayoffBracket series={bracketSeries} games={bracketGames} />
+        <TonightsGames
+          games={bracketGames}
+          series={bracketSeries}
+          bracketHref={`/leagues/${league.id}/bracket`}
+        />
 
         {standings.length === 0 ? (
           <Card>

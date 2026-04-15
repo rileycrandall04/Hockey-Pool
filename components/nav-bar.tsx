@@ -130,6 +130,13 @@ export function NavBar({
       active: isActive(draftHref),
     });
   }
+  if (leagueId) {
+    items.push({
+      href: `/leagues/${leagueId}/bracket`,
+      label: "Bracket",
+      active: isActive(`/leagues/${leagueId}/bracket`),
+    });
+  }
   if (leagueId && isCommissioner) {
     items.push({
       href: `/leagues/${leagueId}/admin`,

@@ -5,39 +5,77 @@ interface PlayoffBracketProps {
   games: PlayoffGame[];
 }
 
-const ROUND_LABELS: Record<number, string> = {
-  1: "First Round",
-  2: "Second Round",
-  3: "Conference Finals",
-  4: "Stanley Cup Final",
-};
-
 /**
- * Playoff bracket card shown on each league landing page.
+ * Full playoff bracket shown on /leagues/[id]/bracket.
  *
- * Data is synced by the 6am ET cron (lib/sync-bracket.ts) and read
- * here via the props. The component is a pure server component — no
- * client-side state, no fetches.
+ * Layout is a tree: on large screens the 15 series are laid out in
+ * 7 columns that converge to the Stanley Cup Final in the middle,
+ * Eastern side on the left and Western side on the right:
  *
- * Layout: one collapsible <details> wrapper, then one section per
- * round (First Round, Second Round, Conference Finals, Final). Each
- * series is a compact card showing:
- *   - Team logos + abbreviations
- *   - Current series score (top_wins-bottom_wins) with the series
- *     leader highlighted.
- *   - Next game: date, time (local to the viewer via Intl), and TV
- *     broadcast networks. "Series complete" if one team has clinched.
+ *   East R1  East R2  ECF  FINAL  WCF  West R2  West R1
+ *   ┌────┐   ┌────┐   ┌──┐  ┌──┐  ┌──┐  ┌────┐  ┌────┐
+ *   │ A  │   │    │   │  │  │  │  │  │  │    │  │ E  │
+ *   ├────┤   │ I  │   │  │  │  │  │  │  │ K  │  ├────┤
+ *   │ B  │   ├────┤   │M │  │O │  │N │  ├────┤  │ F  │
+ *   ├────┤   │ J  │   │  │  │  │  │  │  │ L  │  ├────┤
+ *   │ C  │   └────┘   └──┘  └──┘  └──┘  └────┘  │ G  │
+ *   ├────┤                                      ├────┤
+ *   │ D  │                                      │ H  │
+ *   └────┘                                      └────┘
  *
- * Before the cron has ever run we still render the card with an
- * empty-state skeleton (15 TBD slots across the 4 rounds) so the
- * landing page shows the bracket shell immediately instead of a
- * gap that later fills in.
+ * Slot assignments come from the standard NHL series-letter
+ * convention that's been stable since the 2020 bubble playoffs:
+ *   A–D  East R1       I–J East R2    M ECF
+ *   E–H  West R1       K–L West R2    N WCF   O Final
+ *
+ * Each column uses flex-col + justify-around so cards in the later
+ * rounds naturally line up between their two feeder series without
+ * any pixel math.
+ *
+ * On small screens (< lg) the tree collapses to a single column,
+ * grouped by round headings, so it stays readable on phones.
+ *
+ * The component always renders the full 15-slot structure — even
+ * when the database is empty — so users see the bracket shape
+ * immediately. Missing series are drawn as dashed TBD placeholders.
  */
-export function PlayoffBracket({ series, games }: PlayoffBracketProps) {
-  const isEmpty = !series || series.length === 0;
 
-  // Group games by series letter so each series card can pick out
-  // its own game list in O(1).
+interface BracketSlot {
+  letter: string;
+  round: number;
+  conference: "EAST" | "WEST" | "FINAL";
+}
+
+const BRACKET_SLOTS: BracketSlot[] = [
+  // East Round 1
+  { letter: "A", round: 1, conference: "EAST" },
+  { letter: "B", round: 1, conference: "EAST" },
+  { letter: "C", round: 1, conference: "EAST" },
+  { letter: "D", round: 1, conference: "EAST" },
+  // West Round 1
+  { letter: "E", round: 1, conference: "WEST" },
+  { letter: "F", round: 1, conference: "WEST" },
+  { letter: "G", round: 1, conference: "WEST" },
+  { letter: "H", round: 1, conference: "WEST" },
+  // East Round 2
+  { letter: "I", round: 2, conference: "EAST" },
+  { letter: "J", round: 2, conference: "EAST" },
+  // West Round 2
+  { letter: "K", round: 2, conference: "WEST" },
+  { letter: "L", round: 2, conference: "WEST" },
+  // Conference Finals
+  { letter: "M", round: 3, conference: "EAST" },
+  { letter: "N", round: 3, conference: "WEST" },
+  // Stanley Cup Final
+  { letter: "O", round: 4, conference: "FINAL" },
+];
+
+export function PlayoffBracket({ series, games }: PlayoffBracketProps) {
+  const seriesByLetter = new Map<string, PlayoffSeries>();
+  for (const s of series ?? []) seriesByLetter.set(s.series_letter, s);
+
+  // Group games under their parent series letter. Each series card
+  // only needs its own game list for the "next game" footer.
   const gamesBySeries = new Map<string, PlayoffGame[]>();
   for (const g of games ?? []) {
     const arr = gamesBySeries.get(g.series_letter) ?? [];
@@ -45,124 +83,144 @@ export function PlayoffBracket({ series, games }: PlayoffBracketProps) {
     gamesBySeries.set(g.series_letter, arr);
   }
 
-  // Group series by round so the UI can render section headings.
-  // When there's no data we use a synthetic skeleton that mirrors
-  // the real bracket shape (8 / 4 / 2 / 1 series).
-  const rounds = new Map<number, PlayoffSeries[] | PlaceholderSeries[]>();
-  if (isEmpty) {
-    rounds.set(1, buildPlaceholderRound(1, 8));
-    rounds.set(2, buildPlaceholderRound(2, 4));
-    rounds.set(3, buildPlaceholderRound(3, 2));
-    rounds.set(4, buildPlaceholderRound(4, 1));
-  } else {
-    for (const s of series) {
-      const arr = (rounds.get(s.round) ?? []) as PlayoffSeries[];
-      arr.push(s);
-      rounds.set(s.round, arr);
-    }
-  }
-  const roundKeys = [...rounds.keys()].sort((a, b) => a - b);
+  // Pre-build the slot groupings for both layouts (tree columns
+  // and mobile stacked rounds).
+  const slotsByKey = {
+    eastR1: slots((s) => s.round === 1 && s.conference === "EAST"),
+    eastR2: slots((s) => s.round === 2 && s.conference === "EAST"),
+    ecf: slots((s) => s.round === 3 && s.conference === "EAST"),
+    final: slots((s) => s.round === 4),
+    wcf: slots((s) => s.round === 3 && s.conference === "WEST"),
+    westR2: slots((s) => s.round === 2 && s.conference === "WEST"),
+    westR1: slots((s) => s.round === 1 && s.conference === "WEST"),
+  };
+
+  const renderSlot = (slot: BracketSlot) => {
+    const data = seriesByLetter.get(slot.letter);
+    if (!data) return <PlaceholderSeriesCard key={slot.letter} />;
+    return (
+      <SeriesCard
+        key={slot.letter}
+        series={data}
+        games={gamesBySeries.get(slot.letter) ?? []}
+      />
+    );
+  };
 
   return (
-    <details className="group mt-4 rounded-md border border-puck-border bg-puck-card" open>
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-puck-border/40 [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center gap-2">
-          <span className="inline-block w-3 text-right text-ice-400 transition-transform group-open:rotate-90">
-            ▶
-          </span>
-          <span className="font-semibold text-ice-100">Playoff bracket</span>
-        </span>
-        <span className="text-[10px] uppercase tracking-wider text-ice-500">
-          {isEmpty ? "Populates 6am ET" : "Updated nightly"}
-        </span>
-      </summary>
-      <div className="space-y-4 border-t border-puck-border px-3 py-3">
-        {isEmpty && (
-          <p className="rounded border border-dashed border-puck-border/80 bg-puck-bg/40 px-2 py-1.5 text-[11px] text-ice-400">
-            Waiting for the next nightly update. Matchups, series
-            scores, and broadcast info will appear here after the
-            6am ET sync runs.
-          </p>
-        )}
-        {roundKeys.map((round) => {
-          const roundSeries = rounds.get(round) ?? [];
-          const sorted = isEmpty
-            ? (roundSeries as PlaceholderSeries[])
-            : [...(roundSeries as PlayoffSeries[])].sort(
-                (a, b) => a.sort_order - b.sort_order,
-              );
-          return (
-            <section key={round}>
-              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-ice-400">
-                {ROUND_LABELS[round] ?? `Round ${round}`}
-              </h3>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {sorted.map((s) =>
-                  isPlaceholder(s) ? (
-                    <PlaceholderSeriesCard key={s.key} />
-                  ) : (
-                    <SeriesCard
-                      key={s.series_letter}
-                      series={s}
-                      games={gamesBySeries.get(s.series_letter) ?? []}
-                    />
-                  ),
-                )}
-              </div>
-            </section>
-          );
-        })}
+    <div className="space-y-6">
+      {/* Desktop / tablet tree. Hidden on small screens because the
+          7-column layout gets too cramped below ~1024px. */}
+      <div className="hidden lg:block">
+        <div className="flex items-stretch gap-3">
+          <BracketColumn label="First Round" side="left">
+            {slotsByKey.eastR1.map(renderSlot)}
+          </BracketColumn>
+          <BracketColumn label="Second Round" side="left">
+            {slotsByKey.eastR2.map(renderSlot)}
+          </BracketColumn>
+          <BracketColumn label="Conf. Final" side="left">
+            {slotsByKey.ecf.map(renderSlot)}
+          </BracketColumn>
+          <BracketColumn label="Stanley Cup" center>
+            {slotsByKey.final.map(renderSlot)}
+          </BracketColumn>
+          <BracketColumn label="Conf. Final" side="right">
+            {slotsByKey.wcf.map(renderSlot)}
+          </BracketColumn>
+          <BracketColumn label="Second Round" side="right">
+            {slotsByKey.westR2.map(renderSlot)}
+          </BracketColumn>
+          <BracketColumn label="First Round" side="right">
+            {slotsByKey.westR1.map(renderSlot)}
+          </BracketColumn>
+        </div>
+        <div className="mt-2 flex justify-between text-[10px] uppercase tracking-wider text-ice-500">
+          <span>← Eastern Conference</span>
+          <span>Western Conference →</span>
+        </div>
       </div>
-    </details>
-  );
-}
 
-interface PlaceholderSeries {
-  key: string;
-  __placeholder: true;
-}
-
-function buildPlaceholderRound(
-  round: number,
-  count: number,
-): PlaceholderSeries[] {
-  return Array.from({ length: count }, (_, i) => ({
-    key: `r${round}-${i}`,
-    __placeholder: true as const,
-  }));
-}
-
-function isPlaceholder(
-  s: PlayoffSeries | PlaceholderSeries,
-): s is PlaceholderSeries {
-  return (s as PlaceholderSeries).__placeholder === true;
-}
-
-function PlaceholderSeriesCard() {
-  return (
-    <div className="rounded-md border border-dashed border-puck-border/60 bg-puck-bg/30 p-2 text-xs">
-      <div className="space-y-1">
-        <PlaceholderTeamRow />
-        <PlaceholderTeamRow />
-      </div>
-      <div className="mt-2 border-t border-puck-border/50 pt-1.5 text-[10px] text-ice-500">
-        Awaiting data
+      {/* Mobile / narrow view: stacked groups per round. Preserves
+          the information without the horizontal tree. */}
+      <div className="space-y-5 lg:hidden">
+        <RoundSection title="First Round · Eastern">
+          {slotsByKey.eastR1.map(renderSlot)}
+        </RoundSection>
+        <RoundSection title="First Round · Western">
+          {slotsByKey.westR1.map(renderSlot)}
+        </RoundSection>
+        <RoundSection title="Second Round · Eastern">
+          {slotsByKey.eastR2.map(renderSlot)}
+        </RoundSection>
+        <RoundSection title="Second Round · Western">
+          {slotsByKey.westR2.map(renderSlot)}
+        </RoundSection>
+        <RoundSection title="Eastern Conference Final">
+          {slotsByKey.ecf.map(renderSlot)}
+        </RoundSection>
+        <RoundSection title="Western Conference Final">
+          {slotsByKey.wcf.map(renderSlot)}
+        </RoundSection>
+        <RoundSection title="Stanley Cup Final">
+          {slotsByKey.final.map(renderSlot)}
+        </RoundSection>
       </div>
     </div>
   );
 }
 
-function PlaceholderTeamRow() {
+function slots(predicate: (s: BracketSlot) => boolean): BracketSlot[] {
+  return BRACKET_SLOTS.filter(predicate);
+}
+
+function BracketColumn({
+  label,
+  children,
+  side,
+  center = false,
+}: {
+  label: string;
+  children: React.ReactNode;
+  side?: "left" | "right";
+  center?: boolean;
+}) {
   return (
-    <div className="flex items-center justify-between gap-2 opacity-60">
-      <span className="flex min-w-0 items-center gap-2">
-        <span className="inline-block h-6 w-6 flex-shrink-0 rounded bg-puck-border/40" />
-        <span className="text-ice-500">TBD</span>
-      </span>
-      <span className="flex-shrink-0 font-mono text-[11px] text-ice-600">
-        —
-      </span>
+    <div className="flex min-w-0 flex-1 flex-col">
+      <h3
+        className={
+          "mb-2 text-[10px] font-semibold uppercase tracking-wider " +
+          (center ? "text-center text-ice-200" : "text-center text-ice-400")
+        }
+      >
+        {label}
+      </h3>
+      <div
+        className={
+          "flex flex-1 flex-col justify-around gap-3 " +
+          (side === "right" ? "items-stretch" : "items-stretch")
+        }
+      >
+        {children}
+      </div>
     </div>
+  );
+}
+
+function RoundSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ice-400">
+        {title}
+      </h3>
+      <div className="grid gap-2 sm:grid-cols-2">{children}</div>
+    </section>
   );
 }
 
@@ -296,6 +354,34 @@ function TeamRow({
   );
 }
 
+function PlaceholderSeriesCard() {
+  return (
+    <div className="rounded-md border border-dashed border-puck-border/60 bg-puck-bg/30 p-2 text-xs">
+      <div className="space-y-1">
+        <PlaceholderTeamRow />
+        <PlaceholderTeamRow />
+      </div>
+      <div className="mt-2 border-t border-puck-border/50 pt-1.5 text-[10px] text-ice-500">
+        Awaiting data
+      </div>
+    </div>
+  );
+}
+
+function PlaceholderTeamRow() {
+  return (
+    <div className="flex items-center justify-between gap-2 opacity-60">
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="inline-block h-6 w-6 flex-shrink-0 rounded bg-puck-border/40" />
+        <span className="text-ice-500">TBD</span>
+      </span>
+      <span className="flex-shrink-0 font-mono text-[11px] text-ice-600">
+        —
+      </span>
+    </div>
+  );
+}
+
 function NextGameLine({ game }: { game: PlayoffGame }) {
   const when = formatGameTime(game.start_time_utc, game.game_date);
   const matchup =
@@ -355,16 +441,9 @@ function pickNextGame(games: PlayoffGame[]): PlayoffGame | null {
     return false;
   });
   if (upcoming) return upcoming;
-  // Return the most recent game as a fallback.
   return sorted[sorted.length - 1] ?? null;
 }
 
-/**
- * Format a game's start time for display. Prefers the full ISO
- * timestamp so we can show weekday + time in Eastern (the league's
- * canonical timezone). Falls back to just the date if startTime is
- * unavailable.
- */
 function formatGameTime(
   startTimeUtc: string | null,
   gameDate: string | null,
@@ -384,9 +463,6 @@ function formatGameTime(
     }
   }
   if (gameDate) {
-    // gameDate is YYYY-MM-DD. Parse as noon ET so the weekday matches
-    // the broadcast date (avoids the "UTC midnight = previous day in
-    // ET" edge case).
     const d = new Date(`${gameDate}T17:00:00Z`);
     if (!isNaN(d.getTime())) {
       return new Intl.DateTimeFormat("en-US", {
@@ -400,11 +476,6 @@ function formatGameTime(
   return null;
 }
 
-/**
- * Collapse the TV broadcasts array into a short, comma-separated
- * string suitable for a single line. Dedupes by network so fans in
- * different markets don't see "SN, SN, SN".
- */
 function formatBroadcasts(
   broadcasts: PlayoffBroadcast[] | null | undefined,
 ): string | null {
