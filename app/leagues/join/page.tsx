@@ -48,6 +48,20 @@ async function joinLeagueAction(formData: FormData) {
       { onConflict: "id" },
     );
 
+  // Check if the user already has a team in this league before
+  // inserting. The DB has a unique(league_id, owner_id) constraint
+  // but surfacing the raw Postgres error is confusing — much better
+  // to detect the duplicate here and redirect straight to the league.
+  const { data: existingTeam } = await svc
+    .from("teams")
+    .select("id")
+    .eq("league_id", league.id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (existingTeam) {
+    redirect(`/leagues/${league.id}`);
+  }
+
   const { error: insertError } = await svc.from("teams").insert({
     league_id: league.id,
     owner_id: user.id,
@@ -55,8 +69,11 @@ async function joinLeagueAction(formData: FormData) {
   });
 
   if (insertError) {
+    const friendly = insertError.message.includes("teams_league_id_owner_id_key")
+      ? "You're already in this league."
+      : insertError.message;
     redirect(
-      `/leagues/join?error=${encodeURIComponent(insertError.message)}`,
+      `/leagues/join?error=${encodeURIComponent(friendly)}`,
     );
   }
 
