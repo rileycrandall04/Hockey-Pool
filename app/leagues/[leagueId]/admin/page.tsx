@@ -52,6 +52,74 @@ async function dropPlayerAction(formData: FormData) {
   revalidatePath(`/leagues/${leagueId}`);
 }
 
+/**
+ * Remove a team (and all of its draft picks + score adjustments)
+ * from the league. Commissioner-only. The team's owner will see
+ * the league disappear from their dashboard on their next load.
+ *
+ * Cascade: draft_picks and score_adjustments both have
+ * `ON DELETE CASCADE` on team_id, so deleting the team row cleans
+ * up dependent data automatically. The draft_watches row (if any)
+ * is NOT deleted since it's keyed by user_id + league_id, not
+ * team_id — that's harmless.
+ */
+async function removeTeamAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id"));
+  const teamId = String(formData.get("team_id"));
+  const confirm = String(formData.get("confirm") ?? "");
+  if (confirm !== "REMOVE") {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(
+        'Type "REMOVE" to confirm team removal.',
+      )}`,
+    );
+  }
+
+  const { league } = await assertCommissioner(leagueId);
+
+  // Don't let the commissioner remove their own team — that would
+  // orphan the league (commissioner_id FK).
+  const svc = createServiceClient();
+  const { data: team } = await svc
+    .from("teams")
+    .select("owner_id, name")
+    .eq("id", teamId)
+    .eq("league_id", leagueId)
+    .single();
+  if (!team) {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent("Team not found.")}`,
+    );
+  }
+  if (team.owner_id === league.commissioner_id) {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(
+        "You can't remove your own team. Transfer commissioner first or delete the league.",
+      )}`,
+    );
+  }
+
+  const { error } = await svc
+    .from("teams")
+    .delete()
+    .eq("id", teamId)
+    .eq("league_id", leagueId);
+  if (error) {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(error.message)}`,
+    );
+  }
+
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  revalidatePath(`/leagues/${leagueId}`);
+  redirect(
+    `/leagues/${leagueId}/admin?reset_success=${encodeURIComponent(
+      `Removed team "${team.name}" from the league.`,
+    )}`,
+  );
+}
+
 async function addPickAction(formData: FormData) {
   "use server";
   const leagueId = String(formData.get("league_id"));
@@ -899,11 +967,53 @@ export default async function AdminPage({
           <CardContent className="space-y-6">
             {(teams ?? []).map((t: Team) => (
               <div key={t.id}>
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="font-semibold text-ice-50">{t.name}</h3>
-                  <span className="text-xs text-ice-400">
+                  <span className="flex items-center gap-2 text-xs text-ice-400">
                     {(rosterByTeam.get(t.id) ?? []).length}/
                     {league.roster_size} players
+                    {t.owner_id !== league.commissioner_id && (
+                      <details className="relative inline-block">
+                        <summary className="cursor-pointer rounded border border-red-500/40 px-1.5 py-0.5 text-[10px] font-medium text-red-300 hover:bg-red-500/10">
+                          Remove team
+                        </summary>
+                        <div className="absolute right-0 top-full z-10 mt-1 w-56 rounded-md border border-puck-border bg-puck-card p-3 shadow-lg">
+                          <form
+                            action={removeTeamAction}
+                            className="space-y-2"
+                          >
+                            <input
+                              type="hidden"
+                              name="league_id"
+                              value={leagueId}
+                            />
+                            <input
+                              type="hidden"
+                              name="team_id"
+                              value={t.id}
+                            />
+                            <p className="text-[11px] text-ice-300">
+                              This will delete{" "}
+                              <strong>{t.name}</strong> and all their
+                              draft picks from this league. There is
+                              no undo.
+                            </p>
+                            <Input
+                              name="confirm"
+                              placeholder="Type REMOVE"
+                              className="font-mono text-xs"
+                            />
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              type="submit"
+                            >
+                              Remove team
+                            </Button>
+                          </form>
+                        </div>
+                      </details>
+                    )}
                   </span>
                 </div>
 
