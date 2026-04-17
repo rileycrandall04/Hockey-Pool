@@ -446,6 +446,36 @@ const ADS: string[] = [
     </a>
   </div>
 </div>`,
+
+  // Ad 6: Knob Turners Wanted
+  `<div style="width:370px;max-width:95vw;background:#F5F0E8;border:3px solid #2C2C2C;">
+  <div style="background:#2C2C2C;padding:5px 10px;display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:#ccc;font-size:9px;letter-spacing:2px;">★ SPONSORED — HOCKEY POOL ★</span>
+    <button data-ad-close style="background:#2C2C2C;border:1px solid #ccc;color:#ccc;width:19px;height:19px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;font-weight:900;">✕</button>
+  </div>
+  <div style="padding:18px 22px 20px;">
+    <div style="background:#CC0000;transform:rotate(-2deg);padding:5px 0;margin:0 -8px 18px;box-shadow:2px 3px 0 #880000;">
+      <div style="font-family:Impact,'Arial Black',sans-serif;font-size:11px;color:white;letter-spacing:4px;text-align:center;">— HELP WANTED —</div>
+    </div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:50px;color:#1A1A1A;text-transform:uppercase;line-height:0.92;text-align:center;margin-bottom:16px;">
+      Knob<br>Turners<br>Wanted!
+    </div>
+    <div style="border:2px dashed #2C2C2C;padding:10px 14px;margin-bottom:18px;transform:rotate(1deg);">
+      <div style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:14px;color:#333;text-align:center;line-height:1.5;">
+        "Highly trained monkeys<br>also acceptable"
+      </div>
+    </div>
+    <div style="border:2px solid #2C2C2C;padding:10px 14px;text-align:center;margin-bottom:16px;">
+      <div style="font-family:Arial,sans-serif;font-size:8.5px;color:#555;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">For employment inquiries</div>
+      <div style="font-family:Impact,'Arial Black',sans-serif;font-size:24px;color:#2C2C2C;">Contact Slick Jimmy</div>
+      <div style="font-family:Georgia,serif;font-style:italic;font-size:10px;color:#666;margin-top:2px;">for details</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:7.5px;color:#777;font-style:italic;">*No medical training required</div>
+      <a href="#" data-ad-close style="font-size:9px;color:#777;font-family:Arial;text-decoration:none;">Not qualified</a>
+    </div>
+  </div>
+</div>`,
 ];
 
 export default function AdOverlay({
