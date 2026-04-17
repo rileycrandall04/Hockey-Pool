@@ -3,6 +3,7 @@ import type { PlayoffBroadcast, PlayoffGame, PlayoffSeries } from "@/lib/types";
 interface PlayoffBracketProps {
   series: PlayoffSeries[];
   games: PlayoffGame[];
+  isOwner?: boolean;
 }
 
 /**
@@ -46,7 +47,7 @@ interface BracketSlot {
   conference: "EAST" | "WEST" | "FINAL";
 }
 
-const BRACKET_SLOTS: BracketSlot[] = [
+export const BRACKET_SLOTS: BracketSlot[] = [
   // East Round 1
   { letter: "A", round: 1, conference: "EAST" },
   { letter: "B", round: 1, conference: "EAST" },
@@ -70,7 +71,7 @@ const BRACKET_SLOTS: BracketSlot[] = [
   { letter: "O", round: 4, conference: "FINAL" },
 ];
 
-export function PlayoffBracket({ series, games }: PlayoffBracketProps) {
+export function PlayoffBracket({ series, games, isOwner }: PlayoffBracketProps) {
   const seriesByLetter = new Map<string, PlayoffSeries>();
   for (const s of series ?? []) seriesByLetter.set(s.series_letter, s);
 
@@ -98,13 +99,24 @@ export function PlayoffBracket({ series, games }: PlayoffBracketProps) {
   const renderSlot = (slot: BracketSlot) => {
     const data = seriesByLetter.get(slot.letter);
     if (!data) return <PlaceholderSeriesCard key={slot.letter} />;
-    return (
+    const card = (
       <SeriesCard
-        key={slot.letter}
         series={data}
         games={gamesBySeries.get(slot.letter) ?? []}
       />
     );
+    if (isOwner) {
+      return (
+        <a
+          key={slot.letter}
+          href={`#manage-series-${slot.letter}`}
+          className="block rounded-md transition hover:ring-2 hover:ring-ice-400/50"
+        >
+          {card}
+        </a>
+      );
+    }
+    return <div key={slot.letter}>{card}</div>;
   };
 
   return (

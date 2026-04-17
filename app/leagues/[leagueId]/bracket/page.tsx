@@ -4,7 +4,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getLeagueForMember } from "@/lib/league-access";
 import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
-import { PlayoffBracket } from "@/components/playoff-bracket";
+import { PlayoffBracket, BRACKET_SLOTS } from "@/components/playoff-bracket";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import {
@@ -16,6 +16,49 @@ import {
 import type { League, PlayoffGame, PlayoffSeries } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+/* ------------------------------------------------------------------ */
+/*  MDT ↔ UTC helpers                                                  */
+/* ------------------------------------------------------------------ */
+
+/** Convert a UTC ISO string to a `YYYY-MM-DDTHH:mm` value in MDT. */
+function utcToMdtLocal(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Denver",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = Object.fromEntries(
+    fmt.formatToParts(d).map((p) => [p.type, p.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+/** Convert a `YYYY-MM-DDTHH:mm` local MDT value to a UTC ISO string. */
+function mdtToUtcIso(local: string): string {
+  return new Date(`${local}:00-06:00`).toISOString();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Bracket slot labels                                                */
+/* ------------------------------------------------------------------ */
+
+const CONF_LABELS: Record<string, string> = { EAST: "East", WEST: "West", FINAL: "" };
+const ROUND_LABELS: Record<number, string> = { 1: "R1", 2: "R2", 3: "CF", 4: "Final" };
+const slotLabel = new Map(
+  BRACKET_SLOTS.map((s) => [
+    s.letter,
+    s.conference === "FINAL"
+      ? "Final"
+      : `${CONF_LABELS[s.conference]} ${ROUND_LABELS[s.round]}`,
+  ]),
+);
 
 /* ------------------------------------------------------------------ */
 /*  Auth helper                                                        */
@@ -201,7 +244,7 @@ async function createGameAction(formData: FormData) {
     game_id: gameId,
     series_letter: seriesLetter,
     game_number: gameNumber,
-    start_time_utc: startTimeRaw ? new Date(startTimeRaw).toISOString() : null,
+    start_time_utc: startTimeRaw ? mdtToUtcIso(startTimeRaw) : null,
     game_date: gameDateRaw || null,
     venue,
     away_abbrev: awayAbbrev,
@@ -246,7 +289,7 @@ async function updateGameAction(formData: FormData) {
     .from("playoff_games")
     .update({
       ...(startTimeRaw
-        ? { start_time_utc: new Date(startTimeRaw).toISOString() }
+        ? { start_time_utc: mdtToUtcIso(startTimeRaw) }
         : {}),
       ...(venue !== null ? { venue } : {}),
       ...(awayScore !== "" ? { away_score: Number(awayScore) } : {}),
@@ -386,7 +429,7 @@ export default async function LeagueBracketPage({
             the next nightly sync.
           </p>
         )}
-        <PlayoffBracket series={series} games={games} />
+        <PlayoffBracket series={series} games={games} isOwner={isOwner} />
 
         {/* -------------------------------------------------------- */}
         {/*  Owner-only management section                           */}
@@ -433,10 +476,14 @@ export default async function LeagueBracketPage({
                         {series.map((s) => (
                           <tr
                             key={s.series_letter}
-                            className="border-b border-puck-border/50"
+                            id={`manage-series-${s.series_letter}`}
+                            className="border-b border-puck-border/50 scroll-mt-20"
                           >
                             <td className="px-2 py-2 font-mono font-bold text-ice-100">
                               {s.series_letter}
+                              <span className="ml-1 text-[10px] font-normal text-ice-400">
+                                {slotLabel.get(s.series_letter) ?? ""}
+                              </span>
                             </td>
                             <td className="px-2 py-2 text-ice-300">
                               {s.round}
@@ -670,7 +717,11 @@ export default async function LeagueBracketPage({
                       className="rounded-md border border-puck-border bg-puck-bg/40 p-3"
                     >
                       <summary className="cursor-pointer text-sm font-semibold text-ice-200">
-                        Series {s.series_letter} &mdash;{" "}
+                        Series {s.series_letter}{" "}
+                        <span className="text-xs font-normal text-ice-400">
+                          ({slotLabel.get(s.series_letter) ?? ""})
+                        </span>{" "}
+                        &mdash;{" "}
                         {s.top_seed_abbrev ?? "TBD"} vs{" "}
                         {s.bottom_seed_abbrev ?? "TBD"} ({seriesGames.length}{" "}
                         game{seriesGames.length !== 1 ? "s" : ""})
@@ -716,14 +767,14 @@ export default async function LeagueBracketPage({
                               />
                               <div className="space-y-0.5">
                                 <Label className="text-[10px]">
-                                  Start (UTC)
+                                  Start (MDT)
                                 </Label>
                                 <Input
                                   name="start_time_utc"
                                   type="datetime-local"
                                   defaultValue={
                                     g.start_time_utc
-                                      ? g.start_time_utc.slice(0, 16)
+                                      ? utcToMdtLocal(g.start_time_utc)
                                       : ""
                                   }
                                   className="w-44 text-xs"
@@ -840,7 +891,7 @@ export default async function LeagueBracketPage({
                               key={s.series_letter}
                               value={s.series_letter}
                             >
-                              {s.series_letter} —{" "}
+                              {s.series_letter} ({slotLabel.get(s.series_letter) ?? ""}) —{" "}
                               {s.top_seed_abbrev ?? "?"} vs{" "}
                               {s.bottom_seed_abbrev ?? "?"}
                             </option>
@@ -862,7 +913,7 @@ export default async function LeagueBracketPage({
                       </div>
                       <div className="space-y-1">
                         <Label htmlFor="new-game-start">
-                          Start time
+                          Start time (MDT)
                         </Label>
                         <Input
                           id="new-game-start"
