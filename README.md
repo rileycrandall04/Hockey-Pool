@@ -205,4 +205,3 @@ Things that are easy extensions if you want to keep building:
 - Emailed daily summaries using the same cron.
 - Trade proposals + commissioner approval flow.
 - Goalie scoring (shutouts / wins).
-- 
