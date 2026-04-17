@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AdOverlay from "@/components/ad-overlay";
 
 export const metadata: Metadata = {
   title: "Stanley Cup Pool",
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen bg-puck-bg text-ice-100 antialiased">
         {children}
+        <AdOverlay />
       </body>
     </html>
   );
