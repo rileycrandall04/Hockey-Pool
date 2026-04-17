@@ -457,12 +457,16 @@ export default function AdOverlay({
   const [adIndex, setAdIndex] = useState(0);
 
   useEffect(() => {
+    // Only allow one ad per browser session across all pages
+    if (sessionStorage.getItem("hp_ad_shown")) return;
+
     const raw = localStorage.getItem(storageKey);
     const prev = typeof raw === "string" ? parseInt(raw, 10) || 0 : 0;
     const next = prev + 1;
     localStorage.setItem(storageKey, String(next));
 
     if (next % 2 === 0) {
+      sessionStorage.setItem("hp_ad_shown", "1");
       setAdIndex(Math.floor(Math.random() * ADS.length));
       setOpen(true);
     }
