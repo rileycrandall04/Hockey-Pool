@@ -4,6 +4,7 @@ import { getLeagueForMember } from "@/lib/league-access";
 import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
 import { DraftRoom } from "@/components/draft-room";
+import AdOverlay from "@/components/ad-overlay";
 import type { League, Team } from "@/lib/types";
 
 export default async function DraftPage({
@@ -65,6 +66,7 @@ export default async function DraftPage({
           vapidPublicKey={vapidPublicKey}
         />
       </main>
+      <AdOverlay storageKey="hp_ad_draft" />
     </>
   );
 }

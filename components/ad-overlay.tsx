@@ -448,15 +448,19 @@ const ADS: string[] = [
 </div>`,
 ];
 
-export default function AdOverlay() {
+export default function AdOverlay({
+  storageKey = "hp_ad_visits",
+}: {
+  storageKey?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [adIndex, setAdIndex] = useState(0);
 
   useEffect(() => {
-    const raw = localStorage.getItem("hp_ad_visits");
+    const raw = localStorage.getItem(storageKey);
     const prev = typeof raw === "string" ? parseInt(raw, 10) || 0 : 0;
     const next = prev + 1;
-    localStorage.setItem("hp_ad_visits", String(next));
+    localStorage.setItem(storageKey, String(next));
 
     if (next % 2 === 0) {
       setAdIndex(Math.floor(Math.random() * ADS.length));
