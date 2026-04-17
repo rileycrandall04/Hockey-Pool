@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getLeagueForMember } from "@/lib/league-access";
 import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
 import { PlayoffBracket } from "@/components/playoff-bracket";
@@ -26,11 +27,7 @@ export default async function LeagueBracketPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: league } = await supabase
-    .from("leagues")
-    .select("*")
-    .eq("id", leagueId)
-    .single<League>();
+  const league = await getLeagueForMember(supabase, leagueId, user.id);
   if (!league) notFound();
 
   const { data: profile } = await supabase

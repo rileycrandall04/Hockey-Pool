@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 // Force dynamic rendering so the bell toggle state (and any other
 // additions) refreshes with the latest deploy, not a cached shell.
@@ -100,10 +100,32 @@ export default async function DashboardPage({
     .single();
 
   // Leagues this user is a commissioner of OR has a team in.
+  //
+  // The old approach used an embedded `leagues(*)` join on the teams
+  // query, but Supabase applies RLS to embedded joins independently.
+  // For non-commissioner members the `leagues` SELECT policy calls
+  // `is_league_member()` which can fail during the embedded-join
+  // context, causing the league data to come back null even though
+  // the team row exists. Fix: query teams first, then fetch their
+  // leagues via the service client (safe because we only look up
+  // leagues the authenticated user already has teams in).
   const { data: myTeams } = await supabase
     .from("teams")
-    .select("*, leagues(*)")
+    .select("*")
     .eq("owner_id", user.id);
+
+  const svc = createServiceClient();
+  const teamLeagueIds = [
+    ...new Set((myTeams ?? []).map((t) => t.league_id as string)),
+  ];
+  const memberLeagues: League[] = [];
+  if (teamLeagueIds.length > 0) {
+    const { data } = await svc
+      .from("leagues")
+      .select("*")
+      .in("id", teamLeagueIds);
+    if (data) memberLeagues.push(...(data as League[]));
+  }
 
   const { data: commishLeagues } = await supabase
     .from("leagues")
@@ -112,11 +134,14 @@ export default async function DashboardPage({
 
   // Dedupe into a single list of leagues.
   const leaguesById = new Map<string, LeagueWithTeam>();
-  for (const row of myTeams ?? []) {
-    const l = (row as unknown as { leagues: League }).leagues;
-    if (l) leaguesById.set(l.id, { ...l, team: row as unknown as Team });
+  const teamsByLeague = new Map<string, Team>();
+  for (const t of (myTeams ?? []) as Team[]) {
+    teamsByLeague.set(t.league_id, t);
   }
-  for (const l of commishLeagues ?? []) {
+  for (const l of memberLeagues) {
+    leaguesById.set(l.id, { ...l, team: teamsByLeague.get(l.id) ?? null });
+  }
+  for (const l of (commishLeagues ?? []) as League[]) {
     if (!leaguesById.has(l.id)) leaguesById.set(l.id, { ...l, team: null });
   }
   const leagues = [...leaguesById.values()];
@@ -222,11 +247,18 @@ export default async function DashboardPage({
 
         {leagues.length === 0 ? (
           <Card>
-            <CardContent className="py-10 text-center text-sm text-ice-300">
-              You&rsquo;re not in any leagues yet.{" "}
-              <span className="block text-xs text-ice-500">
-                Open the menu (top-left) to create or join one.
-              </span>
+            <CardContent className="flex flex-col items-center gap-4 py-10">
+              <p className="text-sm text-ice-300">
+                You&rsquo;re not in any leagues yet.
+              </p>
+              <div className="flex gap-3">
+                <Link href="/leagues/join">
+                  <Button>Join a league</Button>
+                </Link>
+                <Link href="/leagues/new">
+                  <Button variant="secondary">Create a league</Button>
+                </Link>
+              </div>
             </CardContent>
           </Card>
         ) : (

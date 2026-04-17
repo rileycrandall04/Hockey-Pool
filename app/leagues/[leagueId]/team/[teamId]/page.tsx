@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getLeagueForMember } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { scoreTeam } from "@/lib/scoring";
@@ -18,11 +19,7 @@ export default async function TeamPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: league } = await supabase
-    .from("leagues")
-    .select("*")
-    .eq("id", leagueId)
-    .single<League>();
+  const league = await getLeagueForMember(supabase, leagueId, user.id);
   if (!league) notFound();
 
   const { data: team } = await supabase

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getLeagueForMember } from "@/lib/league-access";
 
 // Force dynamic rendering so Next.js never serves a cached version
 // of this page that's missing the just-deployed watch toggle (or
@@ -79,11 +80,7 @@ export default async function LeagueStandingsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: league } = await supabase
-    .from("leagues")
-    .select("*")
-    .eq("id", leagueId)
-    .single<League>();
+  const league = await getLeagueForMember(supabase, leagueId, user.id);
   if (!league) notFound();
 
   const { data: profile } = await supabase

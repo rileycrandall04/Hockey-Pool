@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { getLeagueForMember } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -108,11 +109,7 @@ export default async function LeaveLeaguePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: league } = await supabase
-    .from("leagues")
-    .select("*")
-    .eq("id", leagueId)
-    .single<League>();
+  const league = await getLeagueForMember(supabase, leagueId, user.id);
   if (!league) notFound();
 
   // Commissioners don't belong on this page — bounce them at the admin
