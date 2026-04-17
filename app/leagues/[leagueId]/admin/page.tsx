@@ -484,6 +484,98 @@ async function toggleTeamEliminationAction(formData: FormData) {
  * Setting an empty status DELETES the override row, which restores
  * the global NHL feed value for this league.
  */
+async function addMemberAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id"));
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const teamName = String(formData.get("team_name") ?? "").trim();
+
+  if (!email || !teamName) {
+    redirect(
+      `/leagues/${leagueId}/admin?member_error=${encodeURIComponent(
+        "Email and team name are both required.",
+      )}`,
+    );
+  }
+
+  await assertCommissioner(leagueId);
+  const svc = createServiceClient();
+
+  // Look up existing profile by email
+  const { data: profile } = await svc
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+
+  let ownerId: string;
+
+  if (profile) {
+    ownerId = profile.id;
+  } else {
+    // User doesn't exist — invite them via Supabase Auth
+    const { data: invite, error: inviteError } =
+      await svc.auth.admin.inviteUserByEmail(email);
+    if (inviteError || !invite.user) {
+      redirect(
+        `/leagues/${leagueId}/admin?member_error=${encodeURIComponent(
+          inviteError?.message ?? "Failed to invite user.",
+        )}`,
+      );
+    }
+    ownerId = invite.user.id;
+
+    // Upsert a profile row so the team FK is satisfied
+    await svc.from("profiles").upsert(
+      {
+        id: ownerId,
+        email,
+        display_name: email.split("@")[0],
+      },
+      { onConflict: "id" },
+    );
+  }
+
+  // Check for duplicate team (same league + owner)
+  const { data: existing } = await svc
+    .from("teams")
+    .select("id")
+    .eq("league_id", leagueId)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+
+  if (existing) {
+    redirect(
+      `/leagues/${leagueId}/admin?member_error=${encodeURIComponent(
+        "That user already has a team in this league.",
+      )}`,
+    );
+  }
+
+  const { error: insertError } = await svc.from("teams").insert({
+    league_id: leagueId,
+    owner_id: ownerId,
+    name: teamName,
+  });
+
+  if (insertError) {
+    redirect(
+      `/leagues/${leagueId}/admin?member_error=${encodeURIComponent(
+        insertError.message,
+      )}`,
+    );
+  }
+
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/dashboard`);
+  redirect(
+    `/leagues/${leagueId}/admin?member_success=${encodeURIComponent(
+      `Added "${teamName}" (${email}) to the league.`,
+    )}`,
+  );
+}
+
 async function toggleInjuryAction(formData: FormData) {
   "use server";
   const leagueId = String(formData.get("league_id"));
@@ -531,10 +623,12 @@ export default async function AdminPage({
     reset_error?: string;
     reset_success?: string;
     delete_error?: string;
+    member_error?: string;
+    member_success?: string;
   }>;
 }) {
   const { leagueId } = await params;
-  const { reset_error, reset_success, delete_error } = await searchParams;
+  const { reset_error, reset_success, delete_error, member_error, member_success } = await searchParams;
   const { league, user } = await assertCommissioner(leagueId);
   const canRefreshNhlData = isAppOwner(user.email);
 
@@ -1094,6 +1188,57 @@ export default async function AdminPage({
                 </form>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Add member</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-xs text-ice-400">
+              Add someone to this league by email. If they already have an
+              account they&rsquo;ll see the league on their next login. If
+              not, they&rsquo;ll receive an invite email.
+            </p>
+            <p className="mb-3 text-sm text-ice-300">
+              {(teams ?? []).length} team{(teams ?? []).length === 1 ? "" : "s"} in league
+            </p>
+            {member_success && (
+              <div className="mb-3 rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-300">
+                {member_success}
+              </div>
+            )}
+            {member_error && (
+              <div className="mb-3 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                {member_error}
+              </div>
+            )}
+            <form action={addMemberAction} className="space-y-3">
+              <input type="hidden" name="league_id" value={leagueId} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="member_email">Email</Label>
+                  <Input
+                    id="member_email"
+                    name="email"
+                    type="email"
+                    placeholder="player@example.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="member_team_name">Team name</Label>
+                  <Input
+                    id="member_team_name"
+                    name="team_name"
+                    placeholder="Team name"
+                    required
+                  />
+                </div>
+              </div>
+              <Button type="submit">Add member</Button>
+            </form>
           </CardContent>
         </Card>
 
