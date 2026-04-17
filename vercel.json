@@ -4,10 +4,6 @@
     {
       "path": "/api/cron/update-stats",
       "schedule": "0 10 * * *"
-    },
-    {
-      "path": "/api/cron/draft-watch",
-      "schedule": "*/5 * * * *"
     }
   ]
 }
