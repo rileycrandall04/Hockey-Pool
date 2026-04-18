@@ -763,29 +763,37 @@ export function DraftRoom({
   }, [currentPickIndex, draftOver, league.draft_status, clockKey]);
 
   // When clock hits 0, pick from queue if available, otherwise auto-pick.
+  // Fires for the user on the clock OR the commissioner (backstop in case
+  // the on-the-clock user is AFK / has the browser closed).
   // After auto-pick, reload the page to refresh all server data.
+  const canAutoPick = isMyTurn || isCommissioner;
   useEffect(() => {
-    if (pickClock !== 0 || activeClockRef.current === 0 || !isMyTurn || busy || autoDraft || draftOver) return;
+    if (pickClock !== 0 || activeClockRef.current === 0 || !canAutoPick || busy || autoDraft || draftOver) return;
     if (pickClockFiringRef.current) return;
     pickClockFiringRef.current = true;
 
-    const firstAvailable = queue.find((id) => !pickedPlayerIds.has(id));
     const afterPick = () => {
       pickClockFiringRef.current = false;
-      // Refresh page to ensure all data is current after auto-pick
       window.location.reload();
     };
 
-    if (firstAvailable) {
-      handlePick(firstAvailable).then(() => {
-        setQueue((prev) => prev.filter((id) => id !== firstAvailable));
-        afterPick();
-      });
+    if (isMyTurn) {
+      // It's our turn — use queue if available, otherwise auto-pick
+      const firstAvailable = queue.find((id) => !pickedPlayerIds.has(id));
+      if (firstAvailable) {
+        handlePick(firstAvailable).then(() => {
+          setQueue((prev) => prev.filter((id) => id !== firstAvailable));
+          afterPick();
+        });
+      } else {
+        handleAutoPick().then(afterPick);
+      }
     } else {
+      // Commissioner backstop — auto-pick for the AFK user
       handleAutoPick().then(afterPick);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickClock, isMyTurn, busy, autoDraft, draftOver]);
+  }, [pickClock, canAutoPick, isMyTurn, busy, autoDraft, draftOver]);
 
   // ---- render -------------------------------------------------------------
   if (league.draft_status === "pending") {
