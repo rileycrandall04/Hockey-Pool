@@ -889,6 +889,113 @@ const ADS: string[] = [
     </a>
   </div>
 </div>`,
+
+  // Ad 12: Irwin's Snow Shoe Rental
+  `<div style="width:370px;max-width:95vw;background:#F0F6FF;border:3px solid #1565C0;position:relative;">
+  <div style="background:#1565C0;padding:5px 10px;display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:#BBDEFB;font-size:9px;letter-spacing:2px;font-weight:bold;">★ SPONSORED — HOCKEY POOL ★</span>
+    <button data-ad-close style="background:#1565C0;border:1px solid #BBDEFB;color:#BBDEFB;width:19px;height:19px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;font-weight:900;">✕</button>
+  </div>
+  <div style="padding:16px 20px 16px;text-align:center;">
+    <div style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:32px;color:#1565C0;line-height:1;margin-bottom:0;">Irwin's</div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:24px;color:#1A1A1A;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">Snow Shoe Rental</div>
+    <div style="font-family:Georgia,serif;font-style:italic;font-size:9px;color:#90A4AE;letter-spacing:2px;margin-bottom:10px;">Est. at the bottom of the lift</div>
+    <div style="border:2px solid #1565C0;border-radius:4px;overflow:hidden;background:#E3F2FD;margin-bottom:12px;">
+      <svg viewBox="0 0 334 185" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        <rect x="0" y="0" width="334" height="185" fill="#BBDEFB"/>
+        <rect x="0" y="0" width="334" height="80" fill="#90CAF9"/>
+        <circle cx="290" cy="28" r="20" fill="#FFF9C4"/>
+        <circle cx="290" cy="28" r="15" fill="#FFF176"/>
+        <polygon points="0,90 55,30 110,90" fill="#90CAF9"/>
+        <polygon points="70,90 135,20 200,90" fill="#78B4D8"/>
+        <polygon points="180,90 240,35 300,90" fill="#90CAF9"/>
+        <polygon points="270,90 310,45 334,90" fill="#78B4D8"/>
+        <polygon points="120,31 135,20 150,31 144,33 126,33" fill="white" opacity="0.9"/>
+        <polygon points="225,46 240,35 255,46 249,48 231,48" fill="white" opacity="0.9"/>
+        <polygon points="41,41 55,30 69,41 63,43 47,43" fill="white" opacity="0.9"/>
+        <polygon points="0,90 334,90 334,185 0,185" fill="white"/>
+        <polygon points="0,90 334,90 334,110 0,130" fill="#E3F2FD" opacity="0.5"/>
+        <line x1="240" y1="90" x2="334" y2="160" stroke="#B3D4F0" stroke-width="2"/>
+        <line x1="255" y1="90" x2="334" y2="150" stroke="#B3D4F0" stroke-width="2"/>
+        <g transform="translate(260,105)">
+          <ellipse cx="0" cy="-8" rx="6" ry="7" fill="#FF5722"/>
+          <line x1="0" y1="-2" x2="8" y2="6" stroke="#FF5722" stroke-width="5" stroke-linecap="round"/>
+          <line x1="-4" y1="8" x2="18" y2="10" stroke="#1565C0" stroke-width="2" stroke-linecap="round"/>
+          <line x1="-2" y1="10" x2="20" y2="12" stroke="#1565C0" stroke-width="2" stroke-linecap="round"/>
+          <line x1="-8" y1="-4" x2="-20" y2="-6" stroke="#B3D4F0" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="-6" y1="0" x2="-20" y2="1" stroke="#B3D4F0" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="-6" y1="5" x2="-18" y2="7" stroke="#B3D4F0" stroke-width="1.5" stroke-linecap="round"/>
+        </g>
+        <g transform="translate(300,118)">
+          <ellipse cx="0" cy="-6" rx="5" ry="5" fill="#9C27B0"/>
+          <line x1="0" y1="0" x2="6" y2="5" stroke="#9C27B0" stroke-width="4" stroke-linecap="round"/>
+          <line x1="-3" y1="6" x2="14" y2="8" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="-2" y1="8" x2="15" y2="10" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="-6" y1="-2" x2="-14" y2="-4" stroke="#B3D4F0" stroke-width="1" stroke-linecap="round"/>
+          <line x1="-5" y1="2" x2="-14" y2="3" stroke="#B3D4F0" stroke-width="1" stroke-linecap="round"/>
+        </g>
+        <g transform="translate(130,108)">
+          <ellipse cx="-14" cy="52" rx="22" ry="9" fill="none" stroke="#8D6E63" stroke-width="2.5" transform="rotate(-5,-14,52)"/>
+          <line x1="-34" y1="52" x2="6" y2="52" stroke="#8D6E63" stroke-width="1" transform="rotate(-5,-14,52)"/>
+          <line x1="-14" y1="44" x2="-14" y2="60" stroke="#8D6E63" stroke-width="1" transform="rotate(-5,-14,52)"/>
+          <rect x="-20" y="48" width="12" height="8" rx="2" fill="#5D4037" transform="rotate(-5,-14,52)"/>
+          <ellipse cx="14" cy="54" rx="22" ry="9" fill="none" stroke="#8D6E63" stroke-width="2.5" transform="rotate(8,14,54)"/>
+          <line x1="-6" y1="54" x2="34" y2="54" stroke="#8D6E63" stroke-width="1" transform="rotate(8,14,54)"/>
+          <line x1="14" y1="46" x2="14" y2="62" stroke="#8D6E63" stroke-width="1" transform="rotate(8,14,54)"/>
+          <rect x="8" y="50" width="12" height="8" rx="2" fill="#5D4037" transform="rotate(8,14,54)"/>
+          <rect x="-20" y="36" width="12" height="18" rx="3" fill="#4E342E"/>
+          <rect x="8" y="38" width="12" height="16" rx="3" fill="#4E342E"/>
+          <rect x="-22" y="4" width="44" height="36" rx="8" fill="#FF8F00"/>
+          <line x1="0" y1="4" x2="0" y2="38" stroke="#E65100" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <line x1="-22" y1="16" x2="22" y2="16" stroke="#E65100" stroke-width="1" opacity="0.5"/>
+          <line x1="-22" y1="27" x2="22" y2="27" stroke="#E65100" stroke-width="1" opacity="0.5"/>
+          <line x1="-22" y1="14" x2="-52" y2="28" stroke="#FF8F00" stroke-width="10" stroke-linecap="round"/>
+          <line x1="-52" y1="28" x2="-62" y2="58" stroke="#78909C" stroke-width="2.5" stroke-linecap="round"/>
+          <ellipse cx="-63" cy="60" rx="5" ry="3" fill="#546E7A"/>
+          <line x1="22" y1="14" x2="52" y2="28" stroke="#FF8F00" stroke-width="10" stroke-linecap="round"/>
+          <line x1="52" y1="28" x2="62" y2="58" stroke="#78909C" stroke-width="2.5" stroke-linecap="round"/>
+          <ellipse cx="63" cy="60" rx="5" ry="3" fill="#546E7A"/>
+          <rect x="-7" y="-10" width="14" height="16" rx="4" fill="#FFCCAA"/>
+          <ellipse cx="0" cy="-18" rx="18" ry="18" fill="#FFCCAA"/>
+          <ellipse cx="0" cy="-30" rx="18" ry="10" fill="#1565C0"/>
+          <rect x="-18" y="-33" width="36" height="10" rx="2" fill="#1565C0"/>
+          <ellipse cx="0" cy="-36" rx="18" ry="8" fill="#1976D2"/>
+          <circle cx="0" cy="-45" r="6" fill="#FF8F00"/>
+          <rect x="-14" y="-24" width="28" height="11" rx="5" fill="#263238"/>
+          <ellipse cx="-6" cy="-19" rx="7" ry="5" fill="#4FC3F7" opacity="0.6"/>
+          <ellipse cx="8" cy="-19" rx="7" ry="5" fill="#4FC3F7" opacity="0.6"/>
+          <line x1="-18" y1="-19" x2="-14" y2="-19" stroke="#263238" stroke-width="2"/>
+          <line x1="14" y1="-19" x2="18" y2="-19" stroke="#263238" stroke-width="2"/>
+          <rect x="-16" y="-8" width="32" height="8" rx="3" fill="#C62828"/>
+          <path d="M 10 -2 Q 16 4 12 10" fill="none" stroke="#C62828" stroke-width="5" stroke-linecap="round"/>
+          <ellipse cx="-60" cy="155" rx="16" ry="6" fill="none" stroke="#C8DFF0" stroke-width="1.5" transform="rotate(-5,-60,155)"/>
+          <ellipse cx="-28" cy="162" rx="16" ry="6" fill="none" stroke="#C8DFF0" stroke-width="1.5" transform="rotate(5,-28,162)"/>
+          <ellipse cx="4" cy="158" rx="16" ry="6" fill="none" stroke="#C8DFF0" stroke-width="1.5" transform="rotate(-5,4,158)"/>
+        </g>
+        <ellipse cx="258" cy="118" rx="12" ry="4" fill="white" opacity="0.6" transform="rotate(-20,258,118)"/>
+        <rect x="32" y="105" width="52" height="26" rx="3" fill="#FDD835" stroke="#F9A825" stroke-width="1.5"/>
+        <rect x="56" y="131" width="4" height="18" fill="#8D6E63"/>
+        <text x="58" y="117" text-anchor="middle" font-family="Impact" font-size="8" fill="#1A1A1A">SUMMIT</text>
+        <text x="58" y="127" text-anchor="middle" font-family="Impact" font-size="8" fill="#C62828">3.2 miles</text>
+        <text x="58" y="103" text-anchor="middle" font-family="Arial" font-size="7" fill="#1565C0">↓ you</text>
+      </svg>
+    </div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:24px;color:#1565C0;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Safest way down<br>the mountain.</div>
+    <div style="font-family:Georgia,serif;font-style:italic;font-size:11px;color:#888;margin-bottom:12px;">Also the slowest. Significantly the slowest.</div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <span style="font-size:8px;color:#1565C0;border:1px solid #1565C0;padding:3px 7px;border-radius:2px;background:white;">Zero MPH</span>
+      <span style="font-size:8px;color:#1565C0;border:1px solid #1565C0;padding:3px 7px;border-radius:2px;background:white;">No Chairlift Needed</span>
+      <span style="font-size:8px;color:#1565C0;border:1px solid #1565C0;padding:3px 7px;border-radius:2px;background:white;">Arrive Eventually</span>
+    </div>
+    <button style="background:#1565C0;color:white;border:none;padding:11px 0;font-family:Impact,'Arial Black',sans-serif;font-size:20px;text-transform:uppercase;cursor:pointer;letter-spacing:1px;width:100%;display:block;margin-bottom:8px;">
+      RENT SNOWSHOES →
+    </button>
+    <div style="font-size:7.5px;color:#aaa;font-style:italic;margin-bottom:6px;">*Irwin is not responsible for skiers laughing at you &nbsp;|&nbsp; Poles extra</div>
+    <a href="#" data-ad-close style="font-size:9px;color:#aaa;font-family:Arial;text-decoration:none;display:block;">
+      No thanks, I'll take my chances on skis
+    </a>
+  </div>
+</div>`,
 ];
 
 export default function AdOverlay({
@@ -910,7 +1017,10 @@ export default function AdOverlay({
 
     if (next % 2 === 0) {
       sessionStorage.setItem("hp_ad_shown", "1");
-      setAdIndex(Math.floor(Math.random() * ADS.length));
+      const lastIdx = parseInt(localStorage.getItem("hp_ad_idx") ?? "-1", 10);
+      const nextIdx = (lastIdx + 1) % ADS.length;
+      localStorage.setItem("hp_ad_idx", String(nextIdx));
+      setAdIndex(nextIdx);
       setOpen(true);
     }
   }, []);

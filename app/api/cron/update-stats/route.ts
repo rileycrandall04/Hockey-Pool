@@ -97,6 +97,25 @@ export async function POST(request: Request) {
         }
         deltas.set(l.playerId, row);
       }
+
+      // Seed manual_game_stats with per-game per-player rows so the
+      // /games/[id]/stats page can pre-populate and compute correct
+      // deltas when editing. Uses ignoreDuplicates so manual edits
+      // made before the cron runs are never overwritten.
+      const manualRows = lines.map((l) => ({
+        game_id: id,
+        player_id: l.playerId,
+        goals: l.goals,
+        assists: l.assists,
+        ot_goals: l.otGoals,
+        updated_at: new Date().toISOString(),
+      }));
+      if (manualRows.length > 0) {
+        await svc.from("manual_game_stats").upsert(manualRows, {
+          onConflict: "game_id,player_id",
+          ignoreDuplicates: true,
+        });
+      }
     } catch (err) {
       console.error("Failed to fetch game stats", id, err);
     }

@@ -66,6 +66,7 @@ export function DraftRoom({
   );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [autoDraft, setAutoDraft] = useState(false);
   // "granted" | "denied" | "default" | "unsupported"
   const [notifyPermission, setNotifyPermission] = useState<string>("default");
   // Whether the browser currently has an active push subscription for
@@ -607,6 +608,41 @@ export function DraftRoom({
     if (result?.inserted) applyLocalPick(result.inserted);
   };
 
+  // ---- auto-draft effect --------------------------------------------------
+  // When autoDraft is on and it becomes our turn, fire an auto-pick after
+  // a short delay (gives the UI time to render the transition so the user
+  // sees what happened). The ref guard prevents double-fires.
+  const autoPickFiringRef = useRef(false);
+  useEffect(() => {
+    if (
+      !autoDraft ||
+      !isMyTurn ||
+      draftOver ||
+      busy ||
+      league.draft_status !== "in_progress"
+    ) {
+      autoPickFiringRef.current = false;
+      return;
+    }
+    if (autoPickFiringRef.current) return;
+    autoPickFiringRef.current = true;
+
+    const timer = setTimeout(async () => {
+      if (!onClockTeam) return;
+      const result = await post<{ inserted?: PickRow }>("/api/draft/autopick", {
+        league_id: league.id,
+        team_id: onClockTeam.id,
+      });
+      if (result?.inserted) applyLocalPick(result.inserted);
+      autoPickFiringRef.current = false;
+    }, 800);
+
+    return () => {
+      clearTimeout(timer);
+      autoPickFiringRef.current = false;
+    };
+  }, [autoDraft, isMyTurn, draftOver, busy, league.draft_status, league.id, onClockTeam, post, applyLocalPick]);
+
   // ---- render -------------------------------------------------------------
   if (league.draft_status === "pending") {
     // Does every team have a draft_position yet? If so we're
@@ -734,7 +770,11 @@ export function DraftRoom({
             {draftOver ? "Draft complete" : onClockTeam?.name ?? "—"}
           </div>
           {isMyTurn && !draftOver && (
-            <div className="text-xs text-green-400">It&rsquo;s your pick!</div>
+            <div className="text-xs text-green-400">
+              {autoDraft
+                ? "Auto-drafting..."
+                : "It\u2019s your pick!"}
+            </div>
           )}
         </div>
       </div>
@@ -851,7 +891,7 @@ export function DraftRoom({
                 onChange={(e) => setSearch(e.target.value)}
                 className="flex-1 min-w-[160px]"
               />
-              {(isMyTurn || isCommissioner) && !draftOver && (
+              {(isMyTurn || isCommissioner) && !draftOver && !autoDraft && (
                 <Button
                   variant="secondary"
                   size="sm"
@@ -860,6 +900,26 @@ export function DraftRoom({
                 >
                   Auto-pick
                 </Button>
+              )}
+              {!draftOver && (
+                <button
+                  type="button"
+                  onClick={() => setAutoDraft(!autoDraft)}
+                  className={
+                    "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition " +
+                    (autoDraft
+                      ? "bg-green-500/20 text-green-300 ring-1 ring-green-500/50"
+                      : "bg-puck-border text-ice-300 hover:bg-ice-800")
+                  }
+                >
+                  <span
+                    className={
+                      "inline-block h-2 w-2 rounded-full " +
+                      (autoDraft ? "bg-green-400 animate-pulse" : "bg-ice-600")
+                    }
+                  />
+                  {autoDraft ? "Auto ON" : "Auto OFF"}
+                </button>
               )}
             </div>
             <div className="max-h-[60vh] overflow-y-auto">

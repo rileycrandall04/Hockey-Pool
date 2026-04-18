@@ -1,9 +1,12 @@
 import type { PlayoffBroadcast, PlayoffGame, PlayoffSeries } from "@/lib/types";
+import { SeriesGameEditor } from "@/components/series-game-editor";
 
 interface PlayoffBracketProps {
   series: PlayoffSeries[];
   games: PlayoffGame[];
   isOwner?: boolean;
+  leagueId?: string;
+  nhlTeams?: { abbrev: string; name: string }[];
 }
 
 /**
@@ -71,7 +74,7 @@ export const BRACKET_SLOTS: BracketSlot[] = [
   { letter: "O", round: 4, conference: "FINAL" },
 ];
 
-export function PlayoffBracket({ series, games, isOwner }: PlayoffBracketProps) {
+export function PlayoffBracket({ series, games, isOwner, leagueId, nhlTeams }: PlayoffBracketProps) {
   const seriesByLetter = new Map<string, PlayoffSeries>();
   for (const s of series ?? []) seriesByLetter.set(s.series_letter, s);
 
@@ -99,24 +102,27 @@ export function PlayoffBracket({ series, games, isOwner }: PlayoffBracketProps) 
   const renderSlot = (slot: BracketSlot) => {
     const data = seriesByLetter.get(slot.letter);
     if (!data) return <PlaceholderSeriesCard key={slot.letter} />;
-    const card = (
-      <SeriesCard
-        series={data}
-        games={gamesBySeries.get(slot.letter) ?? []}
-      />
-    );
-    if (isOwner) {
+
+    if (isOwner && leagueId) {
       return (
-        <a
+        <SeriesGameEditor
           key={slot.letter}
-          href={`#manage-series-${slot.letter}`}
-          className="block rounded-md transition hover:ring-2 hover:ring-ice-400/50"
-        >
-          {card}
-        </a>
+          series={data}
+          games={gamesBySeries.get(slot.letter) ?? []}
+          leagueId={leagueId}
+          nhlTeams={nhlTeams ?? []}
+        />
       );
     }
-    return <div key={slot.letter}>{card}</div>;
+
+    return (
+      <div key={slot.letter}>
+        <SeriesCard
+          series={data}
+          games={gamesBySeries.get(slot.letter) ?? []}
+        />
+      </div>
+    );
   };
 
   return (
@@ -148,8 +154,8 @@ export function PlayoffBracket({ series, games, isOwner }: PlayoffBracketProps) 
           </BracketColumn>
         </div>
         <div className="mt-2 flex justify-between text-[10px] uppercase tracking-wider text-ice-500">
-          <span>← Eastern Conference</span>
-          <span>Western Conference →</span>
+          <span>&larr; Eastern Conference</span>
+          <span>Western Conference &rarr;</span>
         </div>
       </div>
 
@@ -236,7 +242,7 @@ function RoundSection({
   );
 }
 
-function SeriesCard({
+export function SeriesCard({
   series,
   games,
 }: {
@@ -298,7 +304,7 @@ function SeriesCard({
   );
 }
 
-function TeamRow({
+export function TeamRow({
   abbrev,
   name,
   logo,
@@ -388,13 +394,13 @@ function PlaceholderTeamRow() {
         <span className="text-ice-500">TBD</span>
       </span>
       <span className="flex-shrink-0 font-mono text-[11px] text-ice-600">
-        —
+        &mdash;
       </span>
     </div>
   );
 }
 
-function NextGameLine({ game }: { game: PlayoffGame }) {
+export function NextGameLine({ game }: { game: PlayoffGame }) {
   const when = formatGameTime(game.start_time_utc, game.game_date);
   const matchup =
     game.away_abbrev && game.home_abbrev
@@ -439,7 +445,7 @@ function NextGameLine({ game }: { game: PlayoffGame }) {
  *      case where a series has games scheduled but the bracket hasn't
  *      populated future rows yet.
  */
-function pickNextGame(games: PlayoffGame[]): PlayoffGame | null {
+export function pickNextGame(games: PlayoffGame[]): PlayoffGame | null {
   if (games.length === 0) return null;
   const sorted = [...games].sort((a, b) => {
     const at = a.start_time_utc ? Date.parse(a.start_time_utc) : 0;
@@ -456,7 +462,7 @@ function pickNextGame(games: PlayoffGame[]): PlayoffGame | null {
   return sorted[sorted.length - 1] ?? null;
 }
 
-function formatGameTime(
+export function formatGameTime(
   startTimeUtc: string | null,
   gameDate: string | null,
 ): string | null {
@@ -488,7 +494,7 @@ function formatGameTime(
   return null;
 }
 
-function formatBroadcasts(
+export function formatBroadcasts(
   broadcasts: PlayoffBroadcast[] | null | undefined,
 ): string | null {
   if (!broadcasts || broadcasts.length === 0) return null;
