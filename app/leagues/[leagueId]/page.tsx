@@ -10,6 +10,7 @@ import { getLeagueForMember } from "@/lib/league-access";
 // effectively dynamic anyway, but being explicit guarantees it.
 export const dynamic = "force-dynamic";
 import { isAppOwner } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/server";
 import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -95,6 +96,18 @@ export default async function LeagueStandingsPage({
     .eq("league_id", leagueId);
 
   const isCommissioner = league.commissioner_id === user.id;
+  const ownerFlag = isAppOwner(user.email);
+
+  // Only query unresolved stat conflicts for the app owner
+  let alertCount = 0;
+  if (ownerFlag) {
+    const svc = createServiceClient();
+    const { count } = await svc
+      .from("stat_conflicts")
+      .select("id", { count: "exact", head: true })
+      .eq("resolved", false);
+    alertCount = count ?? 0;
+  }
 
   const { data: rosterRows } = await supabase
     .from("v_team_rosters")
@@ -208,7 +221,8 @@ export default async function LeagueStandingsPage({
         leagueId={leagueId}
         draftStatus={league.draft_status}
         isCommissioner={isCommissioner}
-        isOwner={isAppOwner(user.email)}
+        isOwner={ownerFlag}
+        alertCount={alertCount}
       />
       <DailyTicker />
       <main className="mx-auto max-w-4xl px-3 py-6 sm:px-6 sm:py-8">

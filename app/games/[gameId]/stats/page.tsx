@@ -308,6 +308,17 @@ export default async function GameStatsPage({
 
   const leagueCtx = await getCurrentLeagueContext(user.id);
 
+  // Only query unresolved stat conflicts for the app owner
+  let alertCount = 0;
+  {
+    const svcAlerts = createServiceClient();
+    const { count } = await svcAlerts
+      .from("stat_conflicts")
+      .select("id", { count: "exact", head: true })
+      .eq("resolved", false);
+    alertCount = count ?? 0;
+  }
+
   // Build game header
   const awayLabel = game.away_abbrev ?? "?";
   const homeLabel = game.home_abbrev ?? "?";
@@ -333,6 +344,7 @@ export default async function GameStatsPage({
         draftStatus={leagueCtx.draftStatus}
         isCommissioner={leagueCtx.isCommissioner}
         isOwner
+        alertCount={alertCount}
       />
       <main className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-6 sm:py-8">
         <Link

@@ -167,13 +167,13 @@ function GameChip({
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-shrink-0 items-center gap-1.5 rounded border px-2 py-1 text-[11px] transition sm:gap-2 sm:px-2.5 sm:text-xs ${
+      className={`flex flex-shrink-0 items-center gap-2 rounded border px-3 py-1.5 text-sm transition sm:gap-2.5 sm:px-4 sm:text-base ${
         selected
           ? "border-ice-400 bg-ice-500/25 text-ice-50"
           : "border-puck-border bg-puck-bg text-ice-200 hover:bg-puck-border/60"
       }`}
     >
-      {awayLogo && <img src={awayLogo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />}
+      {awayLogo && <img src={awayLogo} alt="" className="h-6 w-6 flex-shrink-0 object-contain" />}
       <span className={awayWon ? "font-semibold" : "text-ice-400"}>
         {game.away_team_abbrev}
       </span>
@@ -183,9 +183,9 @@ function GameChip({
       <span className={homeWon ? "font-semibold" : "text-ice-400"}>
         {game.home_team_abbrev}
       </span>
-      {homeLogo && <img src={homeLogo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />}
+      {homeLogo && <img src={homeLogo} alt="" className="h-6 w-6 flex-shrink-0 object-contain" />}
       {game.was_overtime && (
-        <span className="text-[9px] uppercase text-ice-400">OT</span>
+        <span className="text-xs uppercase text-ice-400">OT</span>
       )}
     </button>
   );

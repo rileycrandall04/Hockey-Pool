@@ -32,6 +32,12 @@ interface NavBarProps {
    * near the bottom of the dropdown.
    */
   isOwner?: boolean;
+  /**
+   * Number of unresolved stat conflicts. When > 0, a badge appears
+   * on the menu button and an "Alerts" item is added to the owner
+   * section of the dropdown.
+   */
+  alertCount?: number;
 }
 
 /**
@@ -56,6 +62,7 @@ export function NavBar({
   draftStatus,
   isCommissioner = false,
   isOwner = false,
+  alertCount = 0,
 }: NavBarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -186,9 +193,14 @@ export function NavBar({
             aria-expanded={open}
             aria-haspopup="menu"
             aria-label={open ? "Close menu" : "Open menu"}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-puck-border bg-puck-bg text-ice-100 transition-colors hover:bg-puck-border"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-md border border-puck-border bg-puck-bg text-ice-100 transition-colors hover:bg-puck-border"
           >
             {open ? <CloseIcon /> : <MenuIcon />}
+            {alertCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {alertCount}
+              </span>
+            )}
           </button>
 
           {open && (
@@ -226,6 +238,19 @@ export function NavBar({
               </div>
               {isOwner && (
                 <div className="border-t border-puck-border py-1">
+                  {alertCount > 0 && (
+                    <MenuLink
+                      href="/alerts"
+                      active={isActive("/alerts")}
+                    >
+                      <span className="flex items-center gap-2">
+                        Alerts
+                        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                          {alertCount}
+                        </span>
+                      </span>
+                    </MenuLink>
+                  )}
                   <MenuLink
                     href="/admin/injury-sweep"
                     active={isActive("/admin/injury-sweep")}

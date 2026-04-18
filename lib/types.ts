@@ -160,3 +160,20 @@ export interface ManualGameStat {
   created_at: string;
   updated_at: string;
 }
+
+export interface StatConflict {
+  id: string;
+  game_id: number;
+  player_id: number;
+  manual_goals: number;
+  manual_assists: number;
+  manual_ot_goals: number;
+  cron_goals: number;
+  cron_assists: number;
+  cron_ot_goals: number;
+  resolved: boolean;
+  resolution: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  created_at: string;
+}

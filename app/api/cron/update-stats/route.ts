@@ -57,6 +57,7 @@ export async function POST(request: Request) {
     games: 0,
     stats_updated: 0,
     recaps_written: 0,
+    conflicts_created: 0,
     eliminated: 0,
     injuries_checked: 0,
     snapshots_written: 0,
@@ -75,13 +76,60 @@ export async function POST(request: Request) {
     number,
     { goals: number; assists: number; ot_goals: number; games: number }
   >();
+  const conflicts: Array<{
+    game_id: number;
+    player_id: number;
+    manual_goals: number;
+    manual_assists: number;
+    manual_ot_goals: number;
+    cron_goals: number;
+    cron_assists: number;
+    cron_ot_goals: number;
+  }> = [];
 
   for (const id of gameIds) {
     // Stats deltas (used to bump player_stats)
     try {
       const lines = await fetchGameStats(id);
+
+      // Check for user-entered manual stats that already applied
+      // deltas to player_stats. If a user entered stats before the
+      // cron ran, we skip that player's delta to avoid double-counting.
+      const { data: existingManual } = await svc
+        .from("manual_game_stats")
+        .select("player_id, goals, assists, ot_goals, entered_by")
+        .eq("game_id", id);
+      const manualByPlayer = new Map(
+        (existingManual ?? [])
+          .filter((r: { entered_by: string | null }) => r.entered_by != null)
+          .map((r: { player_id: number; goals: number; assists: number; ot_goals: number }) => [r.player_id, r]),
+      );
+
       const seen = new Set<number>();
       for (const l of lines) {
+        const manual = manualByPlayer.get(l.playerId);
+        if (manual) {
+          // User entered stats before cron — skip delta to avoid
+          // double-counting. If values differ, record a conflict.
+          const match =
+            manual.goals === l.goals &&
+            manual.assists === l.assists &&
+            manual.ot_goals === l.otGoals;
+          if (!match) {
+            conflicts.push({
+              game_id: id,
+              player_id: l.playerId,
+              manual_goals: manual.goals,
+              manual_assists: manual.assists,
+              manual_ot_goals: manual.ot_goals,
+              cron_goals: l.goals,
+              cron_assists: l.assists,
+              cron_ot_goals: l.otGoals,
+            });
+          }
+          continue; // skip adding to deltas map either way
+        }
+
         const row = deltas.get(l.playerId) ?? {
           goals: 0,
           assists: 0,
@@ -102,14 +150,17 @@ export async function POST(request: Request) {
       // /games/[id]/stats page can pre-populate and compute correct
       // deltas when editing. Uses ignoreDuplicates so manual edits
       // made before the cron runs are never overwritten.
-      const manualRows = lines.map((l) => ({
-        game_id: id,
-        player_id: l.playerId,
-        goals: l.goals,
-        assists: l.assists,
-        ot_goals: l.otGoals,
-        updated_at: new Date().toISOString(),
-      }));
+      // Skip players that already have user-entered rows.
+      const manualRows = lines
+        .filter((l) => !manualByPlayer.has(l.playerId))
+        .map((l) => ({
+          game_id: id,
+          player_id: l.playerId,
+          goals: l.goals,
+          assists: l.assists,
+          ot_goals: l.otGoals,
+          updated_at: new Date().toISOString(),
+        }));
       if (manualRows.length > 0) {
         await svc.from("manual_game_stats").upsert(manualRows, {
           onConflict: "game_id,player_id",
@@ -143,6 +194,15 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error("Failed to fetch game recap", id, err);
     }
+  }
+
+  // Insert any stat conflicts detected during the game loop
+  if (conflicts.length > 0) {
+    await svc.from("stat_conflicts").upsert(conflicts, {
+      onConflict: "game_id,player_id",
+      ignoreDuplicates: true,
+    });
+    summary.conflicts_created = conflicts.length;
   }
 
   // Apply player_stats deltas in one batch
