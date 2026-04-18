@@ -674,19 +674,22 @@ export function DraftRoom({
   }, [autoDraft, isMyTurn, draftOver, busy, league.draft_status, league.id, onClockTeam, post, applyLocalPick]);
 
   // ---- pick clock -----------------------------------------------------------
-  // Runs whenever it's our turn, auto-draft is OFF, draft is in progress,
-  // and a time limit is set (pickClockLimit > 0). Ticks down to 0.
+  // Runs for ALL users so everyone sees the countdown. Resets whenever a
+  // new pick lands (currentPickIndex changes) or the limit changes.
+  // Auto-draft short-circuits on the picker's client (800ms), but the
+  // visible clock still ticks for spectators.
   useEffect(() => {
     if (
-      !isMyTurn ||
       pickClockLimit === 0 ||
-      autoDraft ||
       draftOver ||
       league.draft_status !== "in_progress"
     ) {
       setPickClock(pickClockLimit);
       return;
     }
+
+    // Reset to full limit on every new pick
+    setPickClock(pickClockLimit);
 
     const interval = setInterval(() => {
       setPickClock((prev) => {
@@ -699,12 +702,7 @@ export function DraftRoom({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isMyTurn, pickClockLimit, autoDraft, draftOver, league.draft_status]);
-
-  // Reset clock whenever the limit changes mid-draft.
-  useEffect(() => {
-    setPickClock(pickClockLimit);
-  }, [pickClockLimit]);
+  }, [currentPickIndex, pickClockLimit, draftOver, league.draft_status]);
 
   // When clock hits 0, pick from queue if available, otherwise auto-pick.
   useEffect(() => {
@@ -855,9 +853,9 @@ export function DraftRoom({
           <div className="text-xl font-bold text-ice-50">
             {draftOver ? "Draft complete" : onClockTeam?.name ?? "—"}
           </div>
-          {isMyTurn && !draftOver && (
+          {!draftOver && (
             <div className={`text-xs ${
-              autoDraft
+              isMyTurn && autoDraft
                 ? "text-green-400"
                 : pickClockLimit === 0
                   ? "text-green-400"
@@ -865,12 +863,12 @@ export function DraftRoom({
                     ? "text-red-400"
                     : pickClock <= 120
                       ? "text-amber-400"
-                      : "text-green-400"
+                      : "text-ice-300"
             }`}>
-              {autoDraft
+              {isMyTurn && autoDraft
                 ? "Auto-drafting..."
                 : pickClockLimit === 0
-                  ? "It\u2019s your pick!"
+                  ? isMyTurn ? "It\u2019s your pick!" : ""
                   : `${Math.floor(pickClock / 60)}:${String(pickClock % 60).padStart(2, "0")}`}
             </div>
           )}
