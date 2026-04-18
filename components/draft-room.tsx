@@ -83,15 +83,20 @@ export function DraftRoom({
   }, [queue, queueKey]);
   const clockKey = `draft-clock-${league.id}`;
   const clockLimitKey = `draft-clock-limit-${league.id}`;
-  const [nextClockLimit, setNextClockLimit] = useState(() => {
-    if (typeof window === "undefined") return 300;
+  const [nextClockLimit, setNextClockLimit] = useState(300);
+  // Restore persisted limit on mount (useEffect avoids SSR/hydration mismatch)
+  const clockLimitLoadedRef = useRef(false);
+  useEffect(() => {
+    if (clockLimitLoadedRef.current) return;
+    clockLimitLoadedRef.current = true;
     try {
       const stored = localStorage.getItem(clockLimitKey);
-      return stored !== null ? Number(stored) : 300;
-    } catch { return 300; }
-  });
+      if (stored !== null) setNextClockLimit(Number(stored));
+    } catch {}
+  }, [clockLimitKey]);
   // Persist limit to localStorage on change
   useEffect(() => {
+    if (!clockLimitLoadedRef.current) return; // don't overwrite before reading
     try { localStorage.setItem(clockLimitKey, String(nextClockLimit)); } catch {}
   }, [nextClockLimit, clockLimitKey]);
   const activeClockRef = useRef(300);                         // limit used by the running countdown
