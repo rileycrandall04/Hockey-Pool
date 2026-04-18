@@ -68,6 +68,10 @@ export function DraftRoom({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [autoDraft, setAutoDraft] = useState(false);
+  // ---- draft queue state ---------------------------------------------------
+  const [queue, setQueue] = useState<number[]>([]);         // ordered player IDs
+  const [queueCountdown, setQueueCountdown] = useState(60); // seconds remaining
+  const queueFiringRef = useRef(false);                     // prevent double-fire
   // "granted" | "denied" | "default" | "unsupported"
   const [notifyPermission, setNotifyPermission] = useState<string>("default");
   // Whether the browser currently has an active push subscription for
@@ -563,15 +567,21 @@ export function DraftRoom({
     );
   }, []);
 
-  const handlePick = async (playerId: number) => {
+  const handlePick = useCallback(async (playerId: number) => {
     if (!onClockTeam) return;
+    // Cancel queue countdown on manual pick
+    setQueueCountdown(60);
     const result = await post<{ inserted?: PickRow }>("/api/draft/pick", {
       league_id: league.id,
       team_id: onClockTeam.id,
       player_id: playerId,
     });
-    if (result?.inserted) applyLocalPick(result.inserted);
-  };
+    if (result?.inserted) {
+      applyLocalPick(result.inserted);
+      // Remove from queue if they were in it
+      setQueue((prev) => prev.filter((id) => id !== playerId));
+    }
+  }, [onClockTeam, league.id, post, applyLocalPick]);
 
   const handleStartDraft = async () => {
     const result = await post<{ league: League; teams: Team[] }>(
@@ -610,6 +620,23 @@ export function DraftRoom({
     if (result?.inserted) applyLocalPick(result.inserted);
   };
 
+  // ---- queue helpers -------------------------------------------------------
+  const toggleQueue = useCallback((playerId: number) => {
+    setQueue((prev) =>
+      prev.includes(playerId)
+        ? prev.filter((id) => id !== playerId)
+        : [...prev, playerId],
+    );
+  }, []);
+
+  // Auto-clean: remove picked players from queue whenever pickedPlayerIds changes
+  useEffect(() => {
+    setQueue((prev) => {
+      const cleaned = prev.filter((id) => !pickedPlayerIds.has(id));
+      return cleaned.length === prev.length ? prev : cleaned;
+    });
+  }, [pickedPlayerIds]);
+
   // ---- auto-draft effect --------------------------------------------------
   // When autoDraft is on and it becomes our turn, fire an auto-pick after
   // a short delay (gives the UI time to render the transition so the user
@@ -644,6 +671,56 @@ export function DraftRoom({
       autoPickFiringRef.current = false;
     };
   }, [autoDraft, isMyTurn, draftOver, busy, league.draft_status, league.id, onClockTeam, post, applyLocalPick]);
+
+  // ---- queue countdown timer -----------------------------------------------
+  // Only runs when: my turn, queue has items, auto-draft OFF, draft in progress.
+  // Ticks down from 60 to 0 once per second.
+  useEffect(() => {
+    if (
+      !isMyTurn ||
+      queue.length === 0 ||
+      autoDraft ||
+      draftOver ||
+      league.draft_status !== "in_progress"
+    ) {
+      setQueueCountdown(60);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setQueueCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isMyTurn, queue.length, autoDraft, draftOver, league.draft_status]);
+
+  // When countdown hits 0, auto-pick the first available queued player.
+  useEffect(() => {
+    if (queueCountdown !== 0 || !isMyTurn || busy || autoDraft || draftOver) return;
+    if (queueFiringRef.current) return;
+    queueFiringRef.current = true;
+
+    const firstAvailable = queue.find((id) => !pickedPlayerIds.has(id));
+    if (firstAvailable) {
+      handlePick(firstAvailable).then(() => {
+        setQueue((prev) => prev.filter((id) => id !== firstAvailable));
+        queueFiringRef.current = false;
+        setQueueCountdown(60);
+      });
+    } else {
+      // All queued players were taken — reset
+      setQueue([]);
+      queueFiringRef.current = false;
+      setQueueCountdown(60);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queueCountdown, isMyTurn, busy, autoDraft, draftOver]);
 
   // ---- render -------------------------------------------------------------
   if (league.draft_status === "pending") {
@@ -772,10 +849,18 @@ export function DraftRoom({
             {draftOver ? "Draft complete" : onClockTeam?.name ?? "—"}
           </div>
           {isMyTurn && !draftOver && (
-            <div className="text-xs text-green-400">
+            <div className={`text-xs ${
+              autoDraft
+                ? "text-green-400"
+                : queue.length > 0 && queueCountdown < 60
+                  ? "text-amber-400"
+                  : "text-green-400"
+            }`}>
               {autoDraft
                 ? "Auto-drafting..."
-                : "It\u2019s your pick!"}
+                : queue.length > 0 && !draftOver
+                  ? `Queue pick in ${queueCountdown}s\u2026`
+                  : "It\u2019s your pick!"}
             </div>
           )}
         </div>
@@ -862,7 +947,63 @@ export function DraftRoom({
           players={filteredPlayers.slice(0, 5)}
           onDraft={handlePick}
           disabled={busy}
+          queue={queue}
+          onToggleQueue={toggleQueue}
         />
+      )}
+
+      {/* Draft queue — only shown when queue has items */}
+      {queue.length > 0 && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300">
+              Queue ({queue.length})
+            </span>
+            <button
+              type="button"
+              onClick={() => setQueue([])}
+              className="text-[10px] text-ice-400 hover:text-ice-200"
+            >
+              Clear all
+            </button>
+          </div>
+          <ol className="space-y-1">
+            {queue.map((playerId, idx) => {
+              const player = players.find((p) => p.id === playerId);
+              if (!player) return null;
+              return (
+                <li
+                  key={playerId}
+                  className="flex items-center gap-2 rounded px-1.5 py-1 text-xs"
+                >
+                  <span className="w-4 flex-shrink-0 text-center font-mono text-[10px] font-bold text-amber-400">
+                    {idx + 1}
+                  </span>
+                  {player.nhl_logo && (
+                    <img src={player.nhl_logo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate font-medium text-ice-100">
+                    {player.full_name}
+                  </span>
+                  <span className="flex-shrink-0 text-[10px] text-ice-400">
+                    {player.nhl_abbrev ?? "—"}
+                  </span>
+                  <span className="flex-shrink-0 font-mono text-[10px] text-ice-300">
+                    {player.season_points} pts
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setQueue((prev) => prev.filter((id) => id !== playerId))}
+                    aria-label={`Remove ${player.full_name} from queue`}
+                    className="flex-shrink-0 text-ice-500 hover:text-red-400"
+                  >
+                    ✕
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
@@ -989,20 +1130,37 @@ export function DraftRoom({
                         {p.season_points}
                       </td>
                       <td className="px-1 py-1.5 text-right sm:px-2">
-                        <button
-                          type="button"
-                          onClick={() => handlePick(p.id)}
-                          disabled={
-                            busy ||
-                            draftOver ||
-                            (!isMyTurn && !isCommissioner)
-                          }
-                          aria-label={`Draft ${p.full_name}`}
-                          className="inline-flex h-7 min-w-[34px] items-center justify-center rounded bg-ice-500 px-2 text-[11px] font-medium text-white hover:bg-ice-600 disabled:cursor-not-allowed disabled:bg-ice-800 disabled:text-ice-300 sm:h-8 sm:text-xs"
-                        >
-                          <span className="sm:hidden">+</span>
-                          <span className="hidden sm:inline">Draft</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          {!draftOver && (
+                            <button
+                              type="button"
+                              onClick={() => toggleQueue(p.id)}
+                              aria-label={queue.includes(p.id) ? `Remove ${p.full_name} from queue` : `Queue ${p.full_name}`}
+                              className={
+                                "relative inline-flex h-7 min-w-[28px] items-center justify-center rounded px-1.5 text-[11px] font-medium transition sm:h-8 sm:text-xs " +
+                                (queue.includes(p.id)
+                                  ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/50"
+                                  : "bg-puck-border text-ice-300 hover:bg-ice-800")
+                              }
+                            >
+                              Q{queue.includes(p.id) ? queue.indexOf(p.id) + 1 : "+"}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handlePick(p.id)}
+                            disabled={
+                              busy ||
+                              draftOver ||
+                              (!isMyTurn && !isCommissioner)
+                            }
+                            aria-label={`Draft ${p.full_name}`}
+                            className="inline-flex h-7 min-w-[34px] items-center justify-center rounded bg-ice-500 px-2 text-[11px] font-medium text-white hover:bg-ice-600 disabled:cursor-not-allowed disabled:bg-ice-800 disabled:text-ice-300 sm:h-8 sm:text-xs"
+                          >
+                            <span className="sm:hidden">+</span>
+                            <span className="hidden sm:inline">Draft</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1044,15 +1202,18 @@ export function DraftRoom({
                             (p) => p.id === pick.player_id,
                           );
                           return (
-                            <li key={pick.id}>
-                              {pick.round}.{pick.pick_number}{" "}
+                            <li key={pick.id} className="flex items-center gap-1">
+                              <span className="text-ice-500">{pick.round}.{pick.pick_number}</span>
+                              {player?.nhl_logo && (
+                                <img src={player.nhl_logo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />
+                              )}
                               <Link
                                 href={`/players/${pick.player_id}`}
-                                className="hover:underline"
+                                className="hover:underline truncate"
                               >
                                 {player?.full_name ?? `#${pick.player_id}`}
                               </Link>
-                              {player && ` (${player.position})`}
+                              {player && <span className="text-ice-500">({player.position})</span>}
                             </li>
                           );
                         })}
@@ -1201,10 +1362,14 @@ function BestAvailableBox({
   players,
   onDraft,
   disabled,
+  queue,
+  onToggleQueue,
 }: {
   players: DraftablePlayer[];
   onDraft: (playerId: number) => void | Promise<void>;
   disabled: boolean;
+  queue: number[];
+  onToggleQueue: (playerId: number) => void;
 }) {
   if (players.length === 0) return null;
   return (
@@ -1213,40 +1378,57 @@ function BestAvailableBox({
         ✨ Best available — tap to draft
       </div>
       <ul className="space-y-1">
-        {players.map((p) => (
-          <li
-            key={p.id}
-            className="flex items-center gap-2 rounded px-1 py-1 hover:bg-ice-500/10"
-          >
-            <span
-              className={
-                p.position === "D"
-                  ? "rounded bg-ice-500/25 px-1 text-[9px] font-semibold text-ice-100"
-                  : "rounded bg-puck-border px-1 text-[9px] text-ice-200"
-              }
+        {players.map((p) => {
+          const queueIndex = queue.indexOf(p.id);
+          const isQueued = queueIndex !== -1;
+          return (
+            <li
+              key={p.id}
+              className="flex items-center gap-2 rounded px-1 py-1 hover:bg-ice-500/10"
             >
-              {p.position}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ice-50">
-              {p.full_name}
-            </span>
-            <span className="flex-shrink-0 text-[10px] text-ice-400">
-              {p.nhl_abbrev ?? "—"}
-            </span>
-            <span className="flex-shrink-0 font-mono text-xs font-bold text-ice-50">
-              {p.season_points}
-            </span>
-            <button
-              type="button"
-              onClick={() => onDraft(p.id)}
-              disabled={disabled}
-              aria-label={`Draft ${p.full_name}`}
-              className="flex-shrink-0 rounded bg-ice-500 px-2 py-1 text-[10px] font-semibold text-white hover:bg-ice-600 disabled:cursor-not-allowed disabled:bg-ice-800 disabled:text-ice-300"
-            >
-              Draft
-            </button>
-          </li>
-        ))}
+              <span
+                className={
+                  p.position === "D"
+                    ? "rounded bg-ice-500/25 px-1 text-[9px] font-semibold text-ice-100"
+                    : "rounded bg-puck-border px-1 text-[9px] text-ice-200"
+                }
+              >
+                {p.position}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ice-50">
+                {p.full_name}
+              </span>
+              <span className="flex-shrink-0 text-[10px] text-ice-400">
+                {p.nhl_abbrev ?? "—"}
+              </span>
+              <span className="flex-shrink-0 font-mono text-xs font-bold text-ice-50">
+                {p.season_points}
+              </span>
+              <button
+                type="button"
+                onClick={() => onToggleQueue(p.id)}
+                aria-label={isQueued ? `Remove ${p.full_name} from queue` : `Queue ${p.full_name}`}
+                className={
+                  "flex-shrink-0 rounded px-2 py-1 text-[10px] font-semibold transition " +
+                  (isQueued
+                    ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/50"
+                    : "bg-puck-border text-ice-300 hover:bg-ice-800")
+                }
+              >
+                Q{isQueued ? queueIndex + 1 : "+"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onDraft(p.id)}
+                disabled={disabled}
+                aria-label={`Draft ${p.full_name}`}
+                className="flex-shrink-0 rounded bg-ice-500 px-2 py-1 text-[10px] font-semibold text-white hover:bg-ice-600 disabled:cursor-not-allowed disabled:bg-ice-800 disabled:text-ice-300"
+              >
+                Draft
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
