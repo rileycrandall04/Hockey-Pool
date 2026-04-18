@@ -147,6 +147,133 @@ async function addPickAction(formData: FormData) {
   revalidatePath(`/leagues/${leagueId}`);
 }
 
+/* ------------------------------------------------------------------ */
+/*  Stat-conflict resolution (app-owner only)                          */
+/* ------------------------------------------------------------------ */
+
+interface StatsTriple {
+  goals: number;
+  assists: number;
+  ot_goals: number;
+}
+
+async function applyPlayerStatsDelta(
+  svc: ReturnType<typeof createServiceClient>,
+  playerId: number,
+  delta: StatsTriple,
+): Promise<string | null> {
+  if (delta.goals === 0 && delta.assists === 0 && delta.ot_goals === 0) {
+    return null;
+  }
+  const { data: existing } = await svc
+    .from("player_stats")
+    .select("goals, assists, ot_goals, games_played")
+    .eq("player_id", playerId)
+    .maybeSingle();
+  const prev = existing ?? { goals: 0, assists: 0, ot_goals: 0, games_played: 0 };
+  const nextGoals = Math.max(0, prev.goals + delta.goals);
+  const nextAssists = Math.max(0, prev.assists + delta.assists);
+  const nextOt = Math.max(0, prev.ot_goals + delta.ot_goals);
+  const clampedOt = Math.min(nextOt, nextGoals);
+  const { error } = await svc
+    .from("player_stats")
+    .upsert(
+      {
+        player_id: playerId,
+        goals: nextGoals,
+        assists: nextAssists,
+        ot_goals: clampedOt,
+        games_played: prev.games_played,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "player_id" },
+    );
+  return error ? error.message : null;
+}
+
+async function acceptCronAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  const conflictId = String(formData.get("conflict_id") ?? "");
+  if (!conflictId || !leagueId) return;
+
+  const { user } = await assertCommissioner(leagueId);
+  if (!isAppOwner(user.email)) redirect(`/leagues/${leagueId}/admin`);
+
+  const svc = createServiceClient();
+  const { data: conflict } = await svc
+    .from("stat_conflicts")
+    .select("*")
+    .eq("id", conflictId)
+    .single();
+  if (!conflict || conflict.resolved) {
+    redirect(`/leagues/${leagueId}/admin`);
+  }
+
+  const delta: StatsTriple = {
+    goals: conflict.cron_goals - conflict.manual_goals,
+    assists: conflict.cron_assists - conflict.manual_assists,
+    ot_goals: conflict.cron_ot_goals - conflict.manual_ot_goals,
+  };
+
+  const deltaError = await applyPlayerStatsDelta(svc, conflict.player_id, delta);
+  if (deltaError) {
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(`Stat update: ${deltaError}`)}`,
+    );
+  }
+
+  await svc
+    .from("manual_game_stats")
+    .update({
+      goals: conflict.cron_goals,
+      assists: conflict.cron_assists,
+      ot_goals: conflict.cron_ot_goals,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("game_id", conflict.game_id)
+    .eq("player_id", conflict.player_id);
+
+  await svc
+    .from("stat_conflicts")
+    .update({
+      resolved: true,
+      resolution: "accepted_cron",
+      resolved_at: new Date().toISOString(),
+      resolved_by: user.id,
+    })
+    .eq("id", conflictId);
+
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  revalidatePath(`/leagues/${leagueId}`);
+  redirect(`/leagues/${leagueId}/admin`);
+}
+
+async function keepManualAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  const conflictId = String(formData.get("conflict_id") ?? "");
+  if (!conflictId || !leagueId) return;
+
+  const { user } = await assertCommissioner(leagueId);
+  if (!isAppOwner(user.email)) redirect(`/leagues/${leagueId}/admin`);
+
+  const svc = createServiceClient();
+  await svc
+    .from("stat_conflicts")
+    .update({
+      resolved: true,
+      resolution: "kept_manual",
+      resolved_at: new Date().toISOString(),
+      resolved_by: user.id,
+    })
+    .eq("id", conflictId);
+
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  revalidatePath(`/leagues/${leagueId}`);
+  redirect(`/leagues/${leagueId}/admin`);
+}
+
 async function adjustScoreAction(formData: FormData) {
   "use server";
   const leagueId = String(formData.get("league_id"));
@@ -703,6 +830,44 @@ export default async function AdminPage({
     const arr = rosterByTeam.get(row.team_id) ?? [];
     arr.push(row);
     rosterByTeam.set(row.team_id, arr);
+  }
+
+  // Stat conflicts (app-owner only)
+  let unresolvedConflicts: ConflictRow[] = [];
+  let resolvedConflicts: ConflictRow[] = [];
+  const conflictPlayerNames = new Map<number, string>();
+  if (canRefreshNhlData) {
+    const [{ data: uRows }, { data: rRows }] = await Promise.all([
+      svc
+        .from("stat_conflicts")
+        .select("*")
+        .eq("resolved", false)
+        .order("created_at", { ascending: false }),
+      svc
+        .from("stat_conflicts")
+        .select("*")
+        .eq("resolved", true)
+        .order("resolved_at", { ascending: false })
+        .limit(20),
+    ]);
+    unresolvedConflicts = (uRows ?? []) as ConflictRow[];
+    resolvedConflicts = (rRows ?? []) as ConflictRow[];
+
+    const allPlayerIds = [
+      ...new Set([
+        ...unresolvedConflicts.map((c) => c.player_id),
+        ...resolvedConflicts.map((c) => c.player_id),
+      ]),
+    ];
+    if (allPlayerIds.length > 0) {
+      const { data: players } = await svc
+        .from("players")
+        .select("id, full_name")
+        .in("id", allPlayerIds);
+      for (const p of players ?? []) {
+        conflictPlayerNames.set(p.id, p.full_name);
+      }
+    }
   }
 
   return (
@@ -1328,8 +1493,164 @@ export default async function AdminPage({
           </CardContent>
           </details>
         </Card>
+
+        {canRefreshNhlData && (
+        <Card>
+          <details className="group" open={unresolvedConflicts.length > 0}>
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="inline-block w-3 text-ice-400 transition-transform group-open:rotate-90">▶</span>
+            <span className="text-lg font-semibold text-ice-50">
+              Stat conflicts
+              {unresolvedConflicts.length > 0 && (
+                <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+                  {unresolvedConflicts.length}
+                </span>
+              )}
+            </span>
+          </summary>
+          <CardContent>
+            <p className="mb-3 text-xs text-ice-400">
+              When you enter stats manually before the nightly cron runs,
+              the cron skips those players. If the NHL data differs, a
+              conflict appears here for review.
+            </p>
+            {unresolvedConflicts.length === 0 ? (
+              <p className="text-sm text-ice-400">No unresolved conflicts.</p>
+            ) : (
+              <div className="space-y-3">
+                {unresolvedConflicts.map((c) => (
+                  <ConflictCard
+                    key={c.id}
+                    conflict={c}
+                    leagueId={leagueId}
+                    playerName={conflictPlayerNames.get(c.player_id) ?? `Player ${c.player_id}`}
+                  />
+                ))}
+              </div>
+            )}
+            {resolvedConflicts.length > 0 && (
+              <details className="mt-4">
+                <summary className="cursor-pointer text-sm font-medium text-ice-300 hover:text-ice-100">
+                  Resolved ({resolvedConflicts.length})
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {resolvedConflicts.map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex items-center justify-between rounded-md border border-puck-border bg-puck-bg px-3 py-2 text-sm opacity-60"
+                    >
+                      <span className="text-ice-200">
+                        {conflictPlayerNames.get(c.player_id) ?? `Player ${c.player_id}`}
+                      </span>
+                      <span className="text-xs text-ice-400">
+                        {c.resolution === "accepted_cron"
+                          ? "Accepted NHL data"
+                          : "Kept manual data"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </CardContent>
+          </details>
+        </Card>
+        )}
       </main>
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Stat conflict sub-components                                       */
+/* ------------------------------------------------------------------ */
+
+interface ConflictRow {
+  id: string;
+  game_id: number;
+  player_id: number;
+  manual_goals: number;
+  manual_assists: number;
+  manual_ot_goals: number;
+  cron_goals: number;
+  cron_assists: number;
+  cron_ot_goals: number;
+  resolution?: string;
+  created_at: string;
+}
+
+function ConflictCard({
+  conflict: c,
+  leagueId,
+  playerName,
+}: {
+  conflict: ConflictRow;
+  leagueId: string;
+  playerName: string;
+}) {
+  const goalsDiff = c.cron_goals - c.manual_goals;
+  const assistsDiff = c.cron_assists - c.manual_assists;
+  const otDiff = c.cron_ot_goals - c.manual_ot_goals;
+
+  return (
+    <div className="rounded-md border border-puck-border bg-puck-bg p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-semibold text-ice-50">{playerName}</span>
+        <span className="text-xs text-ice-400">Game {c.game_id}</span>
+      </div>
+      <div className="mb-3 grid grid-cols-[1fr_auto_auto_auto] gap-x-4 gap-y-1 text-sm">
+        <div />
+        <div className="text-center text-xs font-medium text-ice-400">G</div>
+        <div className="text-center text-xs font-medium text-ice-400">A</div>
+        <div className="text-center text-xs font-medium text-ice-400">OT</div>
+
+        <div className="text-ice-300">Your data</div>
+        <div className="text-center text-ice-100">{c.manual_goals}</div>
+        <div className="text-center text-ice-100">{c.manual_assists}</div>
+        <div className="text-center text-ice-100">{c.manual_ot_goals}</div>
+
+        <div className="text-ice-300">NHL data</div>
+        <div className="text-center text-ice-100">{c.cron_goals}</div>
+        <div className="text-center text-ice-100">{c.cron_assists}</div>
+        <div className="text-center text-ice-100">{c.cron_ot_goals}</div>
+
+        <div className="text-ice-400">Diff</div>
+        <DiffCell value={goalsDiff} />
+        <DiffCell value={assistsDiff} />
+        <DiffCell value={otDiff} />
+      </div>
+
+      <div className="flex gap-2">
+        <form action={acceptCronAction}>
+          <input type="hidden" name="league_id" value={leagueId} />
+          <input type="hidden" name="conflict_id" value={c.id} />
+          <Button type="submit" size="sm" variant="primary">
+            Accept NHL Data
+          </Button>
+        </form>
+        <form action={keepManualAction}>
+          <input type="hidden" name="league_id" value={leagueId} />
+          <input type="hidden" name="conflict_id" value={c.id} />
+          <Button type="submit" size="sm" variant="secondary">
+            Keep My Data
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function DiffCell({ value }: { value: number }) {
+  if (value === 0) {
+    return <div className="text-center text-ice-500">0</div>;
+  }
+  return (
+    <div
+      className={`text-center font-medium ${value > 0 ? "text-green-300" : "text-red-300"}`}
+    >
+      {value > 0 ? "+" : ""}
+      {value}
+    </div>
   );
 }
 
