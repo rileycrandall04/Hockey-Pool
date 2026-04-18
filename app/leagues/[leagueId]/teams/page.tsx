@@ -52,10 +52,20 @@ export default async function LeagueTeamsPage({
     .eq("league_id", leagueId)
     .order("name");
 
-  const { data: rosterRows } = await supabase
-    .from("v_team_rosters")
-    .select("*")
-    .eq("league_id", leagueId);
+  const [{ data: rosterRows }, { data: nhlTeamRows }] = await Promise.all([
+    supabase
+      .from("v_team_rosters")
+      .select("*")
+      .eq("league_id", leagueId),
+    supabase
+      .from("nhl_teams")
+      .select("abbrev, logo_url"),
+  ]);
+
+  const logoByAbbrev = new Map<string, string>();
+  for (const t of nhlTeamRows ?? []) {
+    if (t.logo_url) logoByAbbrev.set(t.abbrev, t.logo_url);
+  }
 
   const { data: adjustments } = await supabase
     .from("score_adjustments")
@@ -172,7 +182,7 @@ export default async function LeagueTeamsPage({
                 ) : (
                   <ul className="space-y-1 text-sm">
                     {row.scoring.map((p) => (
-                      <PlayerLine key={p.player_id} p={p} />
+                      <PlayerLine key={p.player_id} p={p} logoByAbbrev={logoByAbbrev} />
                     ))}
                     {row.bench.length > 0 && (
                       <>
@@ -181,7 +191,7 @@ export default async function LeagueTeamsPage({
                           Bench &middot; not counted
                         </li>
                         {row.bench.map((p) => (
-                          <PlayerLine key={p.player_id} p={p} muted />
+                          <PlayerLine key={p.player_id} p={p} muted logoByAbbrev={logoByAbbrev} />
                         ))}
                       </>
                     )}
@@ -199,17 +209,20 @@ export default async function LeagueTeamsPage({
 function PlayerLine({
   p,
   muted = false,
+  logoByAbbrev,
 }: {
   p: RosterEntry;
   muted?: boolean;
+  logoByAbbrev: Map<string, string>;
 }) {
+  const logo = p.nhl_abbrev ? logoByAbbrev.get(p.nhl_abbrev) : undefined;
   return (
     <li>
       <Link
         href={`/players/${p.player_id}`}
         className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-puck-border/40"
       >
-        <span className="flex min-w-0 items-baseline gap-2">
+        <span className="flex min-w-0 items-center gap-2">
           <span
             className={
               p.position === "D"
@@ -219,13 +232,15 @@ function PlayerLine({
           >
             {p.position}
           </span>
+          {logo ? (
+            <img src={logo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />
+          ) : (
+            <span className="inline-block h-5 w-5 flex-shrink-0 rounded bg-puck-border/40" />
+          )}
           <span
             className={`truncate ${muted ? "text-ice-400" : "text-ice-100"}`}
           >
             {p.full_name}
-          </span>
-          <span className="text-[10px] text-ice-500">
-            {p.nhl_abbrev ?? "—"}
           </span>
         </span>
         <span

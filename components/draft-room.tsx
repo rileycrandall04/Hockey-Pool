@@ -17,6 +17,7 @@ import { InjuryBadge } from "@/components/injury-badge";
 
 interface DraftablePlayer extends Player {
   nhl_abbrev: string | null;
+  nhl_logo: string | null;
   fantasy_points: number;
   goals: number;
   assists: number;
@@ -88,7 +89,7 @@ export function DraftRoom({
         supabase
           .from("players")
           .select(
-            "id, full_name, position, nhl_team_id, jersey_number, headshot_url, active, season_goals, season_assists, season_points, season_games_played, injury_status, injury_description, nhl_teams!inner(abbrev, eliminated), player_stats(goals, assists, ot_goals, fantasy_points)",
+            "id, full_name, position, nhl_team_id, jersey_number, headshot_url, active, season_goals, season_assists, season_points, season_games_played, injury_status, injury_description, nhl_teams!inner(abbrev, eliminated, logo_url), player_stats(goals, assists, ot_goals, fantasy_points)",
           )
           .eq("active", true)
           .eq("nhl_teams.eliminated", false)
@@ -141,8 +142,8 @@ export function DraftRoom({
             injury_status: string | null;
             injury_description: string | null;
             nhl_teams:
-              | { abbrev: string; eliminated: boolean }
-              | { abbrev: string; eliminated: boolean }[]
+              | { abbrev: string; eliminated: boolean; logo_url: string | null }
+              | { abbrev: string; eliminated: boolean; logo_url: string | null }[]
               | null;
             player_stats:
               | {
@@ -182,6 +183,7 @@ export function DraftRoom({
             injury_description:
               override?.injury_description ?? p.injury_description,
             nhl_abbrev: teamRow?.abbrev ?? null,
+            nhl_logo: teamRow?.logo_url ?? null,
             goals: statRow?.goals ?? 0,
             assists: statRow?.assists ?? 0,
             ot_goals: statRow?.ot_goals ?? 0,
@@ -1162,8 +1164,11 @@ function DraftPicksTicker({
                 </span>
                 <span className="truncate">{team?.name ?? ""}</span>
               </div>
-              <div className="truncate text-xs font-semibold text-ice-50">
-                {player?.full_name ?? `#${pick.player_id}`}
+              <div className="flex items-center gap-1.5 truncate text-xs font-semibold text-ice-50">
+                {player?.nhl_logo && (
+                  <img src={player.nhl_logo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />
+                )}
+                <span className="truncate">{player?.full_name ?? `#${pick.player_id}`}</span>
               </div>
               <div className="flex items-center gap-1 text-[10px] text-ice-400">
                 {player && (
