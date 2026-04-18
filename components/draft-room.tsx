@@ -247,6 +247,9 @@ export function DraftRoom({
         },
         (payload) => {
           if (payload.eventType === "INSERT") {
+            // Clear stored clock so the timer effect starts a fresh
+            // countdown from now for all clients when the pick lands.
+            try { localStorage.removeItem(clockKey); } catch {}
             setPicks((prev) => {
               if (prev.some((p) => p.id === (payload.new as PickRow).id))
                 return prev;
