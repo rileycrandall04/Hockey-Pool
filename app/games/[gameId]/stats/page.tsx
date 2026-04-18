@@ -69,40 +69,38 @@ async function applyPlayerStatsDelta(
 /*  Server actions                                                     */
 /* ------------------------------------------------------------------ */
 
-async function upsertStatsAction(formData: FormData) {
+async function batchUpsertStatsAction(formData: FormData) {
   "use server";
   const gameId = Number(formData.get("game_id"));
-  const playerId = Number(formData.get("player_id"));
-  if (!Number.isFinite(gameId) || !Number.isFinite(playerId)) {
+  if (!Number.isFinite(gameId)) {
     redirect(
-      `/games/${formData.get("game_id") ?? ""}/stats?error=${encodeURIComponent("Invalid game or player id")}`,
+      `/games/${formData.get("game_id") ?? ""}/stats?error=${encodeURIComponent("Invalid game id")}`,
     );
   }
 
-  const parseNonNegInt = (name: string): number | string => {
-    const raw = String(formData.get(name) ?? "").trim();
-    if (raw === "") return 0;
-    const n = Number(raw);
-    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
-      return `${name.replace("_", " ")} must be a non-negative integer`;
-    }
-    return n;
-  };
+  const rawEntries = String(formData.get("entries") ?? "[]");
+  let entries: { player_id: number; goals: number; assists: number; ot_goals: number }[];
+  try {
+    entries = JSON.parse(rawEntries);
+  } catch {
+    redirect(`/games/${gameId}/stats?error=${encodeURIComponent("Invalid data")}`);
+  }
 
-  const goals = parseNonNegInt("goals");
-  const assists = parseNonNegInt("assists");
-  const otGoals = parseNonNegInt("ot_goals");
-  for (const v of [goals, assists, otGoals]) {
-    if (typeof v === "string") {
+  // Filter to only rows with actual stats
+  entries = entries.filter(
+    (e) => e.goals > 0 || e.assists > 0 || e.ot_goals > 0,
+  );
+
+  if (entries.length === 0) {
+    redirect(`/games/${gameId}/stats?error=${encodeURIComponent("No stats to save.")}`);
+  }
+
+  for (const e of entries) {
+    if (e.ot_goals > e.goals) {
       redirect(
-        `/games/${gameId}/stats?error=${encodeURIComponent(v)}`,
+        `/games/${gameId}/stats?error=${encodeURIComponent(`Player ${e.player_id}: OT goals cannot exceed total goals.`)}`,
       );
     }
-  }
-  if ((otGoals as number) > (goals as number)) {
-    redirect(
-      `/games/${gameId}/stats?error=${encodeURIComponent("OT goals cannot exceed total goals.")}`,
-    );
   }
 
   const supabase = await createClient();
@@ -118,52 +116,65 @@ async function upsertStatsAction(formData: FormData) {
 
   const svc = createServiceClient();
 
-  const { data: prev } = await svc
+  // Fetch all existing manual stats for this game to compute deltas
+  const { data: existingRows } = await svc
     .from("manual_game_stats")
-    .select("goals, assists, ot_goals")
-    .eq("game_id", gameId)
-    .eq("player_id", playerId)
-    .maybeSingle<StatsTriple>();
-
-  const delta: StatsTriple = {
-    goals: (goals as number) - (prev?.goals ?? 0),
-    assists: (assists as number) - (prev?.assists ?? 0),
-    ot_goals: (otGoals as number) - (prev?.ot_goals ?? 0),
-  };
-
-  const deltaError = await applyPlayerStatsDelta(svc, playerId, delta);
-  if (deltaError) {
-    redirect(
-      `/games/${gameId}/stats?error=${encodeURIComponent(`player_stats update: ${deltaError}`)}`,
-    );
+    .select("player_id, goals, assists, ot_goals")
+    .eq("game_id", gameId);
+  const prevByPlayer = new Map<number, StatsTriple>();
+  for (const r of existingRows ?? []) {
+    prevByPlayer.set(r.player_id, {
+      goals: r.goals,
+      assists: r.assists,
+      ot_goals: r.ot_goals,
+    });
   }
 
-  const { error: upsertError } = await svc.from("manual_game_stats").upsert(
-    {
-      game_id: gameId,
-      player_id: playerId,
-      goals: goals as number,
-      assists: assists as number,
-      ot_goals: otGoals as number,
-      entered_by: user.id,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "game_id,player_id" },
-  );
-  if (upsertError) {
-    await applyPlayerStatsDelta(svc, playerId, {
-      goals: -delta.goals,
-      assists: -delta.assists,
-      ot_goals: -delta.ot_goals,
-    });
-    redirect(
-      `/games/${gameId}/stats?error=${encodeURIComponent(`manual_game_stats upsert: ${upsertError.message}`)}`,
+  let savedCount = 0;
+  for (const e of entries) {
+    const prev = prevByPlayer.get(e.player_id) ?? { goals: 0, assists: 0, ot_goals: 0 };
+    const delta: StatsTriple = {
+      goals: e.goals - prev.goals,
+      assists: e.assists - prev.assists,
+      ot_goals: e.ot_goals - prev.ot_goals,
+    };
+
+    const deltaError = await applyPlayerStatsDelta(svc, e.player_id, delta);
+    if (deltaError) {
+      redirect(
+        `/games/${gameId}/stats?error=${encodeURIComponent(`player ${e.player_id}: ${deltaError}`)}&success=${encodeURIComponent(`Saved ${savedCount} entries before error.`)}`,
+      );
+    }
+
+    const { error: upsertError } = await svc.from("manual_game_stats").upsert(
+      {
+        game_id: gameId,
+        player_id: e.player_id,
+        goals: e.goals,
+        assists: e.assists,
+        ot_goals: e.ot_goals,
+        entered_by: user.id,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "game_id,player_id" },
     );
+    if (upsertError) {
+      // Rollback the delta we just applied
+      await applyPlayerStatsDelta(svc, e.player_id, {
+        goals: -delta.goals,
+        assists: -delta.assists,
+        ot_goals: -delta.ot_goals,
+      });
+      redirect(
+        `/games/${gameId}/stats?error=${encodeURIComponent(`upsert player ${e.player_id}: ${upsertError.message}`)}&success=${encodeURIComponent(`Saved ${savedCount} entries before error.`)}`,
+      );
+    }
+    savedCount++;
   }
 
   revalidatePath(`/games/${gameId}/stats`);
   redirect(
-    `/games/${gameId}/stats?success=${encodeURIComponent(`Saved: ${goals}G ${assists}A ${otGoals}OT`)}`,
+    `/games/${gameId}/stats?success=${encodeURIComponent(`Saved ${savedCount} player${savedCount === 1 ? "" : "s"}.`)}`,
   );
 }
 
@@ -405,7 +416,7 @@ export default async function GameStatsPage({
                 players: homePlayers,
               }}
               existingStats={existingStats}
-              upsertAction={upsertStatsAction}
+              batchUpsertAction={batchUpsertStatsAction}
               deleteAction={deleteStatsAction}
             />
           </CardContent>

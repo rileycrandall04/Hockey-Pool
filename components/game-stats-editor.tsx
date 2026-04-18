@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Input, Label } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import type { ManualGameStat } from "@/lib/types";
 
 interface PlayerInfo {
@@ -17,12 +17,18 @@ interface TeamInfo {
   players: PlayerInfo[];
 }
 
+interface PlayerEdits {
+  goals: number;
+  assists: number;
+  ot_goals: number;
+}
+
 interface GameStatsEditorProps {
   gameId: number;
   awayTeam: TeamInfo;
   homeTeam: TeamInfo;
   existingStats: ManualGameStat[];
-  upsertAction: (formData: FormData) => Promise<void>;
+  batchUpsertAction: (formData: FormData) => Promise<void>;
   deleteAction: (formData: FormData) => Promise<void>;
 }
 
@@ -40,11 +46,9 @@ function sortPlayers(
   statsMap: Map<number, ManualGameStat>,
 ): PlayerInfo[] {
   return [...players].sort((a, b) => {
-    // Players with stats float to the top
     const aHas = statsMap.has(a.id) ? 0 : 1;
     const bHas = statsMap.has(b.id) ? 0 : 1;
     if (aHas !== bHas) return aHas - bHas;
-    // Within each group, sort by position then name
     const pa = POS_ORDER[a.position] ?? 9;
     const pb = POS_ORDER[b.position] ?? 9;
     if (pa !== pb) return pa - pb;
@@ -79,10 +83,25 @@ export function GameStatsEditor({
   awayTeam,
   homeTeam,
   existingStats,
-  upsertAction,
+  batchUpsertAction,
   deleteAction,
 }: GameStatsEditorProps) {
   const [activeTeam, setActiveTeam] = useState<"away" | "home">("away");
+
+  // Track all edits across both teams in a single map
+  const [edits, setEdits] = useState<Map<number, PlayerEdits>>(() => {
+    const m = new Map<number, PlayerEdits>();
+    for (const s of existingStats) {
+      m.set(s.player_id, {
+        goals: s.goals,
+        assists: s.assists,
+        ot_goals: s.ot_goals,
+      });
+    }
+    return m;
+  });
+
+  const formRef = useRef<HTMLFormElement>(null);
 
   const statsByPlayerId = new Map<number, ManualGameStat>();
   for (const s of existingStats) statsByPlayerId.set(s.player_id, s);
@@ -104,14 +123,48 @@ export function GameStatsEditor({
     }
   }
 
+  // Count how many players have been edited (non-zero stats)
+  let dirtyCount = 0;
+  for (const [, v] of edits) {
+    if (v.goals > 0 || v.assists > 0 || v.ot_goals > 0) dirtyCount++;
+  }
+
+  function updateField(
+    playerId: number,
+    field: keyof PlayerEdits,
+    value: number,
+  ) {
+    setEdits((prev) => {
+      const next = new Map(prev);
+      const cur = next.get(playerId) ?? { goals: 0, assists: 0, ot_goals: 0 };
+      next.set(playerId, { ...cur, [field]: value });
+      return next;
+    });
+  }
+
+  function handleSubmit() {
+    if (!formRef.current) return;
+    // Build the entries JSON from current edits
+    const entries: { player_id: number; goals: number; assists: number; ot_goals: number }[] = [];
+    for (const [playerId, vals] of edits) {
+      if (vals.goals > 0 || vals.assists > 0 || vals.ot_goals > 0) {
+        entries.push({ player_id: playerId, ...vals });
+      }
+    }
+    // Set the hidden field and submit
+    const entriesInput = formRef.current.querySelector<HTMLInputElement>(
+      'input[name="entries"]',
+    );
+    if (entriesInput) entriesInput.value = JSON.stringify(entries);
+    formRef.current.requestSubmit();
+  }
+
   return (
     <div className="space-y-4">
       {/* Last-updated summary */}
       {latestUpdate && (
         <div className="flex items-center gap-2 text-[10px] text-ice-500">
-          <span>
-            Last updated: {timeAgo(latestUpdate)}
-          </span>
+          <span>Last updated: {timeAgo(latestUpdate)}</span>
           <span className="text-ice-600">
             ({new Date(latestUpdate).toLocaleString("en-US", {
               timeZone: "America/Denver",
@@ -180,134 +233,138 @@ export function GameStatsEditor({
         <div className="space-y-1">
           {sorted.map((player) => {
             const existing = statsByPlayerId.get(player.id);
+            const vals = edits.get(player.id) ?? {
+              goals: 0,
+              assists: 0,
+              ot_goals: 0,
+            };
             const hasStats = existing != null;
+            const posColor =
+              POS_COLORS[player.position] ?? "bg-puck-border/40 text-ice-400";
+
             return (
-              <PlayerStatRow
+              <div
                 key={player.id}
-                player={player}
-                gameId={gameId}
-                existing={existing}
-                hasStats={hasStats}
-                upsertAction={upsertAction}
-                deleteAction={deleteAction}
-              />
+                className={
+                  "rounded-md border px-2 py-1.5 " +
+                  (hasStats
+                    ? "border-ice-500/30 bg-ice-500/5"
+                    : "border-puck-border/50 bg-puck-bg/40")
+                }
+              >
+                <div className="grid grid-cols-[1fr_3.5rem_3.5rem_3.5rem_auto] items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span
+                      className={
+                        "inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[9px] font-bold " +
+                        posColor
+                      }
+                    >
+                      {player.position}
+                    </span>
+                    <div className="min-w-0">
+                      <span className="block truncate text-xs text-ice-100">
+                        {player.full_name}
+                      </span>
+                      {hasStats && existing && (
+                        <span className="block text-[9px] text-ice-500">
+                          Saved: {existing.goals}G {existing.assists}A{" "}
+                          {existing.ot_goals}OT
+                          {existing.updated_at && (
+                            <> &middot; {timeAgo(existing.updated_at)}</>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    value={vals.goals}
+                    onChange={(e) =>
+                      updateField(
+                        player.id,
+                        "goals",
+                        Math.max(0, parseInt(e.target.value) || 0),
+                      )
+                    }
+                    className="h-7 px-1 text-center text-xs"
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    value={vals.assists}
+                    onChange={(e) =>
+                      updateField(
+                        player.id,
+                        "assists",
+                        Math.max(0, parseInt(e.target.value) || 0),
+                      )
+                    }
+                    className="h-7 px-1 text-center text-xs"
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    value={vals.ot_goals}
+                    onChange={(e) =>
+                      updateField(
+                        player.id,
+                        "ot_goals",
+                        Math.max(0, parseInt(e.target.value) || 0),
+                      )
+                    }
+                    className="h-7 px-1 text-center text-xs"
+                  />
+
+                  <div className="flex items-center">
+                    {hasStats && (
+                      <form action={deleteAction} className="inline">
+                        <input type="hidden" name="game_id" value={gameId} />
+                        <input
+                          type="hidden"
+                          name="player_id"
+                          value={player.id}
+                        />
+                        <button
+                          type="submit"
+                          className="h-7 px-1 text-[10px] text-red-400 hover:text-red-300"
+                          title="Remove entry"
+                        >
+                          &times;
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              </div>
             );
           })}
         </div>
       )}
-    </div>
-  );
-}
 
-function PlayerStatRow({
-  player,
-  gameId,
-  existing,
-  hasStats,
-  upsertAction,
-  deleteAction,
-}: {
-  player: PlayerInfo;
-  gameId: number;
-  existing: ManualGameStat | undefined;
-  hasStats: boolean;
-  upsertAction: (formData: FormData) => Promise<void>;
-  deleteAction: (formData: FormData) => Promise<void>;
-}) {
-  const posColor = POS_COLORS[player.position] ?? "bg-puck-border/40 text-ice-400";
-
-  return (
-    <div
-      className={
-        "rounded-md border px-2 py-1.5 " +
-        (hasStats
-          ? "border-ice-500/30 bg-ice-500/5"
-          : "border-puck-border/50 bg-puck-bg/40")
-      }
-    >
-      <form
-        action={upsertAction}
-        className="grid grid-cols-[1fr_3.5rem_3.5rem_3.5rem_auto] items-center gap-1.5"
-      >
+      {/* Single save button */}
+      <form ref={formRef} action={batchUpsertAction}>
         <input type="hidden" name="game_id" value={gameId} />
-        <input type="hidden" name="player_id" value={player.id} />
-
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span
-            className={
-              "inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[9px] font-bold " +
-              posColor
-            }
-          >
-            {player.position}
-          </span>
-          <div className="min-w-0">
-            <span className="block truncate text-xs text-ice-100">
-              {player.full_name}
-            </span>
-            {hasStats && existing && (
-              <span className="block text-[9px] text-ice-500">
-                Saved: {existing.goals}G {existing.assists}A{" "}
-                {existing.ot_goals}OT
-                {existing.updated_at && (
-                  <> &middot; {timeAgo(existing.updated_at)}</>
-                )}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <Input
-          name="goals"
-          type="number"
-          min={0}
-          step={1}
-          inputMode="numeric"
-          defaultValue={existing?.goals ?? 0}
-          className="h-7 px-1 text-center text-xs"
-        />
-        <Input
-          name="assists"
-          type="number"
-          min={0}
-          step={1}
-          inputMode="numeric"
-          defaultValue={existing?.assists ?? 0}
-          className="h-7 px-1 text-center text-xs"
-        />
-        <Input
-          name="ot_goals"
-          type="number"
-          min={0}
-          step={1}
-          inputMode="numeric"
-          defaultValue={existing?.ot_goals ?? 0}
-          className="h-7 px-1 text-center text-xs"
-        />
-
-        <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            type="submit"
-            className="h-7 px-2 text-[10px]"
-          >
-            Save
-          </Button>
-          {hasStats && (
-            <form action={deleteAction} className="inline">
-              <input type="hidden" name="game_id" value={gameId} />
-              <input type="hidden" name="player_id" value={player.id} />
-              <button
-                type="submit"
-                className="h-7 px-1 text-[10px] text-red-400 hover:text-red-300"
-                title="Remove entry"
-              >
-                &times;
-              </button>
-            </form>
-          )}
-        </div>
+        <input type="hidden" name="entries" value="[]" />
       </form>
+      <div className="sticky bottom-4 flex justify-end">
+        <Button
+          type="button"
+          onClick={handleSubmit}
+          disabled={dirtyCount === 0}
+          className="shadow-lg"
+        >
+          Save all ({dirtyCount} player{dirtyCount === 1 ? "" : "s"})
+        </Button>
+      </div>
     </div>
   );
 }
