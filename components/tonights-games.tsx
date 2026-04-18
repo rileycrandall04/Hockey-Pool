@@ -102,6 +102,8 @@ function GameRow({
   const time = formatGameTimeShort(game.start_time_utc);
   const networks = formatBroadcasts(game.tv_broadcasts);
   const seriesLine = formatSeriesContext(game, parentSeries);
+  const hasScore = game.away_score != null && game.home_score != null;
+  const isFinal = game.game_state === "FINAL" || game.game_state === "OFF";
 
   return (
     <li className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
@@ -109,9 +111,20 @@ function GameRow({
         <span className="flex items-center gap-2 font-semibold text-ice-50">
           {awayLogo && <img src={awayLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
           {game.away_abbrev ?? "TBD"}
-          <span className="text-ice-400">@</span>
+          {hasScore ? (
+            <span className="font-mono text-ice-100">
+              {game.away_score}–{game.home_score}
+            </span>
+          ) : (
+            <span className="text-ice-400">@</span>
+          )}
           {homeLogo && <img src={homeLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
           {game.home_abbrev ?? "TBD"}
+          {isFinal && (
+            <span className="rounded bg-green-500/20 px-1 py-0.5 text-[9px] font-semibold uppercase text-green-300">
+              Final
+            </span>
+          )}
         </span>
         {seriesLine && (
           <span className="truncate text-xs text-ice-500">

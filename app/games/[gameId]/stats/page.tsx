@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
+import { Button } from "@/components/ui/button";
 import { GameStatsEditor } from "@/components/game-stats-editor";
 import {
   Card,
@@ -130,6 +131,31 @@ async function batchUpsertStatsAction(formData: FormData) {
     });
   }
 
+  // Fetch game to know which team each player belongs to
+  const { data: gameRow } = await svc
+    .from("playoff_games")
+    .select("away_abbrev, home_abbrev")
+    .eq("game_id", gameId)
+    .maybeSingle();
+  // Build player → nhl_team_id lookup for score tallying
+  const allPlayerIds = entries.map((e) => e.player_id);
+  const { data: playerTeamRows } = await svc
+    .from("players")
+    .select("id, nhl_team_id")
+    .in("id", allPlayerIds.length > 0 ? allPlayerIds : [-1]);
+  const playerNhlTeam = new Map<number, number>();
+  for (const p of playerTeamRows ?? []) {
+    playerNhlTeam.set(p.id, p.nhl_team_id);
+  }
+  // Resolve abbrev → nhl_team_id
+  const abbrevs = [gameRow?.away_abbrev, gameRow?.home_abbrev].filter(Boolean) as string[];
+  const { data: nhlTeamLookup } = await svc
+    .from("nhl_teams")
+    .select("id, abbrev")
+    .in("abbrev", abbrevs.length > 0 ? abbrevs : ["---"]);
+  const awayNhlId = nhlTeamLookup?.find((t) => t.abbrev === gameRow?.away_abbrev)?.id;
+  const homeNhlId = nhlTeamLookup?.find((t) => t.abbrev === gameRow?.home_abbrev)?.id;
+
   let savedCount = 0;
   for (const e of entries) {
     const prev = prevByPlayer.get(e.player_id) ?? { goals: 0, assists: 0, ot_goals: 0 };
@@ -159,7 +185,6 @@ async function batchUpsertStatsAction(formData: FormData) {
       { onConflict: "game_id,player_id" },
     );
     if (upsertError) {
-      // Rollback the delta we just applied
       await applyPlayerStatsDelta(svc, e.player_id, {
         goals: -delta.goals,
         assists: -delta.assists,
@@ -170,6 +195,29 @@ async function batchUpsertStatsAction(formData: FormData) {
       );
     }
     savedCount++;
+  }
+
+  // Auto-compute game scores from all manual stats for this game
+  if (awayNhlId != null && homeNhlId != null) {
+    const { data: allStats } = await svc
+      .from("manual_game_stats")
+      .select("player_id, goals")
+      .eq("game_id", gameId);
+    let awayGoals = 0;
+    let homeGoals = 0;
+    for (const s of allStats ?? []) {
+      const teamId = playerNhlTeam.get(s.player_id);
+      if (teamId === awayNhlId) awayGoals += s.goals;
+      else if (teamId === homeNhlId) homeGoals += s.goals;
+    }
+    await svc
+      .from("playoff_games")
+      .update({
+        away_score: awayGoals,
+        home_score: homeGoals,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("game_id", gameId);
   }
 
   revalidatePath(`/games/${gameId}/stats`);
@@ -231,6 +279,34 @@ async function deleteStatsAction(formData: FormData) {
   revalidatePath(`/games/${gameId}/stats`);
   redirect(
     `/games/${gameId}/stats?success=${encodeURIComponent("Entry removed")}`,
+  );
+}
+
+async function markFinalAction(formData: FormData) {
+  "use server";
+  const gameId = Number(formData.get("game_id"));
+  const newState = String(formData.get("game_state") ?? "FINAL");
+  if (!Number.isFinite(gameId)) return;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  if (!isAppOwner(user.email)) redirect(`/games/${gameId}/stats`);
+
+  const svc = createServiceClient();
+  await svc
+    .from("playoff_games")
+    .update({
+      game_state: newState,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("game_id", gameId);
+
+  revalidatePath(`/games/${gameId}/stats`);
+  redirect(
+    `/games/${gameId}/stats?success=${encodeURIComponent(`Game marked as ${newState}.`)}`,
   );
 }
 
@@ -365,16 +441,36 @@ export default async function GameStatsPage({
           &larr; Back to bracket
         </Link>
 
-        <header>
-          <h1 className="text-2xl font-bold text-ice-50 sm:text-3xl">
-            {gameTitle}
-          </h1>
-          <p className="text-xs text-ice-400">
-            {game.game_date ?? "No date"} &middot;{" "}
-            Game {game.game_number ?? "?"} &middot;{" "}
-            Series {game.series_letter} &middot;{" "}
-            <span className="uppercase">{game.game_state ?? "FUT"}</span>
-          </p>
+        <header className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-ice-50 sm:text-3xl">
+              {gameTitle}
+            </h1>
+            <p className="text-xs text-ice-400">
+              {game.game_date ?? "No date"} &middot;{" "}
+              Game {game.game_number ?? "?"} &middot;{" "}
+              Series {game.series_letter} &middot;{" "}
+              <span className="uppercase">{game.game_state ?? "FUT"}</span>
+            </p>
+          </div>
+          <form action={markFinalAction} className="flex-shrink-0">
+            <input type="hidden" name="game_id" value={gameId} />
+            {game.game_state === "FINAL" ? (
+              <>
+                <input type="hidden" name="game_state" value="LIVE" />
+                <Button size="sm" variant="secondary" type="submit">
+                  Reopen game
+                </Button>
+              </>
+            ) : (
+              <>
+                <input type="hidden" name="game_state" value="FINAL" />
+                <Button size="sm" variant="primary" type="submit">
+                  Mark as Final
+                </Button>
+              </>
+            )}
+          </form>
         </header>
 
         {success && (
