@@ -24,6 +24,7 @@ function mkPlayer(overrides: {
     position: overrides.position ?? "C",
     nhl_team_id: 1,
     nhl_abbrev: "TOR",
+    nhl_logo: null,
     goals: overrides.goals ?? 0,
     assists: 0,
     ot_goals: 0,

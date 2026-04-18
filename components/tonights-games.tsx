@@ -5,6 +5,7 @@ interface TonightsGamesProps {
   games: PlayoffGame[];
   series: PlayoffSeries[];
   bracketHref: string;
+  teamLogos?: Record<string, string>;
 }
 
 /**
@@ -30,6 +31,7 @@ export function TonightsGames({
   games,
   series,
   bracketHref,
+  teamLogos = {},
 }: TonightsGamesProps) {
   const today = todayEasternISO();
   const scheduledToday = (games ?? []).filter((g) => g.game_date === today);
@@ -77,6 +79,7 @@ export function TonightsGames({
               key={g.game_id}
               game={g}
               parentSeries={seriesByLetter.get(g.series_letter)}
+              teamLogos={teamLogos}
             />
           ))}
         </ul>
@@ -88,14 +91,14 @@ export function TonightsGames({
 function GameRow({
   game,
   parentSeries,
+  teamLogos = {},
 }: {
   game: PlayoffGame;
   parentSeries: PlayoffSeries | undefined;
+  teamLogos?: Record<string, string>;
 }) {
-  const matchup =
-    game.away_abbrev && game.home_abbrev
-      ? `${game.away_abbrev} @ ${game.home_abbrev}`
-      : "TBD";
+  const awayLogo = game.away_abbrev ? teamLogos[game.away_abbrev] : undefined;
+  const homeLogo = game.home_abbrev ? teamLogos[game.home_abbrev] : undefined;
   const time = formatGameTimeShort(game.start_time_utc);
   const networks = formatBroadcasts(game.tv_broadcasts);
   const seriesLine = formatSeriesContext(game, parentSeries);
@@ -103,7 +106,13 @@ function GameRow({
   return (
     <li className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
       <div className="flex min-w-0 flex-col">
-        <span className="font-semibold text-ice-50">{matchup}</span>
+        <span className="flex items-center gap-1.5 font-semibold text-ice-50">
+          {awayLogo && <img src={awayLogo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />}
+          {game.away_abbrev ?? "TBD"}
+          <span className="text-ice-400">@</span>
+          {homeLogo && <img src={homeLogo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />}
+          {game.home_abbrev ?? "TBD"}
+        </span>
         {seriesLine && (
           <span className="truncate text-[10px] text-ice-500">
             {seriesLine}

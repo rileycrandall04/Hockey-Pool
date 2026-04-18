@@ -14,6 +14,7 @@ interface Props {
    * level so non-owners never see the link.
    */
   isOwner?: boolean;
+  teamLogos?: Record<string, string>;
 }
 
 /**
@@ -31,7 +32,7 @@ interface Props {
  * - With fewer than 3 games the animation is disabled because the
  *   duplicated content wouldn't overflow the viewport meaningfully.
  */
-export function DailyTickerClient({ date, games, isOwner = false }: Props) {
+export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {} }: Props) {
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
   const selectedGame =
     selectedGameId != null
@@ -68,6 +69,7 @@ export function DailyTickerClient({ date, games, isOwner = false }: Props) {
                 game={g}
                 selected={selectedGameId === g.game_id}
                 onClick={() => toggleSelected(g.game_id)}
+                teamLogos={teamLogos}
               />
             ))}
           </div>
@@ -75,12 +77,18 @@ export function DailyTickerClient({ date, games, isOwner = false }: Props) {
         {selectedGame && (
           <div className="border-t border-puck-border bg-puck-bg/80 px-3 py-2 text-xs sm:px-4">
             <div className="mb-1 flex items-center justify-between">
-              <div className="font-semibold text-ice-100">
+              <div className="flex items-center gap-1.5 font-semibold text-ice-100">
+                {teamLogos[selectedGame.away_team_abbrev] && (
+                  <img src={teamLogos[selectedGame.away_team_abbrev]} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />
+                )}
                 {selectedGame.away_team_abbrev}{" "}
                 <span className="font-mono">
                   {selectedGame.away_team_score}–{selectedGame.home_team_score}
                 </span>{" "}
                 {selectedGame.home_team_abbrev}
+                {teamLogos[selectedGame.home_team_abbrev] && (
+                  <img src={teamLogos[selectedGame.home_team_abbrev]} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />
+                )}
                 {selectedGame.was_overtime && (
                   <span className="ml-1 text-[10px] uppercase text-ice-400">
                     OT
@@ -103,11 +111,14 @@ export function DailyTickerClient({ date, games, isOwner = false }: Props) {
                     key={s.player_id}
                     className="flex justify-between gap-2"
                   >
-                    <span className="truncate">
+                    <span className="flex min-w-0 items-center gap-1 truncate">
+                      {teamLogos[s.team] && (
+                        <img src={teamLogos[s.team]} alt="" className="h-3.5 w-3.5 flex-shrink-0 object-contain" />
+                      )}
                       <span className="text-[10px] text-ice-500">
                         {s.team}
-                      </span>{" "}
-                      {s.name}
+                      </span>
+                      <span className="truncate">{s.name}</span>
                     </span>
                     <span className="flex-shrink-0 text-ice-400">
                       {s.goals > 0 && `${s.goals}G`}
@@ -141,13 +152,17 @@ function GameChip({
   game,
   selected,
   onClick,
+  teamLogos = {},
 }: {
   game: DailyRecap;
   selected: boolean;
   onClick: () => void;
+  teamLogos?: Record<string, string>;
 }) {
   const awayWon = game.away_team_score > game.home_team_score;
   const homeWon = game.home_team_score > game.away_team_score;
+  const awayLogo = teamLogos[game.away_team_abbrev];
+  const homeLogo = teamLogos[game.home_team_abbrev];
   return (
     <button
       type="button"
@@ -158,6 +173,7 @@ function GameChip({
           : "border-puck-border bg-puck-bg text-ice-200 hover:bg-puck-border/60"
       }`}
     >
+      {awayLogo && <img src={awayLogo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />}
       <span className={awayWon ? "font-semibold" : "text-ice-400"}>
         {game.away_team_abbrev}
       </span>
@@ -167,6 +183,7 @@ function GameChip({
       <span className={homeWon ? "font-semibold" : "text-ice-400"}>
         {game.home_team_abbrev}
       </span>
+      {homeLogo && <img src={homeLogo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />}
       {game.was_overtime && (
         <span className="text-[9px] uppercase text-ice-400">OT</span>
       )}

@@ -99,6 +99,7 @@ export interface RosterEntry {
   position: Position;
   nhl_team_id: number | null;
   nhl_abbrev: string | null;
+  nhl_logo: string | null;
   goals: number;
   assists: number;
   ot_goals: number;

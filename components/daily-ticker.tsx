@@ -39,11 +39,19 @@ export async function DailyTicker() {
   const rows = (recaps ?? []) as DailyRecap[];
   if (rows.length === 0) return null;
 
+  const { data: nhlTeamRows } = await svc
+    .from("nhl_teams")
+    .select("abbrev, logo_url");
+  const teamLogos: Record<string, string> = {};
+  for (const t of (nhlTeamRows ?? []) as { abbrev: string; logo_url: string | null }[]) {
+    if (t.logo_url) teamLogos[t.abbrev] = t.logo_url;
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   const isOwner = isAppOwner(user?.email);
 
-  return <DailyTickerClient date={date} games={rows} isOwner={isOwner} />;
+  return <DailyTickerClient date={date} games={rows} isOwner={isOwner} teamLogos={teamLogos} />;
 }

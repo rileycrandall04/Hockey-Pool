@@ -119,8 +119,16 @@ export default async function LeagueStandingsPage({
     .from("playoff_games")
     .select("*")
     .order("start_time_utc", { ascending: true });
+  const { data: nhlTeamRows } = await supabase
+    .from("nhl_teams")
+    .select("abbrev, logo_url");
   const bracketSeries = (bracketSeriesRows ?? []) as PlayoffSeries[];
   const bracketGames = (bracketGameRows ?? []) as PlayoffGame[];
+  // Abbreviation → logo URL lookup for game components
+  const teamLogos: Record<string, string> = {};
+  for (const t of (nhlTeamRows ?? []) as { abbrev: string; logo_url: string | null }[]) {
+    if (t.logo_url) teamLogos[t.abbrev] = t.logo_url;
+  }
 
   // Is the current user watching this league for draft stall alerts?
   // Only relevant while the draft is still live; the bell button is
@@ -258,6 +266,7 @@ export default async function LeagueStandingsPage({
           games={bracketGames}
           series={bracketSeries}
           bracketHref={`/leagues/${league.id}/bracket`}
+          teamLogos={teamLogos}
         />
 
         {standings.length === 0 ? (
@@ -420,7 +429,7 @@ function PlayerRow({
       href={`/players/${p.player_id}`}
       className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-puck-border/40"
     >
-      <span className="flex min-w-0 items-baseline gap-2">
+      <span className="flex min-w-0 items-center gap-2">
         <span
           className={
             p.position === "D"
@@ -430,6 +439,9 @@ function PlayerRow({
         >
           {p.position}
         </span>
+        {p.nhl_logo && (
+          <img src={p.nhl_logo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />
+        )}
         <span
           className={`truncate ${muted ? "text-ice-400" : "text-ice-100"}`}
         >
