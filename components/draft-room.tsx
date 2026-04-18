@@ -702,13 +702,25 @@ export function DraftRoom({
   // Persisted via localStorage so the countdown survives page navigation.
   // Stores { startedAt, limit, pickIndex } and calculates remaining time
   // from the wall clock on every tick / remount.
+  //
+  // prevPickIndexRef distinguishes "initial data load" from "actual new
+  // pick via realtime". On mount / refresh, picks start as [] so
+  // currentPickIndex is 0, then jumps to the real value once data loads.
+  // We only write a new startedAt when we see an actual transition
+  // (prev !== null && prev !== current), not on mount.
+  const prevPickIndexRef = useRef<number | null>(null);
   useEffect(() => {
     if (draftOver || league.draft_status !== "in_progress") {
+      prevPickIndexRef.current = currentPickIndex;
       setPickClock(nextClockLimit);
       return;
     }
 
-    // Check if this is a new pick or a remount of an existing one
+    const isRealNewPick =
+      prevPickIndexRef.current !== null &&
+      prevPickIndexRef.current !== currentPickIndex;
+    prevPickIndexRef.current = currentPickIndex;
+
     let startedAt: number;
     let limit: number;
     try {
@@ -716,11 +728,18 @@ export function DraftRoom({
         startedAt?: number; limit?: number; pickIndex?: number;
       };
       if (stored.pickIndex === currentPickIndex && typeof stored.startedAt === "number" && typeof stored.limit === "number") {
-        // Resuming existing countdown
+        // Stored clock matches this pick — resume it
         startedAt = stored.startedAt;
         limit = stored.limit;
+      } else if (isRealNewPick) {
+        // Actual pick transition via realtime — start fresh clock
+        startedAt = Date.now();
+        limit = nextClockLimit;
+        localStorage.setItem(clockKey, JSON.stringify({ startedAt, limit, pickIndex: currentPickIndex }));
       } else {
-        // New pick — latch the dropdown value
+        // Initial mount / data load, no stored clock for this pick.
+        // Don't know when the pick actually started, so start from now
+        // and store it so subsequent refreshes resume correctly.
         startedAt = Date.now();
         limit = nextClockLimit;
         localStorage.setItem(clockKey, JSON.stringify({ startedAt, limit, pickIndex: currentPickIndex }));
@@ -737,7 +756,7 @@ export function DraftRoom({
       return;
     }
 
-    // Calculate remaining right away (handles remount after navigation)
+    // Calculate remaining from wall clock (handles remount after navigation)
     const calcRemaining = () => Math.max(0, Math.ceil(limit - (Date.now() - startedAt) / 1000));
     setPickClock(calcRemaining());
 
