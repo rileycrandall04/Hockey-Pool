@@ -1107,9 +1107,9 @@ export function DraftRoom({
                   <col className="w-[32px] sm:w-[44px]" />
                   <col className="hidden w-[36px] sm:table-column" />
                   <col className="w-[34px] sm:w-[44px]" />
-                  <col className="w-[44px] sm:w-[64px]" />
+                  <col className="w-[76px] sm:w-[100px]" />
                 </colgroup>
-                <thead className="sticky top-0 bg-puck-card">
+                <thead className="sticky top-0 z-10 bg-puck-card">
                   <tr className="border-b border-puck-border text-left text-ice-400">
                     <th className="px-1.5 py-1.5 sm:px-2 sm:py-2">Player</th>
                     <th className="px-1 py-1.5 sm:px-2 sm:py-2">Pos</th>
