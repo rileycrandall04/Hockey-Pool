@@ -703,6 +703,192 @@ const ADS: string[] = [
     </a>
   </div>
 </div>`,
+
+  // Ad 10: Rhett's Pest Control
+  `<div style="width:370px;max-width:95vw;background:#FFF8F0;border:3px solid #4E342E;position:relative;">
+  <div style="background:#4E342E;padding:5px 10px;display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:#FFCC80;font-size:9px;letter-spacing:2px;font-weight:bold;">★ SPONSORED — HOCKEY POOL ★</span>
+    <button data-ad-close style="background:#4E342E;border:1px solid #FFCC80;color:#FFCC80;width:19px;height:19px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;font-weight:900;">✕</button>
+  </div>
+  <div style="padding:16px 20px 16px;text-align:center;">
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:13px;color:#4E342E;letter-spacing:4px;text-transform:uppercase;margin-bottom:0;">Rhett's</div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:34px;color:#1A1A1A;line-height:0.9;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Pest<br>Control</div>
+    <div style="font-family:Georgia,serif;font-style:italic;font-size:10px;color:#888;letter-spacing:2px;margin-bottom:10px;">Licensed · Bonded · Enthusiastic</div>
+    <div style="border:2px solid #4E342E;border-radius:4px;overflow:hidden;background:#FDF5EC;margin-bottom:12px;">
+      <svg viewBox="0 0 334 175" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        <rect x="0" y="0" width="334" height="175" fill="#F5ECD8"/>
+        <rect x="0" y="0" width="334" height="12" fill="#8D6E63"/>
+        <rect x="0" y="8" width="334" height="4" fill="#795548"/>
+        <rect x="30" y="12" width="12" height="100" rx="2" fill="#A1887F" transform="rotate(18,36,12)"/>
+        <rect x="130" y="12" width="12" height="110" rx="2" fill="#A1887F" transform="rotate(8,136,12)"/>
+        <rect x="200" y="12" width="12" height="110" rx="2" fill="#A1887F" transform="rotate(-8,206,12)"/>
+        <rect x="295" y="12" width="12" height="100" rx="2" fill="#A1887F" transform="rotate(-18,301,12)"/>
+        <rect x="40" y="55" width="260" height="8" rx="2" fill="#8D6E63" opacity="0.5"/>
+        <rect x="0" y="140" width="334" height="35" fill="#BCAAA4"/>
+        <line x1="0" y1="140" x2="334" y2="140" stroke="#A1887F" stroke-width="2"/>
+        <line x1="55" y1="140" x2="55" y2="175" stroke="#A1887F" stroke-width="1"/>
+        <line x1="110" y1="140" x2="110" y2="175" stroke="#A1887F" stroke-width="1"/>
+        <line x1="165" y1="140" x2="165" y2="175" stroke="#A1887F" stroke-width="1"/>
+        <line x1="220" y1="140" x2="220" y2="175" stroke="#A1887F" stroke-width="1"/>
+        <line x1="275" y1="140" x2="275" y2="175" stroke="#A1887F" stroke-width="1"/>
+        <circle cx="80" cy="45" r="2" fill="#D4B896" opacity="0.6"/>
+        <circle cx="200" cy="30" r="1.5" fill="#D4B896" opacity="0.5"/>
+        <circle cx="260" cy="60" r="2" fill="#D4B896" opacity="0.4"/>
+        <circle cx="140" cy="40" r="1" fill="#D4B896" opacity="0.6"/>
+        <ellipse cx="105" cy="50" rx="10" ry="8" fill="#5D4037"/>
+        <ellipse cx="112" cy="47" rx="7" ry="6" fill="#6D4C41"/>
+        <polygon points="119,47 124,45 119,50" fill="#FF8F00"/>
+        <circle cx="117" cy="45" r="2" fill="#1a1a1a"/>
+        <circle cx="117.5" cy="44.5" r="0.8" fill="white"/>
+        <path d="M 97 52 Q 105 58 113 52" fill="#4E342E" opacity="0.4"/>
+        <polygon points="94,50 86,55 94,56" fill="#4E342E"/>
+        <line x1="102" y1="57" x2="99" y2="62" stroke="#795548" stroke-width="1.2"/>
+        <line x1="106" y1="57" x2="109" y2="62" stroke="#795548" stroke-width="1.2"/>
+        <line x1="99" y1="62" x2="96" y2="65" stroke="#795548" stroke-width="1"/>
+        <line x1="99" y1="62" x2="101" y2="66" stroke="#795548" stroke-width="1"/>
+        <line x1="109" y1="62" x2="106" y2="65" stroke="#795548" stroke-width="1"/>
+        <line x1="109" y1="62" x2="112" y2="65" stroke="#795548" stroke-width="1"/>
+        <ellipse cx="228" cy="38" rx="11" ry="7" fill="#6D4C41" transform="rotate(-25,228,38)"/>
+        <ellipse cx="237" cy="33" rx="7" ry="5" fill="#795548" transform="rotate(-25,237,33)"/>
+        <polygon points="244,30 250,27 244,34" fill="#FF8F00" transform="rotate(-25,244,30)"/>
+        <circle cx="242" cy="29" r="2" fill="#1a1a1a"/>
+        <path d="M 218 35 Q 225 22 232 35" fill="#5D4037" opacity="0.8" transform="rotate(-25,225,35)"/>
+        <path d="M 232 38 Q 240 25 248 38" fill="#4E342E" opacity="0.7" transform="rotate(-25,240,38)"/>
+        <line x1="255" y1="28" x2="268" y2="24" stroke="#CCC0A8" stroke-width="1.2" stroke-dasharray="3,2"/>
+        <line x1="255" y1="35" x2="270" y2="33" stroke="#CCC0A8" stroke-width="1" stroke-dasharray="3,2"/>
+        <ellipse cx="280" cy="22" rx="7" ry="5" fill="#8D6E63"/>
+        <ellipse cx="285" cy="20" rx="5" ry="4" fill="#A1887F"/>
+        <polygon points="290,19 294,18 290,22" fill="#FF8F00"/>
+        <path d="M 42 95 Q 60 88 78 95 Q 78 108 60 110 Q 42 108 42 95 Z" fill="#8D6E63"/>
+        <path d="M 45 96 Q 60 90 75 96" fill="none" stroke="#6D4C41" stroke-width="1.5"/>
+        <path d="M 44 100 Q 60 93 76 100" fill="none" stroke="#6D4C41" stroke-width="1.5"/>
+        <ellipse cx="55" cy="104" rx="6" ry="4" fill="#E8D8C0"/>
+        <ellipse cx="65" cy="105" rx="5" ry="4" fill="#EAD8C4"/>
+        <rect x="148" y="132" width="70" height="8" rx="2" fill="#6D4C41"/>
+        <rect x="150" y="133" width="66" height="6" rx="1" fill="#5D4037"/>
+        <ellipse cx="183" cy="118" rx="22" ry="10" fill="#FF8F00"/>
+        <rect x="162" y="118" width="42" height="6" rx="1" fill="#E65100"/>
+        <ellipse cx="183" cy="128" rx="16" ry="15" fill="#FFCCAA"/>
+        <ellipse cx="177" cy="124" rx="3.5" ry="4" fill="white"/>
+        <ellipse cx="189" cy="124" rx="3.5" ry="4" fill="white"/>
+        <circle cx="178" cy="123" r="2.5" fill="#3E2723"/>
+        <circle cx="190" cy="123" r="2.5" fill="#3E2723"/>
+        <circle cx="178.8" cy="122.2" r="1" fill="white"/>
+        <circle cx="190.8" cy="122.2" r="1" fill="white"/>
+        <path d="M 178 133 Q 183 137 188 133" fill="none" stroke="#A0522D" stroke-width="1.2"/>
+        <rect x="162" y="138" width="42" height="18" rx="4" fill="#1565C0"/>
+        <rect x="162" y="138" width="42" height="6" rx="2" fill="#0D47A1"/>
+        <rect x="168" y="144" width="14" height="8" rx="1" fill="#FF8F00"/>
+        <text x="175" y="150" text-anchor="middle" font-family="Impact" font-size="5" fill="white">RHETT</text>
+        <polygon points="158,122 142,90 115,88 140,96" fill="#FFFDE7" opacity="0.35"/>
+        <polygon points="158,122 142,90 128,86 142,96" fill="#FFFDE7" opacity="0.2"/>
+        <rect x="148" y="120" width="14" height="6" rx="2" fill="#546E7A"/>
+        <ellipse cx="148" cy="123" rx="4" ry="4" fill="#FFEE58"/>
+        <ellipse cx="108" cy="143" rx="4" ry="2.5" fill="white" opacity="0.8"/>
+        <ellipse cx="115" cy="145" rx="3" ry="2" fill="white" opacity="0.7"/>
+        <ellipse cx="240" cy="142" rx="3.5" ry="2" fill="white" opacity="0.8"/>
+      </svg>
+    </div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:22px;color:#4E342E;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Birds in the attic?</div>
+    <div style="font-family:Georgia,serif;font-style:italic;font-size:14px;color:#333;margin-bottom:12px;">"Rhett will find them."</div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <span style="font-size:8px;color:#4E342E;border:1px solid #4E342E;padding:3px 7px;border-radius:2px;background:white;">Attics Specialty</span>
+      <span style="font-size:8px;color:#4E342E;border:1px solid #4E342E;padding:3px 7px;border-radius:2px;background:white;">Flashlight Included</span>
+      <span style="font-size:8px;color:#4E342E;border:1px solid #4E342E;padding:3px 7px;border-radius:2px;background:white;">Will Not Stop</span>
+    </div>
+    <button style="background:#4E342E;color:#FFCC80;border:none;padding:11px 0;font-family:Impact,'Arial Black',sans-serif;font-size:20px;text-transform:uppercase;cursor:pointer;letter-spacing:1px;width:100%;display:block;margin-bottom:8px;">
+      CALL RHETT →
+    </button>
+    <div style="font-size:7.5px;color:#aaa;font-style:italic;margin-bottom:6px;">*Rhett will also find squirrels. Nobody asked him to.</div>
+    <a href="#" data-ad-close style="font-size:9px;color:#aaa;font-family:Arial;text-decoration:none;display:block;">
+      No thanks, the birds can stay
+    </a>
+  </div>
+</div>`,
+
+  // Ad 11: Scott's Probe Service
+  `<div style="width:370px;max-width:95vw;background:#FFF0F3;border:3px solid #C62828;position:relative;">
+  <div style="background:#C62828;padding:5px 10px;display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:#FFCDD2;font-size:9px;letter-spacing:2px;font-weight:bold;">★ SPONSORED — HOCKEY POOL ★</span>
+    <button data-ad-close style="background:#C62828;border:1px solid #FFCDD2;color:#FFCDD2;width:19px;height:19px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;font-weight:900;">✕</button>
+  </div>
+  <div style="padding:16px 20px 16px;text-align:center;">
+    <div style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:34px;color:#C62828;line-height:1;margin-bottom:0;">Scott's</div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:26px;color:#1A1A1A;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">Probe Service</div>
+    <div style="font-family:Georgia,serif;font-style:italic;font-size:9px;color:#999;letter-spacing:2px;margin-bottom:10px;">Transesophageal Echocardiography · Est. Whenever</div>
+    <div style="border:2px solid #C62828;border-radius:4px;overflow:hidden;background:#FFF5F5;margin-bottom:12px;">
+      <svg viewBox="0 0 334 170" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        <rect x="0" y="0" width="334" height="170" fill="#FFF5F5"/>
+        <rect x="12" y="18" width="88" height="66" rx="4" fill="#0A0A14" stroke="#333" stroke-width="2"/>
+        <rect x="16" y="22" width="80" height="58" rx="2" fill="#0D1020"/>
+        <ellipse cx="56" cy="51" rx="28" ry="24" fill="none" stroke="#00BCD4" stroke-width="1" opacity="0.6"/>
+        <path d="M 24 51 Q 30 35 40 51 Q 50 67 56 51 Q 62 35 72 51 Q 78 60 88 51" fill="none" stroke="#00E5FF" stroke-width="1.2" opacity="0.8"/>
+        <path d="M 24 58 Q 35 45 44 58 Q 52 68 60 55 Q 68 44 80 58" fill="none" stroke="#00BCD4" stroke-width="0.8" opacity="0.5"/>
+        <ellipse cx="50" cy="48" rx="10" ry="12" fill="none" stroke="#FF5252" stroke-width="1" opacity="0.7"/>
+        <ellipse cx="64" cy="48" rx="10" ry="12" fill="none" stroke="#FF5252" stroke-width="1" opacity="0.7"/>
+        <rect x="16" y="22" width="80" height="8" rx="2" fill="white" opacity="0.04"/>
+        <rect x="46" y="84" width="20" height="8" rx="1" fill="#444"/>
+        <rect x="36" y="90" width="40" height="5" rx="2" fill="#333"/>
+        <rect x="130" y="20" width="38" height="60" rx="8" fill="#37474F"/>
+        <rect x="134" y="24" width="30" height="18" rx="4" fill="#455A64"/>
+        <circle cx="144" cy="30" r="6" fill="#546E7A"/>
+        <circle cx="144" cy="30" r="3" fill="#607D8B"/>
+        <circle cx="158" cy="30" r="6" fill="#546E7A"/>
+        <circle cx="158" cy="30" r="3" fill="#607D8B"/>
+        <rect x="136" y="46" width="26" height="6" rx="3" fill="#78909C"/>
+        <rect x="148" y="44" width="8" height="10" rx="2" fill="#90A4AE"/>
+        <rect x="144" y="57" width="10" height="8" rx="2" fill="#546E7A"/>
+        <rect x="143" y="78" width="12" height="10" rx="3" fill="#B0BEC5"/>
+        <path d="M 149 88 Q 149 110 160 125 Q 170 140 167 155" fill="none" stroke="#78909C" stroke-width="8" stroke-linecap="round"/>
+        <path d="M 149 88 Q 149 110 160 125 Q 170 140 167 155" fill="none" stroke="#90A4AE" stroke-width="5" stroke-linecap="round"/>
+        <path d="M 149 94 Q 150 94 151 94" fill="none" stroke="#455A64" stroke-width="1.5"/>
+        <path d="M 150 100 Q 151 100 153 100" fill="none" stroke="#455A64" stroke-width="1.5"/>
+        <path d="M 152 108 Q 154 107 156 107" fill="none" stroke="#455A64" stroke-width="1.5"/>
+        <path d="M 155 116 Q 157 115 160 114" fill="none" stroke="#455A64" stroke-width="1.5"/>
+        <path d="M 160 124 Q 163 122 165 121" fill="none" stroke="#455A64" stroke-width="1.5"/>
+        <ellipse cx="167" cy="160" rx="8" ry="10" fill="#455A64"/>
+        <ellipse cx="167" cy="157" rx="6" ry="5" fill="#00BCD4" opacity="0.5"/>
+        <polygon points="160,162 174,162 180,170 154,170" fill="#00E5FF" opacity="0.15"/>
+        <polygon points="162,162 172,162 176,168 158,168" fill="#00E5FF" opacity="0.1"/>
+        <path d="M 130 50 Q 110 50 100 70 Q 90 88 100 88" fill="none" stroke="#546E7A" stroke-width="4" stroke-linecap="round"/>
+        <g transform="translate(220,30)">
+          <ellipse cx="47" cy="18" rx="20" ry="22" fill="#FFCCAA" stroke="#DDA070" stroke-width="1"/>
+          <rect x="40" y="38" width="14" height="22" rx="3" fill="#FFCCAA" stroke="#DDA070" stroke-width="1"/>
+          <rect x="28" y="58" width="38" height="50" rx="6" fill="#FFCCAA" stroke="#DDA070" stroke-width="1"/>
+          <rect x="28" y="58" width="38" height="50" rx="6" fill="#B3E5FC" opacity="0.3"/>
+          <line x1="47" y1="30" x2="47" y2="58" stroke="#EF9A9A" stroke-width="2" stroke-dasharray="3,2"/>
+          <line x1="47" y1="58" x2="47" y2="100" stroke="#EF9A9A" stroke-width="2" stroke-dasharray="3,2"/>
+          <path d="M 38 75 Q 38 68 44 68 Q 47 68 47 72 Q 47 68 50 68 Q 56 68 56 75 Q 56 82 47 88 Q 38 82 38 75 Z" fill="#FF5252" opacity="0.7"/>
+          <path d="M 62 20 Q 70 40 62 70 Q 58 84 52 82" fill="none" stroke="#C62828" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arr)"/>
+          <text x="72" y="52" font-family="Arial" font-size="7" fill="#C62828" font-style="italic">probe</text>
+          <text x="72" y="61" font-family="Arial" font-size="7" fill="#C62828" font-style="italic">path</text>
+        </g>
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#C62828" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <div style="background:#C62828;padding:8px 12px;margin-bottom:10px;">
+      <div style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:16px;color:white;line-height:1.4;">
+        "The quickest way to your heart<br>is through your esophagus."
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <span style="font-size:8px;color:#C62828;border:1px solid #C62828;padding:3px 7px;border-radius:2px;background:white;">Fully Lubricated</span>
+      <span style="font-size:8px;color:#C62828;border:1px solid #C62828;padding:3px 7px;border-radius:2px;background:white;">Board Certified*</span>
+      <span style="font-size:8px;color:#C62828;border:1px solid #C62828;padding:3px 7px;border-radius:2px;background:white;">Bite Guard Included</span>
+    </div>
+    <button style="background:#C62828;color:white;border:none;padding:11px 0;font-family:Impact,'Arial Black',sans-serif;font-size:20px;text-transform:uppercase;cursor:pointer;letter-spacing:1px;width:100%;display:block;margin-bottom:8px;">
+      OPEN WIDE →
+    </button>
+    <div style="font-size:7.5px;color:#aaa;font-style:italic;margin-bottom:6px;">*Board certified in something &nbsp;|&nbsp; NPO after midnight</div>
+    <a href="#" data-ad-close style="font-size:9px;color:#aaa;font-family:Arial;text-decoration:none;display:block;">
+      No thanks, I'll use the echo lab
+    </a>
+  </div>
+</div>`,
 ];
 
 export default function AdOverlay({
