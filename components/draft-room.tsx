@@ -81,6 +81,7 @@ export function DraftRoom({
   useEffect(() => {
     try { localStorage.setItem(queueKey, JSON.stringify(queue)); } catch {}
   }, [queue, queueKey]);
+  const clockKey = `draft-clock-${league.id}`;
   const [nextClockLimit, setNextClockLimit] = useState(300);  // dropdown value, applied on next pick
   const activeClockRef = useRef(300);                         // limit used by the running countdown
   const [pickClock, setPickClock] = useState(300);            // current countdown (seconds)
@@ -582,7 +583,8 @@ export function DraftRoom({
 
   const handlePick = useCallback(async (playerId: number) => {
     if (!onClockTeam) return;
-    // Cancel pick clock on manual pick
+    // Cancel pick clock on manual pick — clear stored clock so next pick starts fresh
+    try { localStorage.removeItem(clockKey); } catch {}
     setPickClock(nextClockLimit);
     const result = await post<{ inserted?: PickRow }>("/api/draft/pick", {
       league_id: league.id,
@@ -686,57 +688,80 @@ export function DraftRoom({
   }, [autoDraft, isMyTurn, draftOver, busy, league.draft_status, league.id, onClockTeam, post, applyLocalPick]);
 
   // ---- pick clock -----------------------------------------------------------
-  // Runs for ALL users so everyone sees the countdown. Resets whenever a
-  // new pick lands (currentPickIndex changes). Changing the dropdown
-  // mid-pick does NOT reset the running clock — it applies on the next pick.
+  // Persisted via localStorage so the countdown survives page navigation.
+  // Stores { startedAt, limit, pickIndex } and calculates remaining time
+  // from the wall clock on every tick / remount.
   useEffect(() => {
-    // Latch the dropdown value as the active limit for this pick
-    activeClockRef.current = nextClockLimit;
-
-    if (
-      nextClockLimit === 0 ||
-      draftOver ||
-      league.draft_status !== "in_progress"
-    ) {
+    if (draftOver || league.draft_status !== "in_progress") {
       setPickClock(nextClockLimit);
       return;
     }
 
-    setPickClock(nextClockLimit);
+    // Check if this is a new pick or a remount of an existing one
+    let startedAt: number;
+    let limit: number;
+    try {
+      const stored = JSON.parse(localStorage.getItem(clockKey) ?? "{}") as {
+        startedAt?: number; limit?: number; pickIndex?: number;
+      };
+      if (stored.pickIndex === currentPickIndex && typeof stored.startedAt === "number" && typeof stored.limit === "number") {
+        // Resuming existing countdown
+        startedAt = stored.startedAt;
+        limit = stored.limit;
+      } else {
+        // New pick — latch the dropdown value
+        startedAt = Date.now();
+        limit = nextClockLimit;
+        localStorage.setItem(clockKey, JSON.stringify({ startedAt, limit, pickIndex: currentPickIndex }));
+      }
+    } catch {
+      startedAt = Date.now();
+      limit = nextClockLimit;
+    }
+
+    activeClockRef.current = limit;
+
+    if (limit === 0) {
+      setPickClock(0);
+      return;
+    }
+
+    // Calculate remaining right away (handles remount after navigation)
+    const calcRemaining = () => Math.max(0, Math.ceil(limit - (Date.now() - startedAt) / 1000));
+    setPickClock(calcRemaining());
 
     const interval = setInterval(() => {
-      setPickClock((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
+      const remaining = calcRemaining();
+      setPickClock(remaining);
+      if (remaining <= 0) clearInterval(interval);
     }, 1000);
 
     return () => clearInterval(interval);
   // nextClockLimit intentionally excluded — only apply on new pick
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPickIndex, draftOver, league.draft_status]);
+  }, [currentPickIndex, draftOver, league.draft_status, clockKey]);
 
   // When clock hits 0, pick from queue if available, otherwise auto-pick.
+  // After auto-pick, reload the page to refresh all server data.
   useEffect(() => {
     if (pickClock !== 0 || activeClockRef.current === 0 || !isMyTurn || busy || autoDraft || draftOver) return;
     if (pickClockFiringRef.current) return;
     pickClockFiringRef.current = true;
 
     const firstAvailable = queue.find((id) => !pickedPlayerIds.has(id));
+    const afterPick = () => {
+      pickClockFiringRef.current = false;
+      // Refresh page to ensure all data is current after auto-pick
+      window.location.reload();
+    };
+
     if (firstAvailable) {
       handlePick(firstAvailable).then(() => {
         setQueue((prev) => prev.filter((id) => id !== firstAvailable));
-        pickClockFiringRef.current = false;
-        setPickClock(nextClockLimit);
+        afterPick();
       });
     } else {
-      handleAutoPick().then(() => {
-        pickClockFiringRef.current = false;
-        setPickClock(nextClockLimit);
-      });
+      handleAutoPick().then(afterPick);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickClock, isMyTurn, busy, autoDraft, draftOver]);
