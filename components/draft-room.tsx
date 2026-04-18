@@ -60,6 +60,7 @@ export function DraftRoom({
   const [league, setLeague] = useState<League>(initialLeague);
   const [teams, setTeams] = useState<Team[]>(initialTeams);
   const [picks, setPicks] = useState<PickRow[]>([]);
+  const picksLoadedRef = useRef(false);
   const [players, setPlayers] = useState<DraftablePlayer[]>([]);
   const [search, setSearch] = useState("");
   const [positionFilter, setPositionFilter] = useState<Position | "ALL">(
@@ -159,6 +160,7 @@ export function DraftRoom({
       }
 
       setPicks((pickRows ?? []) as PickRow[]);
+      picksLoadedRef.current = true;
       const normalized: DraftablePlayer[] = (playerRows ?? []).map(
         (
           p: {
@@ -711,24 +713,16 @@ export function DraftRoom({
   // Stores { startedAt, limit, pickIndex } and calculates remaining time
   // from the wall clock on every tick / remount.
   //
-  // prevPickIndexRef distinguishes "initial data load" from "actual new
-  // pick via realtime". On mount / refresh, picks start as [] so
-  // currentPickIndex is 0, then jumps to the real value once data loads.
-  // We only write a new startedAt when we see an actual transition
-  // (prev !== null && prev !== current), not on mount.
-  const prevPickIndexRef = useRef<number | null>(null);
+  // Waits for initial picks to load (picksLoadedRef) so the empty-state
+  // currentPickIndex=0 doesn't overwrite a valid stored clock.
   useEffect(() => {
+    if (!picksLoadedRef.current) return; // wait for initial data
     if (draftOver || league.draft_status !== "in_progress") {
-      prevPickIndexRef.current = currentPickIndex;
       setPickClock(nextClockLimit);
       return;
     }
 
-    const isRealNewPick =
-      prevPickIndexRef.current !== null &&
-      prevPickIndexRef.current !== currentPickIndex;
-    prevPickIndexRef.current = currentPickIndex;
-
+    // Try to resume a stored clock for this exact pick
     let startedAt: number;
     let limit: number;
     try {
@@ -739,15 +733,8 @@ export function DraftRoom({
         // Stored clock matches this pick — resume it
         startedAt = stored.startedAt;
         limit = stored.limit;
-      } else if (isRealNewPick) {
-        // Actual pick transition via realtime — start fresh clock
-        startedAt = Date.now();
-        limit = nextClockLimit;
-        localStorage.setItem(clockKey, JSON.stringify({ startedAt, limit, pickIndex: currentPickIndex }));
       } else {
-        // Initial mount / data load, no stored clock for this pick.
-        // Don't know when the pick actually started, so start from now
-        // and store it so subsequent refreshes resume correctly.
+        // No stored clock for this pick — start fresh
         startedAt = Date.now();
         limit = nextClockLimit;
         localStorage.setItem(clockKey, JSON.stringify({ startedAt, limit, pickIndex: currentPickIndex }));
