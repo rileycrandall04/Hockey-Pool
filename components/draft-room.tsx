@@ -296,7 +296,36 @@ export function DraftRoom({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, league.id]);
+  }, [supabase, league.id, clockKey]);
+
+  // ---- polling fallback ----------------------------------------------------
+  // Supabase realtime can silently drop events. Poll every 10s to check if
+  // the pick count has changed, and reload if so. This guarantees every
+  // client stays current even when realtime fails.
+  const knownPickCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (league.draft_status !== "in_progress") return;
+
+    const poll = async () => {
+      const { count } = await supabase
+        .from("draft_picks")
+        .select("id", { count: "exact", head: true })
+        .eq("league_id", league.id);
+      if (count === null) return;
+      if (knownPickCountRef.current === null) {
+        // First poll — just record the baseline
+        knownPickCountRef.current = count;
+        return;
+      }
+      if (count !== knownPickCountRef.current) {
+        try { localStorage.removeItem(clockKey); } catch {}
+        window.location.reload();
+      }
+    };
+
+    const interval = setInterval(poll, 10_000);
+    return () => clearInterval(interval);
+  }, [supabase, league.id, league.draft_status, clockKey]);
 
   // ---- turn notifications -------------------------------------------------
   // Two layers:
