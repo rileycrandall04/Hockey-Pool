@@ -82,7 +82,18 @@ export function DraftRoom({
     try { localStorage.setItem(queueKey, JSON.stringify(queue)); } catch {}
   }, [queue, queueKey]);
   const clockKey = `draft-clock-${league.id}`;
-  const [nextClockLimit, setNextClockLimit] = useState(300);  // dropdown value, applied on next pick
+  const clockLimitKey = `draft-clock-limit-${league.id}`;
+  const [nextClockLimit, setNextClockLimit] = useState(() => {
+    if (typeof window === "undefined") return 300;
+    try {
+      const stored = localStorage.getItem(clockLimitKey);
+      return stored !== null ? Number(stored) : 300;
+    } catch { return 300; }
+  });
+  // Persist limit to localStorage on change
+  useEffect(() => {
+    try { localStorage.setItem(clockLimitKey, String(nextClockLimit)); } catch {}
+  }, [nextClockLimit, clockLimitKey]);
   const activeClockRef = useRef(300);                         // limit used by the running countdown
   const [pickClock, setPickClock] = useState(300);            // current countdown (seconds)
   const pickClockFiringRef = useRef(false);                   // prevent double-fire
