@@ -759,9 +759,12 @@ export function DraftRoom({
         startedAt = stored.startedAt;
         limit = stored.limit;
       } else {
-        // No stored clock for this pick — start fresh
+        // No stored clock for this pick — start fresh.
+        // If the user has queued players, use 2 min so the queue pick
+        // fires faster than the normal draft clock.
         startedAt = Date.now();
-        limit = nextClockLimit;
+        const hasQueue = queue.length > 0 && queue.some((id) => !pickedPlayerIds.has(id));
+        limit = isMyTurn && hasQueue ? Math.min(120, nextClockLimit) : nextClockLimit;
         localStorage.setItem(clockKey, JSON.stringify({ startedAt, limit, pickIndex: currentPickIndex }));
       }
     } catch {
