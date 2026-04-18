@@ -68,10 +68,10 @@ export function DraftRoom({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [autoDraft, setAutoDraft] = useState(false);
-  // ---- draft queue state ---------------------------------------------------
-  const [queue, setQueue] = useState<number[]>([]);         // ordered player IDs
-  const [queueCountdown, setQueueCountdown] = useState(60); // seconds remaining
-  const queueFiringRef = useRef(false);                     // prevent double-fire
+  // ---- draft queue + pick clock state ---------------------------------------
+  const [queue, setQueue] = useState<number[]>([]);           // ordered player IDs
+  const [pickClock, setPickClock] = useState(300);            // 5-minute draft clock (seconds)
+  const pickClockFiringRef = useRef(false);                   // prevent double-fire
   // "granted" | "denied" | "default" | "unsupported"
   const [notifyPermission, setNotifyPermission] = useState<string>("default");
   // Whether the browser currently has an active push subscription for
@@ -569,8 +569,8 @@ export function DraftRoom({
 
   const handlePick = useCallback(async (playerId: number) => {
     if (!onClockTeam) return;
-    // Cancel queue countdown on manual pick
-    setQueueCountdown(60);
+    // Cancel pick clock on manual pick
+    setPickClock(300);
     const result = await post<{ inserted?: PickRow }>("/api/draft/pick", {
       league_id: league.id,
       team_id: onClockTeam.id,
@@ -672,23 +672,22 @@ export function DraftRoom({
     };
   }, [autoDraft, isMyTurn, draftOver, busy, league.draft_status, league.id, onClockTeam, post, applyLocalPick]);
 
-  // ---- queue countdown timer -----------------------------------------------
-  // Only runs when: my turn, queue has items, auto-draft OFF, draft in progress.
-  // Ticks down from 60 to 0 once per second.
+  // ---- 5-minute pick clock -------------------------------------------------
+  // Runs whenever it's our turn, auto-draft is OFF, and draft is in progress.
+  // Ticks down from 300 (5 min) to 0 once per second.
   useEffect(() => {
     if (
       !isMyTurn ||
-      queue.length === 0 ||
       autoDraft ||
       draftOver ||
       league.draft_status !== "in_progress"
     ) {
-      setQueueCountdown(60);
+      setPickClock(300);
       return;
     }
 
     const interval = setInterval(() => {
-      setQueueCountdown((prev) => {
+      setPickClock((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
           return 0;
@@ -698,29 +697,30 @@ export function DraftRoom({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isMyTurn, queue.length, autoDraft, draftOver, league.draft_status]);
+  }, [isMyTurn, autoDraft, draftOver, league.draft_status]);
 
-  // When countdown hits 0, auto-pick the first available queued player.
+  // When clock hits 0, pick from queue if available, otherwise auto-pick.
   useEffect(() => {
-    if (queueCountdown !== 0 || !isMyTurn || busy || autoDraft || draftOver) return;
-    if (queueFiringRef.current) return;
-    queueFiringRef.current = true;
+    if (pickClock !== 0 || !isMyTurn || busy || autoDraft || draftOver) return;
+    if (pickClockFiringRef.current) return;
+    pickClockFiringRef.current = true;
 
     const firstAvailable = queue.find((id) => !pickedPlayerIds.has(id));
     if (firstAvailable) {
       handlePick(firstAvailable).then(() => {
         setQueue((prev) => prev.filter((id) => id !== firstAvailable));
-        queueFiringRef.current = false;
-        setQueueCountdown(60);
+        pickClockFiringRef.current = false;
+        setPickClock(300);
       });
     } else {
-      // All queued players were taken — reset
-      setQueue([]);
-      queueFiringRef.current = false;
-      setQueueCountdown(60);
+      // No queue — fire server auto-pick (best available)
+      handleAutoPick().then(() => {
+        pickClockFiringRef.current = false;
+        setPickClock(300);
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queueCountdown, isMyTurn, busy, autoDraft, draftOver]);
+  }, [pickClock, isMyTurn, busy, autoDraft, draftOver]);
 
   // ---- render -------------------------------------------------------------
   if (league.draft_status === "pending") {
@@ -852,15 +852,15 @@ export function DraftRoom({
             <div className={`text-xs ${
               autoDraft
                 ? "text-green-400"
-                : queue.length > 0 && queueCountdown < 60
-                  ? "text-amber-400"
-                  : "text-green-400"
+                : pickClock <= 60
+                  ? "text-red-400"
+                  : pickClock <= 120
+                    ? "text-amber-400"
+                    : "text-green-400"
             }`}>
               {autoDraft
                 ? "Auto-drafting..."
-                : queue.length > 0 && !draftOver
-                  ? `Queue pick in ${queueCountdown}s\u2026`
-                  : "It\u2019s your pick!"}
+                : `${Math.floor(pickClock / 60)}:${String(pickClock % 60).padStart(2, "0")}`}
             </div>
           )}
         </div>
