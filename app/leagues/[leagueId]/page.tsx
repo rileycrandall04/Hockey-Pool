@@ -19,6 +19,7 @@ import { DailyTicker } from "@/components/daily-ticker";
 import { TonightsGames } from "@/components/tonights-games";
 import { scoreTeam } from "@/lib/scoring";
 import { getOvernightDeltas } from "@/lib/snapshot-standings";
+import type { OvernightDelta } from "@/lib/snapshot-standings";
 import type {
   League,
   PlayoffGame,
@@ -283,6 +284,12 @@ export default async function LeagueStandingsPage({
           teamLogos={teamLogos}
         />
 
+        <HotTeams
+          deltas={deltas}
+          standings={standings}
+          leagueAvgDelta={leagueAvgDelta}
+        />
+
         {standings.length === 0 ? (
           <Card>
             <CardContent className="px-4 py-6 text-center text-ice-400">
@@ -375,6 +382,60 @@ export default async function LeagueStandingsPage({
 
       </main>
     </>
+  );
+}
+
+/**
+ * Compact card showing which teams scored the most points overnight.
+ * Uses the already-fetched overnight deltas — no extra queries.
+ */
+function HotTeams({
+  deltas,
+  standings,
+  leagueAvgDelta,
+}: {
+  deltas: Map<string, OvernightDelta> | null;
+  standings: { team: Team; total: number }[];
+  leagueAvgDelta: number;
+}) {
+  if (!deltas) return null;
+
+  const rows = standings
+    .map((s) => {
+      const d = deltas.get(s.team.id);
+      return d && d.delta_points > 0
+        ? { name: s.team.name, pts: d.delta_points }
+        : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b!.pts - a!.pts) as { name: string; pts: number }[];
+
+  if (rows.length === 0) return null;
+
+  return (
+    <Card className="mb-4">
+      <CardContent className="px-3 py-2.5 sm:px-4 sm:py-3">
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ice-400 sm:text-xs">
+          Last 24 Hours
+        </p>
+        <div className="space-y-0.5">
+          {rows.map((r) => (
+            <div
+              key={r.name}
+              className="flex items-center justify-between text-[11px] sm:text-sm"
+            >
+              <span className="truncate text-ice-100">{r.name}</span>
+              <span className="flex-shrink-0 font-medium text-green-400">
+                +{r.pts} pts
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-1.5 text-[10px] text-ice-500 sm:text-xs">
+          League avg: +{leagueAvgDelta.toFixed(1)} pts
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 

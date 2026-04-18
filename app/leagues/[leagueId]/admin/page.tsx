@@ -7,12 +7,7 @@ export const dynamic = "force-dynamic";
 import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { teamOnTheClock, pickMeta } from "@/lib/draft";
 import { isAppOwner } from "@/lib/auth";
 import type { League, RosterEntry, Team } from "@/lib/types";
@@ -737,9 +732,11 @@ export default async function AdminPage({
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Data freshness</CardTitle>
-          </CardHeader>
+          <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="inline-block w-3 text-ice-400 transition-transform group-open:rotate-90">▶</span>
+            <span className="text-lg font-semibold text-ice-50">Data freshness</span>
+          </summary>
           <CardContent>
             <p className="mb-4 text-xs text-ice-400">
               All data below is pulled from the NHL public API by the
@@ -817,12 +814,15 @@ export default async function AdminPage({
               </p>
             )}
           </CardContent>
+          </details>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Draft controls</CardTitle>
-          </CardHeader>
+          <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="inline-block w-3 text-ice-400 transition-transform group-open:rotate-90">▶</span>
+            <span className="text-lg font-semibold text-ice-50">Draft controls</span>
+          </summary>
           <CardContent className="space-y-6">
             <div className="text-sm text-ice-300">
               Status:{" "}
@@ -953,12 +953,15 @@ export default async function AdminPage({
               </form>
             </div>
           </CardContent>
+          </details>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Playoff teams</CardTitle>
-          </CardHeader>
+          <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="inline-block w-3 text-ice-400 transition-transform group-open:rotate-90">▶</span>
+            <span className="text-lg font-semibold text-ice-50">Playoff teams</span>
+          </summary>
           <CardContent>
             <p className="mb-3 text-xs text-ice-400">
               The nightly cron tries to detect eliminations from the NHL
@@ -1012,12 +1015,15 @@ export default async function AdminPage({
               )}
             </div>
           </CardContent>
+          </details>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Injury override</CardTitle>
-          </CardHeader>
+          <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="inline-block w-3 text-ice-400 transition-transform group-open:rotate-90">▶</span>
+            <span className="text-lg font-semibold text-ice-50">Injury override</span>
+          </summary>
           <CardContent>
             <p className="mb-3 text-xs text-ice-400">
               Manually flag a player as injured (or clear an existing
@@ -1054,12 +1060,15 @@ export default async function AdminPage({
               </Button>
             </form>
           </CardContent>
+          </details>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Rosters</CardTitle>
-          </CardHeader>
+          <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="inline-block w-3 text-ice-400 transition-transform group-open:rotate-90">▶</span>
+            <span className="text-lg font-semibold text-ice-50">Rosters</span>
+          </summary>
           <CardContent className="space-y-6">
             {(teams ?? []).map((t: Team) => (
               <div key={t.id}>
@@ -1189,12 +1198,15 @@ export default async function AdminPage({
               </div>
             ))}
           </CardContent>
+          </details>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Add member</CardTitle>
-          </CardHeader>
+          <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="inline-block w-3 text-ice-400 transition-transform group-open:rotate-90">▶</span>
+            <span className="text-lg font-semibold text-ice-50">Add member</span>
+          </summary>
           <CardContent>
             <p className="mb-3 text-xs text-ice-400">
               Add someone to this league by email. If they already have an
@@ -1240,12 +1252,15 @@ export default async function AdminPage({
               <Button type="submit">Add member</Button>
             </form>
           </CardContent>
+          </details>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Score adjustment</CardTitle>
-          </CardHeader>
+          <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="inline-block w-3 text-ice-400 transition-transform group-open:rotate-90">▶</span>
+            <span className="text-lg font-semibold text-ice-50">Score adjustment</span>
+          </summary>
           <CardContent>
             <form action={adjustScoreAction} className="space-y-3">
               <input type="hidden" name="league_id" value={leagueId} />
@@ -1311,6 +1326,7 @@ export default async function AdminPage({
               </div>
             )}
           </CardContent>
+          </details>
         </Card>
       </main>
     </>

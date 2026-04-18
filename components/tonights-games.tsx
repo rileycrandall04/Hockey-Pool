@@ -49,26 +49,26 @@ export function TonightsGames({
 
   return (
     <section className="mt-4 rounded-md border border-puck-border bg-puck-card">
-      <header className="flex items-center justify-between gap-2 border-b border-puck-border px-3 py-2">
+      <header className="flex items-center justify-between gap-2 border-b border-puck-border px-4 py-2.5">
         <div className="flex items-baseline gap-2">
-          <h2 className="text-sm font-semibold text-ice-100">
+          <h2 className="text-base font-semibold text-ice-100 sm:text-lg">
             {upcomingLabel}
           </h2>
           {shown.length > 0 && (
-            <span className="text-[10px] uppercase tracking-wider text-ice-500">
+            <span className="text-xs uppercase tracking-wider text-ice-500">
               {shown.length} game{shown.length === 1 ? "" : "s"}
             </span>
           )}
         </div>
         <Link
           href={bracketHref}
-          className="text-[11px] font-medium text-ice-300 underline-offset-2 hover:text-ice-100 hover:underline"
+          className="text-xs font-medium text-ice-300 underline-offset-2 hover:text-ice-100 hover:underline sm:text-sm"
         >
           Full bracket →
         </Link>
       </header>
       {shown.length === 0 ? (
-        <p className="px-3 py-2 text-[11px] text-ice-400">
+        <p className="px-4 py-3 text-xs text-ice-400 sm:text-sm">
           No playoff games scheduled yet. Check back after the next
           nightly update.
         </p>
@@ -104,17 +104,17 @@ function GameRow({
   const seriesLine = formatSeriesContext(game, parentSeries);
 
   return (
-    <li className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
-      <div className="flex min-w-0 flex-col">
-        <span className="flex items-center gap-1.5 font-semibold text-ice-50">
-          {awayLogo && <img src={awayLogo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />}
+    <li className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="flex items-center gap-2 font-semibold text-ice-50">
+          {awayLogo && <img src={awayLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
           {game.away_abbrev ?? "TBD"}
           <span className="text-ice-400">@</span>
-          {homeLogo && <img src={homeLogo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />}
+          {homeLogo && <img src={homeLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
           {game.home_abbrev ?? "TBD"}
         </span>
         {seriesLine && (
-          <span className="truncate text-[10px] text-ice-500">
+          <span className="truncate text-xs text-ice-500">
             {seriesLine}
           </span>
         )}
@@ -122,7 +122,7 @@ function GameRow({
       <div className="flex flex-shrink-0 flex-col items-end text-right">
         {time && <span className="font-mono text-ice-200">{time}</span>}
         {networks && (
-          <span className="text-[10px] uppercase tracking-wider text-ice-400">
+          <span className="text-xs uppercase tracking-wider text-ice-400">
             {networks}
           </span>
         )}
