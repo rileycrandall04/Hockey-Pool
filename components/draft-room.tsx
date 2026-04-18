@@ -81,7 +81,8 @@ export function DraftRoom({
   useEffect(() => {
     try { localStorage.setItem(queueKey, JSON.stringify(queue)); } catch {}
   }, [queue, queueKey]);
-  const [pickClockLimit, setPickClockLimit] = useState(300);  // configurable limit (seconds), 0 = no limit
+  const [nextClockLimit, setNextClockLimit] = useState(300);  // dropdown value, applied on next pick
+  const activeClockRef = useRef(300);                         // limit used by the running countdown
   const [pickClock, setPickClock] = useState(300);            // current countdown (seconds)
   const pickClockFiringRef = useRef(false);                   // prevent double-fire
   // "granted" | "denied" | "default" | "unsupported"
@@ -582,7 +583,7 @@ export function DraftRoom({
   const handlePick = useCallback(async (playerId: number) => {
     if (!onClockTeam) return;
     // Cancel pick clock on manual pick
-    setPickClock(pickClockLimit);
+    setPickClock(nextClockLimit);
     const result = await post<{ inserted?: PickRow }>("/api/draft/pick", {
       league_id: league.id,
       team_id: onClockTeam.id,
@@ -686,21 +687,22 @@ export function DraftRoom({
 
   // ---- pick clock -----------------------------------------------------------
   // Runs for ALL users so everyone sees the countdown. Resets whenever a
-  // new pick lands (currentPickIndex changes) or the limit changes.
-  // Auto-draft short-circuits on the picker's client (800ms), but the
-  // visible clock still ticks for spectators.
+  // new pick lands (currentPickIndex changes). Changing the dropdown
+  // mid-pick does NOT reset the running clock — it applies on the next pick.
   useEffect(() => {
+    // Latch the dropdown value as the active limit for this pick
+    activeClockRef.current = nextClockLimit;
+
     if (
-      pickClockLimit === 0 ||
+      nextClockLimit === 0 ||
       draftOver ||
       league.draft_status !== "in_progress"
     ) {
-      setPickClock(pickClockLimit);
+      setPickClock(nextClockLimit);
       return;
     }
 
-    // Reset to full limit on every new pick
-    setPickClock(pickClockLimit);
+    setPickClock(nextClockLimit);
 
     const interval = setInterval(() => {
       setPickClock((prev) => {
@@ -713,11 +715,13 @@ export function DraftRoom({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [currentPickIndex, pickClockLimit, draftOver, league.draft_status]);
+  // nextClockLimit intentionally excluded — only apply on new pick
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPickIndex, draftOver, league.draft_status]);
 
   // When clock hits 0, pick from queue if available, otherwise auto-pick.
   useEffect(() => {
-    if (pickClock !== 0 || pickClockLimit === 0 || !isMyTurn || busy || autoDraft || draftOver) return;
+    if (pickClock !== 0 || activeClockRef.current === 0 || !isMyTurn || busy || autoDraft || draftOver) return;
     if (pickClockFiringRef.current) return;
     pickClockFiringRef.current = true;
 
@@ -726,17 +730,16 @@ export function DraftRoom({
       handlePick(firstAvailable).then(() => {
         setQueue((prev) => prev.filter((id) => id !== firstAvailable));
         pickClockFiringRef.current = false;
-        setPickClock(pickClockLimit);
+        setPickClock(nextClockLimit);
       });
     } else {
-      // No queue — fire server auto-pick (best available)
       handleAutoPick().then(() => {
         pickClockFiringRef.current = false;
-        setPickClock(pickClockLimit);
+        setPickClock(nextClockLimit);
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickClock, pickClockLimit, isMyTurn, busy, autoDraft, draftOver]);
+  }, [pickClock, isMyTurn, busy, autoDraft, draftOver]);
 
   // ---- render -------------------------------------------------------------
   if (league.draft_status === "pending") {
@@ -843,7 +846,7 @@ export function DraftRoom({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-end justify-between gap-3 bg-puck-bg px-4 pb-3 pt-3">
         <div>
           <Link
             href={`/leagues/${league.id}`}
@@ -868,7 +871,7 @@ export function DraftRoom({
             <div className={`text-xs ${
               isMyTurn && autoDraft
                 ? "text-green-400"
-                : pickClockLimit === 0
+                : activeClockRef.current === 0
                   ? "text-green-400"
                   : pickClock <= 60
                     ? "text-red-400"
@@ -878,7 +881,7 @@ export function DraftRoom({
             }`}>
               {isMyTurn && autoDraft
                 ? "Auto-drafting..."
-                : pickClockLimit === 0
+                : activeClockRef.current === 0
                   ? isMyTurn ? "It\u2019s your pick!" : ""
                   : `${Math.floor(pickClock / 60)}:${String(pickClock % 60).padStart(2, "0")}`}
             </div>
@@ -1086,8 +1089,8 @@ export function DraftRoom({
               )}
               {isCommissioner && !draftOver && (
                 <select
-                  value={pickClockLimit}
-                  onChange={(e) => setPickClockLimit(Number(e.target.value))}
+                  value={nextClockLimit}
+                  onChange={(e) => setNextClockLimit(Number(e.target.value))}
                   className="rounded-md bg-puck-border px-2 py-1.5 text-xs text-ice-200 hover:bg-ice-800"
                 >
                   <option value={60}>1 min</option>
