@@ -69,7 +69,18 @@ export function DraftRoom({
   const [message, setMessage] = useState<string | null>(null);
   const [autoDraft, setAutoDraft] = useState(false);
   // ---- draft queue + pick clock state ---------------------------------------
-  const [queue, setQueue] = useState<number[]>([]);           // ordered player IDs
+  const queueKey = `draft-queue-${league.id}`;
+  const [queue, setQueue] = useState<number[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = localStorage.getItem(queueKey);
+      return stored ? (JSON.parse(stored) as number[]) : [];
+    } catch { return []; }
+  });
+  // Sync queue to localStorage on every change
+  useEffect(() => {
+    try { localStorage.setItem(queueKey, JSON.stringify(queue)); } catch {}
+  }, [queue, queueKey]);
   const [pickClockLimit, setPickClockLimit] = useState(300);  // configurable limit (seconds), 0 = no limit
   const [pickClock, setPickClock] = useState(300);            // current countdown (seconds)
   const pickClockFiringRef = useRef(false);                   // prevent double-fire
