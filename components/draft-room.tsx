@@ -719,11 +719,18 @@ export function DraftRoom({
 
     const timer = setTimeout(async () => {
       if (!onClockTeam) return;
-      const result = await post<{ inserted?: PickRow }>("/api/draft/autopick", {
-        league_id: league.id,
-        team_id: onClockTeam.id,
-      });
-      if (result?.inserted) applyLocalPick(result.inserted);
+      // Pick from queue first if available, otherwise server auto-pick
+      const firstQueued = queue.find((id) => !pickedPlayerIds.has(id));
+      if (firstQueued) {
+        await handlePick(firstQueued);
+        setQueue((prev) => prev.filter((id) => id !== firstQueued));
+      } else {
+        const result = await post<{ inserted?: PickRow }>("/api/draft/autopick", {
+          league_id: league.id,
+          team_id: onClockTeam.id,
+        });
+        if (result?.inserted) applyLocalPick(result.inserted);
+      }
       autoPickFiringRef.current = false;
     }, 800);
 
