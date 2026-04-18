@@ -70,7 +70,8 @@ export function DraftRoom({
   const [autoDraft, setAutoDraft] = useState(false);
   // ---- draft queue + pick clock state ---------------------------------------
   const [queue, setQueue] = useState<number[]>([]);           // ordered player IDs
-  const [pickClock, setPickClock] = useState(300);            // 5-minute draft clock (seconds)
+  const [pickClockLimit, setPickClockLimit] = useState(300);  // configurable limit (seconds), 0 = no limit
+  const [pickClock, setPickClock] = useState(300);            // current countdown (seconds)
   const pickClockFiringRef = useRef(false);                   // prevent double-fire
   // "granted" | "denied" | "default" | "unsupported"
   const [notifyPermission, setNotifyPermission] = useState<string>("default");
@@ -570,7 +571,7 @@ export function DraftRoom({
   const handlePick = useCallback(async (playerId: number) => {
     if (!onClockTeam) return;
     // Cancel pick clock on manual pick
-    setPickClock(300);
+    setPickClock(pickClockLimit);
     const result = await post<{ inserted?: PickRow }>("/api/draft/pick", {
       league_id: league.id,
       team_id: onClockTeam.id,
@@ -672,17 +673,18 @@ export function DraftRoom({
     };
   }, [autoDraft, isMyTurn, draftOver, busy, league.draft_status, league.id, onClockTeam, post, applyLocalPick]);
 
-  // ---- 5-minute pick clock -------------------------------------------------
-  // Runs whenever it's our turn, auto-draft is OFF, and draft is in progress.
-  // Ticks down from 300 (5 min) to 0 once per second.
+  // ---- pick clock -----------------------------------------------------------
+  // Runs whenever it's our turn, auto-draft is OFF, draft is in progress,
+  // and a time limit is set (pickClockLimit > 0). Ticks down to 0.
   useEffect(() => {
     if (
       !isMyTurn ||
+      pickClockLimit === 0 ||
       autoDraft ||
       draftOver ||
       league.draft_status !== "in_progress"
     ) {
-      setPickClock(300);
+      setPickClock(pickClockLimit);
       return;
     }
 
@@ -697,11 +699,16 @@ export function DraftRoom({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isMyTurn, autoDraft, draftOver, league.draft_status]);
+  }, [isMyTurn, pickClockLimit, autoDraft, draftOver, league.draft_status]);
+
+  // Reset clock whenever the limit changes mid-draft.
+  useEffect(() => {
+    setPickClock(pickClockLimit);
+  }, [pickClockLimit]);
 
   // When clock hits 0, pick from queue if available, otherwise auto-pick.
   useEffect(() => {
-    if (pickClock !== 0 || !isMyTurn || busy || autoDraft || draftOver) return;
+    if (pickClock !== 0 || pickClockLimit === 0 || !isMyTurn || busy || autoDraft || draftOver) return;
     if (pickClockFiringRef.current) return;
     pickClockFiringRef.current = true;
 
@@ -710,17 +717,17 @@ export function DraftRoom({
       handlePick(firstAvailable).then(() => {
         setQueue((prev) => prev.filter((id) => id !== firstAvailable));
         pickClockFiringRef.current = false;
-        setPickClock(300);
+        setPickClock(pickClockLimit);
       });
     } else {
       // No queue — fire server auto-pick (best available)
       handleAutoPick().then(() => {
         pickClockFiringRef.current = false;
-        setPickClock(300);
+        setPickClock(pickClockLimit);
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickClock, isMyTurn, busy, autoDraft, draftOver]);
+  }, [pickClock, pickClockLimit, isMyTurn, busy, autoDraft, draftOver]);
 
   // ---- render -------------------------------------------------------------
   if (league.draft_status === "pending") {
@@ -852,15 +859,19 @@ export function DraftRoom({
             <div className={`text-xs ${
               autoDraft
                 ? "text-green-400"
-                : pickClock <= 60
-                  ? "text-red-400"
-                  : pickClock <= 120
-                    ? "text-amber-400"
-                    : "text-green-400"
+                : pickClockLimit === 0
+                  ? "text-green-400"
+                  : pickClock <= 60
+                    ? "text-red-400"
+                    : pickClock <= 120
+                      ? "text-amber-400"
+                      : "text-green-400"
             }`}>
               {autoDraft
                 ? "Auto-drafting..."
-                : `${Math.floor(pickClock / 60)}:${String(pickClock % 60).padStart(2, "0")}`}
+                : pickClockLimit === 0
+                  ? "It\u2019s your pick!"
+                  : `${Math.floor(pickClock / 60)}:${String(pickClock % 60).padStart(2, "0")}`}
             </div>
           )}
         </div>
@@ -1063,6 +1074,20 @@ export function DraftRoom({
                   />
                   {autoDraft ? "Auto ON" : "Auto OFF"}
                 </button>
+              )}
+              {isCommissioner && !draftOver && (
+                <select
+                  value={pickClockLimit}
+                  onChange={(e) => setPickClockLimit(Number(e.target.value))}
+                  className="rounded-md bg-puck-border px-2 py-1.5 text-xs text-ice-200 hover:bg-ice-800"
+                >
+                  <option value={60}>1 min</option>
+                  <option value={120}>2 min</option>
+                  <option value={180}>3 min</option>
+                  <option value={300}>5 min</option>
+                  <option value={600}>10 min</option>
+                  <option value={0}>No limit</option>
+                </select>
               )}
             </div>
             <div className="max-h-[60vh] overflow-y-auto">
