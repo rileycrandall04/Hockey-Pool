@@ -476,6 +476,233 @@ const ADS: string[] = [
     </div>
   </div>
 </div>`,
+
+  // Ad 7: Tyson's Hot Dog Delivery
+  `<div style="width:370px;max-width:95vw;background:#FFF8F0;border:3px solid #CC2200;position:relative;">
+  <div style="background:#CC2200;padding:5px 10px;display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:#FFD700;font-size:9px;letter-spacing:2px;font-weight:bold;">★ SPONSORED — HOCKEY POOL ★</span>
+    <button data-ad-close style="background:#CC2200;border:1px solid #FFD700;color:#FFD700;width:19px;height:19px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;font-weight:900;">✕</button>
+  </div>
+  <div style="padding:16px 20px 16px;text-align:center;">
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:13px;color:#CC2200;letter-spacing:4px;text-transform:uppercase;margin-bottom:0px;">Tyson's</div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:38px;color:#1A1A1A;line-height:0.92;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Hot Dog<br>Delivery</div>
+    <div style="font-size:18px;letter-spacing:6px;margin-bottom:10px;">🌭🌭🌭</div>
+    <div style="border:2px solid #CC2200;border-radius:6px;background:#FFF3E0;overflow:hidden;margin-bottom:12px;">
+      <svg viewBox="0 0 334 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        <rect x="0" y="0" width="334" height="160" fill="#FFF3E0"/>
+        <rect x="0" y="110" width="334" height="50" fill="#FFCCBC"/>
+        <line x1="0" y1="110" x2="334" y2="110" stroke="#FF8A65" stroke-width="1.5"/>
+        <rect x="0" y="110" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="40" y="110" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="80" y="110" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="120" y="110" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="160" y="110" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="200" y="110" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="240" y="110" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="280" y="110" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="320" y="110" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="20" y="130" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="60" y="130" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="100" y="130" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="140" y="130" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="180" y="130" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="220" y="130" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="260" y="130" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <rect x="300" y="130" width="20" height="20" fill="#FFAB91" opacity="0.4"/>
+        <line x1="0" y1="55" x2="60" y2="55" stroke="#FFCCBC" stroke-width="3" stroke-linecap="round"/>
+        <line x1="0" y1="68" x2="45" y2="68" stroke="#FFCCBC" stroke-width="2" stroke-linecap="round"/>
+        <line x1="0" y1="80" x2="55" y2="80" stroke="#FFCCBC" stroke-width="2.5" stroke-linecap="round"/>
+        <ellipse cx="185" cy="100" rx="110" ry="22" fill="#D4841A"/>
+        <ellipse cx="185" cy="98" rx="110" ry="20" fill="#E8963A"/>
+        <ellipse cx="175" cy="102" rx="60" ry="8" fill="#F0A84A" opacity="0.4"/>
+        <ellipse cx="185" cy="82" rx="100" ry="18" fill="#8B2500"/>
+        <ellipse cx="185" cy="80" rx="100" ry="16" fill="#A83020"/>
+        <line x1="130" y1="70" x2="120" y2="92" stroke="#7B1A00" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+        <line x1="155" y1="67" x2="145" y2="93" stroke="#7B1A00" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+        <line x1="180" y1="66" x2="170" y2="94" stroke="#7B1A00" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+        <line x1="205" y1="66" x2="195" y2="94" stroke="#7B1A00" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+        <line x1="230" y1="67" x2="220" y2="93" stroke="#7B1A00" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+        <ellipse cx="85" cy="80" rx="12" ry="16" fill="#922510"/>
+        <ellipse cx="285" cy="80" rx="12" ry="16" fill="#922510"/>
+        <ellipse cx="185" cy="72" rx="70" ry="6" fill="#C83828" opacity="0.4"/>
+        <ellipse cx="185" cy="64" rx="110" ry="26" fill="#E8963A"/>
+        <ellipse cx="185" cy="60" rx="108" ry="24" fill="#F0A840"/>
+        <ellipse cx="170" cy="52" rx="60" ry="10" fill="#F8C060" opacity="0.5"/>
+        <ellipse cx="155" cy="50" rx="4" ry="2.5" fill="#D4841A" transform="rotate(-20,155,50)"/>
+        <ellipse cx="175" cy="44" rx="4" ry="2.5" fill="#D4841A" transform="rotate(10,175,44)"/>
+        <ellipse cx="198" cy="47" rx="4" ry="2.5" fill="#D4841A" transform="rotate(-10,198,47)"/>
+        <ellipse cx="218" cy="53" rx="4" ry="2.5" fill="#D4841A" transform="rotate(20,218,53)"/>
+        <path d="M 85 75 Q 105 65 125 75 Q 145 85 165 75 Q 185 65 205 75 Q 225 85 245 75 Q 260 68 278 75" fill="none" stroke="#FFD700" stroke-width="5" stroke-linecap="round"/>
+        <path d="M 90 83 Q 115 76 140 83 Q 165 90 190 83 Q 215 76 240 83 Q 258 87 275 83" fill="none" stroke="#FFD700" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+        <path d="M 100 78 Q 130 70 160 78 Q 190 86 220 78 Q 248 70 270 78" fill="none" stroke="#F9A800" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+        <path d="M 100 82 Q 125 76 150 82 Q 175 88 200 82 Q 225 76 250 82 Q 265 85 278 82" fill="none" stroke="#CC2200" stroke-width="3" stroke-linecap="round"/>
+        <path d="M 150 38 Q 145 30 150 22 Q 155 14 150 6" fill="none" stroke="#FFCCBC" stroke-width="2" stroke-linecap="round"/>
+        <path d="M 185 34 Q 180 26 185 18 Q 190 10 185 2" fill="none" stroke="#FFCCBC" stroke-width="2" stroke-linecap="round"/>
+        <path d="M 220 38 Q 215 30 220 22 Q 225 14 220 6" fill="none" stroke="#FFCCBC" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:26px;color:#CC2200;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">We'll Come To You!</div>
+    <div style="font-family:Georgia,serif;font-style:italic;font-size:12px;color:#888;margin-bottom:14px;">Hot, fresh, delivered to your exact GPS coordinates</div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <span style="font-size:8px;color:#CC2200;border:1px solid #CC2200;padding:3px 7px;border-radius:2px;background:white;">Mustard Mandatory</span>
+      <span style="font-size:8px;color:#CC2200;border:1px solid #CC2200;padding:3px 7px;border-radius:2px;background:white;">Extra Mustard</span>
+      <span style="font-size:8px;color:#CC2200;border:1px solid #CC2200;padding:3px 7px;border-radius:2px;background:white;">Est. Recently</span>
+    </div>
+    <button style="background:#CC2200;color:#FFD700;border:none;padding:11px 0;font-family:Impact,'Arial Black',sans-serif;font-size:22px;text-transform:uppercase;cursor:pointer;letter-spacing:1px;width:100%;display:block;margin-bottom:8px;">
+      ORDER NOW →
+    </button>
+    <a href="#" data-ad-close style="font-size:9px;color:#aaa;font-family:Arial;text-decoration:none;display:block;">
+      No thanks, I'm not hungry
+    </a>
+  </div>
+</div>`,
+
+  // Ad 8: Esteban's Custom Scrub Bottoms
+  `<div style="width:370px;max-width:95vw;background:#F0F4F0;border:3px solid #2E7D32;position:relative;">
+  <div style="background:#2E7D32;padding:5px 10px;display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:#A5D6A7;font-size:9px;letter-spacing:2px;font-weight:bold;">★ SPONSORED — HOCKEY POOL ★</span>
+    <button data-ad-close style="background:#2E7D32;border:1px solid #A5D6A7;color:#A5D6A7;width:19px;height:19px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;font-weight:900;">✕</button>
+  </div>
+  <div style="padding:16px 20px 16px;text-align:center;">
+    <div style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:32px;color:#2E7D32;line-height:1;margin-bottom:0px;">Esteban's</div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:17px;color:#1A1A1A;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;">Custom Scrub Bottoms</div>
+    <div style="border:2px solid #2E7D32;border-radius:4px;overflow:hidden;background:#E8F5E9;margin-bottom:12px;">
+      <svg viewBox="0 0 334 175" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        <rect x="0" y="0" width="334" height="175" fill="#E8F5E9"/>
+        <rect x="0" y="135" width="334" height="40" fill="#C8E6C9"/>
+        <line x1="0" y1="135" x2="334" y2="135" stroke="#A5D6A7" stroke-width="1.5"/>
+        <rect x="12" y="10" width="55" height="120" rx="3" fill="none" stroke="#A5D6A7" stroke-width="2"/>
+        <rect x="15" y="13" width="49" height="114" rx="2" fill="#C8E6C9" opacity="0.4"/>
+        <line x1="22" y1="20" x2="22" y2="118" stroke="white" stroke-width="1" opacity="0.5"/>
+        <rect x="267" y="10" width="55" height="120" rx="3" fill="none" stroke="#A5D6A7" stroke-width="2"/>
+        <rect x="270" y="13" width="49" height="114" rx="2" fill="#C8E6C9" opacity="0.4"/>
+        <line x1="277" y1="20" x2="277" y2="118" stroke="white" stroke-width="1" opacity="0.5"/>
+        <rect x="107" y="28" width="120" height="18" rx="3" fill="#1B5E20"/>
+        <path d="M 155 28 L 150 20 L 145 22" fill="none" stroke="#81C784" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M 179 28 L 184 20 L 189 22" fill="none" stroke="#81C784" stroke-width="1.5" stroke-linecap="round"/>
+        <ellipse cx="155" cy="20" rx="5" ry="3" fill="#A5D6A7"/>
+        <ellipse cx="184" cy="20" rx="5" ry="3" fill="#A5D6A7"/>
+        <path d="M 107 44 Q 107 130 120 138 L 167 138 L 167 85 L 167 85 L 167 138 L 214 138 Q 227 130 227 44 Z" fill="#388E3C"/>
+        <line x1="167" y1="55" x2="167" y2="138" stroke="#2E7D32" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <rect x="118" y="55" width="36" height="28" rx="2" fill="#2E7D32" stroke="#1B5E20" stroke-width="1"/>
+        <line x1="118" y1="66" x2="154" y2="66" stroke="#1B5E20" stroke-width="0.8"/>
+        <path d="M 118 55 Q 136 50 154 55" fill="none" stroke="#1B5E20" stroke-width="1"/>
+        <rect x="180" y="55" width="36" height="28" rx="2" fill="#2E7D32" stroke="#1B5E20" stroke-width="1"/>
+        <line x1="180" y1="66" x2="216" y2="66" stroke="#1B5E20" stroke-width="0.8"/>
+        <path d="M 180 55 Q 198 50 216 55" fill="none" stroke="#1B5E20" stroke-width="1"/>
+        <text x="136" y="77" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="7" fill="#A5D6A7">Est.</text>
+        <path d="M 107 44 L 107 130 Q 108 138 120 138 L 167 138 L 167 44 Z" fill="#43A047"/>
+        <path d="M 227 44 L 227 130 Q 226 138 214 138 L 167 138 L 167 44 Z" fill="#43A047"/>
+        <rect x="107" y="130" width="60" height="8" rx="2" fill="#2E7D32"/>
+        <rect x="167" y="130" width="60" height="8" rx="2" fill="#2E7D32"/>
+        <ellipse cx="140" cy="80" rx="22" ry="26" fill="#4CAF50" opacity="0.25"/>
+        <ellipse cx="194" cy="80" rx="22" ry="26" fill="#4CAF50" opacity="0.25"/>
+        <text x="88" y="75" font-size="14" fill="#FFD700" opacity="0.8">✦</text>
+        <text x="244" y="68" font-size="12" fill="#FFD700" opacity="0.8">✦</text>
+        <text x="78" y="105" font-size="10" fill="#FFD700" opacity="0.6">✦</text>
+        <text x="252" y="100" font-size="10" fill="#FFD700" opacity="0.6">✦</text>
+        <rect x="145" y="31" width="44" height="11" rx="2" fill="#FFD700"/>
+        <text x="167" y="39" text-anchor="middle" font-family="Impact" font-size="7" fill="#2E7D32" letter-spacing="0.5">CUSTOM FIT</text>
+      </svg>
+    </div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:26px;color:#2E7D32;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">We've Got Your Back.</div>
+    <div style="font-family:Georgia,serif;font-style:italic;font-size:14px;color:#CC2200;margin-bottom:12px;">Literally.</div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <span style="font-size:8px;color:#2E7D32;border:1px solid #2E7D32;padding:3px 7px;border-radius:2px;background:white;">Custom Tailored</span>
+      <span style="font-size:8px;color:#2E7D32;border:1px solid #2E7D32;padding:3px 7px;border-radius:2px;background:white;">All Sizes Welcome</span>
+      <span style="font-size:8px;color:#2E7D32;border:1px solid #2E7D32;padding:3px 7px;border-radius:2px;background:white;">Deep Pockets</span>
+    </div>
+    <button style="background:#2E7D32;color:white;border:none;padding:11px 0;font-family:Impact,'Arial Black',sans-serif;font-size:20px;text-transform:uppercase;cursor:pointer;letter-spacing:1px;width:100%;display:block;margin-bottom:8px;">
+      GET FITTED →
+    </button>
+    <div style="font-size:7.5px;color:#aaa;font-style:italic;margin-bottom:6px;">*Esteban measures twice, cuts once</div>
+    <a href="#" data-ad-close style="font-size:9px;color:#aaa;font-family:Arial;text-decoration:none;display:block;">
+      No thanks, my scrubs fit fine
+    </a>
+  </div>
+</div>`,
+
+  // Ad 9: Dillon's White Bread
+  `<div style="width:370px;max-width:95vw;background:white;border:3px solid #E53935;position:relative;">
+  <div style="background:#E53935;padding:5px 10px;display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:white;font-size:9px;letter-spacing:2px;font-weight:bold;">★ SPONSORED — HOCKEY POOL ★</span>
+    <button data-ad-close style="background:#E53935;border:1px solid white;color:white;width:19px;height:19px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;font-weight:900;">✕</button>
+  </div>
+  <div style="background:#1565C0;padding:4px 10px;display:flex;gap:6px;align-items:center;justify-content:center;">
+    <div style="width:12px;height:12px;border-radius:50%;background:#E53935;"></div>
+    <div style="width:16px;height:16px;border-radius:50%;background:#FFD700;"></div>
+    <div style="width:10px;height:10px;border-radius:50%;background:#E53935;"></div>
+    <div style="width:14px;height:14px;border-radius:50%;background:#FFD700;"></div>
+    <div style="width:11px;height:11px;border-radius:50%;background:#E53935;"></div>
+    <div style="width:16px;height:16px;border-radius:50%;background:#FFD700;"></div>
+    <div style="width:12px;height:12px;border-radius:50%;background:#E53935;"></div>
+    <div style="width:14px;height:14px;border-radius:50%;background:#FFD700;"></div>
+    <div style="width:10px;height:10px;border-radius:50%;background:#E53935;"></div>
+    <div style="width:15px;height:15px;border-radius:50%;background:#FFD700;"></div>
+    <div style="width:11px;height:11px;border-radius:50%;background:#E53935;"></div>
+  </div>
+  <div style="padding:16px 20px 16px;text-align:center;">
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:44px;color:#1565C0;text-transform:uppercase;line-height:0.9;letter-spacing:2px;margin-bottom:2px;">Dillon's</div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:22px;color:#E53935;text-transform:uppercase;letter-spacing:4px;margin-bottom:12px;">White Bread</div>
+    <div style="border:2px solid #E0E0E0;border-radius:4px;background:#FAFAFA;overflow:hidden;margin-bottom:12px;">
+      <svg viewBox="0 0 334 155" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        <rect x="0" y="0" width="334" height="155" fill="#FAFAFA"/>
+        <rect x="0" y="115" width="334" height="40" fill="#F0F0F0"/>
+        <line x1="0" y1="115" x2="334" y2="115" stroke="#E0E0E0" stroke-width="1.5"/>
+        <ellipse cx="167" cy="125" rx="105" ry="10" fill="#E0E0E0"/>
+        <rect x="55" y="35" width="224" height="88" rx="6" fill="#F5F5F5" stroke="#E0E0E0" stroke-width="1"/>
+        <ellipse cx="62" cy="79" rx="8" ry="44" fill="#EEEEEE" stroke="#E0E0E0" stroke-width="1"/>
+        <ellipse cx="272" cy="79" rx="8" ry="44" fill="#EEEEEE" stroke="#E0E0E0" stroke-width="1"/>
+        <rect x="80" y="42" width="18" height="74" rx="3" fill="#F5DEB3" opacity="0.5"/>
+        <rect x="100" y="40" width="16" height="78" rx="3" fill="#F5DEB3" opacity="0.6"/>
+        <rect x="118" y="39" width="16" height="80" rx="3" fill="#F5E8C0" opacity="0.7"/>
+        <rect x="136" y="38" width="16" height="82" rx="4" fill="#F5E8C0" opacity="0.8"/>
+        <rect x="154" y="38" width="16" height="82" rx="4" fill="#FAF0D0" opacity="0.9"/>
+        <rect x="172" y="38" width="16" height="82" rx="4" fill="#FAF0D0"/>
+        <rect x="190" y="38" width="16" height="82" rx="4" fill="#F5E8C0" opacity="0.9"/>
+        <rect x="208" y="39" width="16" height="80" rx="3" fill="#F5E8C0" opacity="0.8"/>
+        <rect x="226" y="40" width="16" height="78" rx="3" fill="#F5DEB3" opacity="0.7"/>
+        <rect x="118" y="52" width="98" height="54" rx="4" fill="white" stroke="#E53935" stroke-width="1.5"/>
+        <circle cx="124" cy="58" r="3" fill="#E53935"/>
+        <circle cx="210" cy="58" r="3" fill="#E53935"/>
+        <circle cx="124" cy="100" r="3" fill="#1565C0"/>
+        <circle cx="210" cy="100" r="3" fill="#1565C0"/>
+        <text x="167" y="72" text-anchor="middle" font-family="Impact,'Arial Black'" font-size="11" fill="#1565C0" letter-spacing="1">DILLON'S</text>
+        <text x="167" y="83" text-anchor="middle" font-family="Impact,'Arial Black'" font-size="8" fill="#E53935" letter-spacing="2">WHITE</text>
+        <text x="167" y="94" text-anchor="middle" font-family="Impact,'Arial Black'" font-size="8" fill="#E53935" letter-spacing="2">BREAD</text>
+        <rect x="260" y="72" width="14" height="14" rx="3" fill="#FFD700" stroke="#F9A825" stroke-width="1" transform="rotate(15,267,79)"/>
+        <rect x="78" y="35" width="22" height="84" rx="5" fill="#FFF8E7" stroke="#DEB887" stroke-width="1.5"/>
+        <rect x="78" y="35" width="22" height="8" rx="3" fill="#DEB887"/>
+        <rect x="78" y="111" width="22" height="8" rx="3" fill="#DEB887"/>
+        <rect x="78" y="35" width="5" height="84" rx="3" fill="#DEB887"/>
+        <rect x="95" y="35" width="5" height="84" rx="3" fill="#DEB887"/>
+        <rect x="84" y="44" width="12" height="66" rx="2" fill="#FFFDF5"/>
+        <ellipse cx="88" cy="55" rx="3" ry="2" fill="#F5F0E0" opacity="0.8"/>
+        <ellipse cx="93" cy="70" rx="2" ry="3" fill="#F5F0E0" opacity="0.8"/>
+        <ellipse cx="87" cy="85" rx="3" ry="2" fill="#F5F0E0" opacity="0.8"/>
+        <ellipse cx="93" cy="98" rx="2" ry="2" fill="#F5F0E0" opacity="0.8"/>
+        <text x="52" y="58" font-size="10" fill="#FFD700">✦</text>
+        <text x="48" y="80" font-size="8" fill="#FFD700" opacity="0.7">✦</text>
+      </svg>
+    </div>
+    <div style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:17px;color:#333;margin-bottom:6px;line-height:1.3;">
+      "It's bread."
+    </div>
+    <div style="font-family:Georgia,serif;font-style:italic;font-size:11px;color:#999;margin-bottom:14px;">White bread. From Dillon.</div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <span style="font-size:8px;color:#1565C0;border:1px solid #1565C0;padding:3px 7px;border-radius:2px;">Sliced</span>
+      <span style="font-size:8px;color:#1565C0;border:1px solid #1565C0;padding:3px 7px;border-radius:2px;">White</span>
+      <span style="font-size:8px;color:#1565C0;border:1px solid #1565C0;padding:3px 7px;border-radius:2px;">Bread</span>
+    </div>
+    <button style="background:#E53935;color:white;border:none;padding:11px 0;font-family:Impact,'Arial Black',sans-serif;font-size:20px;text-transform:uppercase;cursor:pointer;letter-spacing:1px;width:100%;display:block;margin-bottom:8px;">
+      BUY BREAD →
+    </button>
+    <div style="font-size:7.5px;color:#bbb;font-style:italic;margin-bottom:6px;">*Contains bread &nbsp;|&nbsp; May contain more bread</div>
+    <a href="#" data-ad-close style="font-size:9px;color:#bbb;font-family:Arial;text-decoration:none;display:block;">
+      No thanks, I prefer sourdough
+    </a>
+  </div>
+</div>`,
 ];
 
 export default function AdOverlay({
