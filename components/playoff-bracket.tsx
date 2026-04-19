@@ -242,6 +242,38 @@ function RoundSection({
   );
 }
 
+/** Compute series wins directly from FINAL game scores. */
+export function computeWinsFromGames(
+  series: PlayoffSeries,
+  games: PlayoffGame[],
+): { topWins: number; bottomWins: number; winningTeam: string | null } {
+  let topWins = 0;
+  let bottomWins = 0;
+  const topAbbrev = (series.top_seed_abbrev ?? "").toUpperCase();
+  const bottomAbbrev = (series.bottom_seed_abbrev ?? "").toUpperCase();
+
+  for (const g of games) {
+    if (g.game_state !== "FINAL" && g.game_state !== "OFF") continue;
+    if (g.away_score == null || g.home_score == null) continue;
+    if (g.away_score === 0 && g.home_score === 0) continue;
+    const awayWon = g.away_score > g.home_score;
+    const winner = (
+      awayWon ? g.away_abbrev ?? "" : g.home_abbrev ?? ""
+    ).toUpperCase();
+    if (winner === topAbbrev) topWins++;
+    else if (winner === bottomAbbrev) bottomWins++;
+  }
+
+  const winningTeam =
+    topWins >= series.needed_to_win
+      ? series.top_seed_abbrev
+      : bottomWins >= series.needed_to_win
+        ? series.bottom_seed_abbrev
+        : null;
+
+  return { topWins, bottomWins, winningTeam };
+}
+
 export function SeriesCard({
   series,
   games,
@@ -249,19 +281,20 @@ export function SeriesCard({
   series: PlayoffSeries;
   games: PlayoffGame[];
 }) {
+  const computed = computeWinsFromGames(series, games);
   const nextGame = pickNextGame(games);
-  const topWins = series.top_seed_wins;
-  const bottomWins = series.bottom_seed_wins;
+  const topWins = computed.topWins;
+  const bottomWins = computed.bottomWins;
   const topClinched =
-    series.winning_team_abbrev != null &&
-    series.winning_team_abbrev === series.top_seed_abbrev;
+    computed.winningTeam != null &&
+    computed.winningTeam === series.top_seed_abbrev;
   const bottomClinched =
-    series.winning_team_abbrev != null &&
-    series.winning_team_abbrev === series.bottom_seed_abbrev;
-  const seriesOver = series.winning_team_abbrev != null;
+    computed.winningTeam != null &&
+    computed.winningTeam === series.bottom_seed_abbrev;
+  const seriesOver = computed.winningTeam != null;
 
   return (
-    <div className="rounded-md border border-puck-border/80 bg-puck-bg/40 p-2 text-xs">
+    <div className={`rounded-md border p-2 text-xs ${seriesOver ? "border-green-500/40 bg-green-500/5" : "border-puck-border/80 bg-puck-bg/40"}`}>
       <div className="space-y-1">
         <TeamRow
           abbrev={series.top_seed_abbrev}

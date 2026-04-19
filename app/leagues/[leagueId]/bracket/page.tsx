@@ -7,12 +7,6 @@ import { NavBar } from "@/components/nav-bar";
 import { PlayoffBracket, BRACKET_SLOTS } from "@/components/playoff-bracket";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import type { League, PlayoffGame, PlayoffSeries } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -141,6 +135,79 @@ async function updateSeriesAction(formData: FormData) {
       winning_team_abbrev: winnerAbbrev,
       updated_at: new Date().toISOString(),
     })
+    .eq("series_letter", seriesLetter);
+
+  revalidatePath(`/leagues/${leagueId}/bracket`);
+  if (error) {
+    redirect(
+      `/leagues/${leagueId}/bracket?series_error=${encodeURIComponent(error.message)}`,
+    );
+  }
+  redirect(
+    `/leagues/${leagueId}/bracket?series_success=${encodeURIComponent(`Series ${seriesLetter} updated.`)}`,
+  );
+}
+
+async function updateSeriesFullAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  await assertOwner(leagueId);
+
+  const seriesLetter = String(formData.get("series_letter") ?? "").trim();
+  if (!seriesLetter) {
+    redirect(
+      `/leagues/${leagueId}/bracket?series_error=${encodeURIComponent("Missing series letter.")}`,
+    );
+  }
+
+  const round = Number(formData.get("round")) || undefined;
+  const season = String(formData.get("season") ?? "").trim() || undefined;
+  const topAbbrev = String(formData.get("top_seed_abbrev") ?? "").trim();
+  const bottomAbbrev = String(formData.get("bottom_seed_abbrev") ?? "").trim();
+  const seriesTitle = String(formData.get("series_title") ?? "").trim();
+  const neededToWin = Number(formData.get("needed_to_win")) || 4;
+  const sortOrder = Number(formData.get("sort_order")) || 0;
+
+  const svc = createServiceClient();
+
+  // Look up team names + logos from nhl_teams
+  const abbrevs = [topAbbrev, bottomAbbrev].filter(Boolean);
+  let teamMap = new Map<string, { name: string; logo: string | null }>();
+  if (abbrevs.length > 0) {
+    const { data: teams } = await svc
+      .from("nhl_teams")
+      .select("abbrev, name, logo_url")
+      .in("abbrev", abbrevs);
+    teamMap = new Map(
+      (teams ?? []).map((t: { abbrev: string; name: string; logo_url: string | null }) => [
+        t.abbrev,
+        { name: t.name, logo: t.logo_url },
+      ]),
+    );
+  }
+
+  const updates: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+    needed_to_win: neededToWin,
+    sort_order: sortOrder,
+    series_title: seriesTitle || null,
+    top_seed_abbrev: topAbbrev || null,
+    top_seed_name: topAbbrev ? teamMap.get(topAbbrev)?.name ?? null : null,
+    top_seed_logo: topAbbrev ? teamMap.get(topAbbrev)?.logo ?? null : null,
+    bottom_seed_abbrev: bottomAbbrev || null,
+    bottom_seed_name: bottomAbbrev
+      ? teamMap.get(bottomAbbrev)?.name ?? null
+      : null,
+    bottom_seed_logo: bottomAbbrev
+      ? teamMap.get(bottomAbbrev)?.logo ?? null
+      : null,
+  };
+  if (round) updates.round = round;
+  if (season) updates.season = season;
+
+  const { error } = await svc
+    .from("playoff_series")
+    .update(updates)
     .eq("series_letter", seriesLetter);
 
   revalidatePath(`/leagues/${leagueId}/bracket`);
@@ -298,145 +365,162 @@ export default async function LeagueBracketPage({
         {/*  Owner-only management section                           */}
         {/* -------------------------------------------------------- */}
         {isOwner && (
-          <div className="mt-10 space-y-6">
-            <h2 className="text-xl font-bold text-ice-100">
-              Bracket management
-            </h2>
+          <details className="mt-10">
+            <summary className="cursor-pointer text-xl font-bold text-ice-100 hover:text-ice-50">
+              Bracket Management
+            </summary>
+            <div className="mt-4 space-y-3">
+              {series_success && (
+                <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+                  {series_success}
+                </div>
+              )}
+              {series_error && (
+                <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                  {series_error}
+                </div>
+              )}
 
-            {/* ---------- Manage series ---------- */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Manage series</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {series_success && (
-                  <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-200">
-                    {series_success}
-                  </div>
-                )}
-                {series_error && (
-                  <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-                    {series_error}
-                  </div>
-                )}
-
-                {/* Existing series table */}
-                {series.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-puck-border text-[11px] uppercase tracking-wider text-ice-400">
-                          <th className="px-2 py-1">Letter</th>
-                          <th className="px-2 py-1">Rd</th>
-                          <th className="px-2 py-1">Matchup</th>
-                          <th className="px-2 py-1">Top W</th>
-                          <th className="px-2 py-1">Bot W</th>
-                          <th className="px-2 py-1">Winner</th>
-                          <th className="px-2 py-1"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {series.map((s) => (
-                          <tr
-                            key={s.series_letter}
-                            id={`manage-series-${s.series_letter}`}
-                            className="border-b border-puck-border/50 scroll-mt-20"
-                          >
-                            <td className="px-2 py-2 font-mono font-bold text-ice-100">
-                              {s.series_letter}
-                              <span className="ml-1 text-[10px] font-normal text-ice-400">
-                                {slotLabel.get(s.series_letter) ?? ""}
-                              </span>
-                            </td>
-                            <td className="px-2 py-2 text-ice-300">
-                              {s.round}
-                            </td>
-                            <td className="px-2 py-2 text-ice-200">
-                              {s.top_seed_abbrev ?? "TBD"} vs{" "}
-                              {s.bottom_seed_abbrev ?? "TBD"}
-                            </td>
-                            <td colSpan={4} className="px-2 py-2">
-                              <form
-                                action={updateSeriesAction}
-                                className="flex flex-wrap items-center gap-2"
-                              >
-                                <input
-                                  type="hidden"
-                                  name="league_id"
-                                  value={leagueId}
-                                />
-                                <input
-                                  type="hidden"
-                                  name="series_letter"
-                                  value={s.series_letter}
-                                />
-                                <Input
-                                  name="top_seed_wins"
-                                  type="number"
-                                  min={0}
-                                  max={4}
-                                  defaultValue={s.top_seed_wins}
-                                  className="w-14"
-                                />
-                                <Input
-                                  name="bottom_seed_wins"
-                                  type="number"
-                                  min={0}
-                                  max={4}
-                                  defaultValue={s.bottom_seed_wins}
-                                  className="w-14"
-                                />
-                                <Input
-                                  name="winning_team_abbrev"
-                                  type="text"
-                                  placeholder="Winner"
-                                  defaultValue={
-                                    s.winning_team_abbrev ?? ""
-                                  }
-                                  className="w-20"
-                                />
-                                <Button size="sm" type="submit">
-                                  Save
-                                </Button>
-                              </form>
-                              <form
-                                action={deleteSeriesAction}
-                                className="mt-1 inline-block"
-                              >
-                                <input
-                                  type="hidden"
-                                  name="league_id"
-                                  value={leagueId}
-                                />
-                                <input
-                                  type="hidden"
-                                  name="series_letter"
-                                  value={s.series_letter}
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="danger"
-                                  type="submit"
-                                >
-                                  Delete
-                                </Button>
-                              </form>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* Add series form */}
-                <details className="rounded-md border border-puck-border bg-puck-bg/40 p-3">
-                  <summary className="cursor-pointer text-sm font-semibold text-ice-200">
-                    Add / overwrite series
+              {series.map((s) => (
+                <details
+                  key={s.series_letter}
+                  className="rounded-md border border-puck-border bg-puck-card/60"
+                >
+                  <summary className="flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm">
+                    <span className="font-mono font-bold text-ice-100">
+                      {s.series_letter}
+                    </span>
+                    <span className="text-ice-200">
+                      {s.top_seed_abbrev ?? "TBD"} vs{" "}
+                      {s.bottom_seed_abbrev ?? "TBD"}
+                    </span>
+                    <span className="text-xs text-ice-400">
+                      {slotLabel.get(s.series_letter) ?? ""}
+                    </span>
+                    <span className="ml-auto text-xs text-ice-400">
+                      Rd {s.round}
+                    </span>
                   </summary>
+                  <div className="space-y-3 border-t border-puck-border/50 px-4 py-3">
+                    <form
+                      action={updateSeriesFullAction}
+                      className="space-y-3"
+                    >
+                      <input
+                        type="hidden"
+                        name="league_id"
+                        value={leagueId}
+                      />
+                      <input
+                        type="hidden"
+                        name="series_letter"
+                        value={s.series_letter}
+                      />
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div className="space-y-1">
+                          <Label>Round</Label>
+                          <Input
+                            name="round"
+                            type="number"
+                            min={1}
+                            max={4}
+                            defaultValue={s.round}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Top seed</Label>
+                          <Select
+                            name="top_seed_abbrev"
+                            defaultValue={s.top_seed_abbrev ?? ""}
+                          >
+                            <option value="">-- select --</option>
+                            {nhlTeams.map((t) => (
+                              <option key={t.abbrev} value={t.abbrev}>
+                                {t.abbrev} &mdash; {t.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Bottom seed</Label>
+                          <Select
+                            name="bottom_seed_abbrev"
+                            defaultValue={s.bottom_seed_abbrev ?? ""}
+                          >
+                            <option value="">-- select --</option>
+                            {nhlTeams.map((t) => (
+                              <option key={t.abbrev} value={t.abbrev}>
+                                {t.abbrev} &mdash; {t.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Series title</Label>
+                          <Input
+                            name="series_title"
+                            defaultValue={s.series_title ?? ""}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Needed to win</Label>
+                          <Input
+                            name="needed_to_win"
+                            type="number"
+                            min={1}
+                            defaultValue={s.needed_to_win}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Sort order</Label>
+                          <Input
+                            name="sort_order"
+                            type="number"
+                            defaultValue={s.sort_order}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Season</Label>
+                          <Input
+                            name="season"
+                            defaultValue={s.season}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" type="submit">
+                          Save
+                        </Button>
+                      </div>
+                    </form>
+                    <form action={deleteSeriesAction}>
+                      <input
+                        type="hidden"
+                        name="league_id"
+                        value={leagueId}
+                      />
+                      <input
+                        type="hidden"
+                        name="series_letter"
+                        value={s.series_letter}
+                      />
+                      <Button size="sm" variant="danger" type="submit">
+                        Delete series
+                      </Button>
+                    </form>
+                  </div>
+                </details>
+              ))}
+
+              {/* Add new series */}
+              <details className="rounded-md border border-puck-border bg-puck-card/60">
+                <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-ice-200">
+                  Add new series
+                </summary>
+                <div className="border-t border-puck-border/50 px-4 py-3">
                   <form
                     action={upsertSeriesAction}
-                    className="mt-3 space-y-3"
+                    className="space-y-3"
                   >
                     <input
                       type="hidden"
@@ -475,10 +559,10 @@ export default async function LeagueBracketPage({
                           id="new-series-top"
                           name="top_seed_abbrev"
                         >
-                          <option value="">— select —</option>
+                          <option value="">-- select --</option>
                           {nhlTeams.map((t) => (
                             <option key={t.abbrev} value={t.abbrev}>
-                              {t.abbrev} — {t.name}
+                              {t.abbrev} &mdash; {t.name}
                             </option>
                           ))}
                         </Select>
@@ -491,10 +575,10 @@ export default async function LeagueBracketPage({
                           id="new-series-bottom"
                           name="bottom_seed_abbrev"
                         >
-                          <option value="">— select —</option>
+                          <option value="">-- select --</option>
                           {nhlTeams.map((t) => (
                             <option key={t.abbrev} value={t.abbrev}>
-                              {t.abbrev} — {t.name}
+                              {t.abbrev} &mdash; {t.name}
                             </option>
                           ))}
                         </Select>
@@ -547,10 +631,10 @@ export default async function LeagueBracketPage({
                     Re-submitting a series letter will overwrite it. The
                     nightly sync may also update these.
                   </p>
-                </details>
-              </CardContent>
-            </Card>
-          </div>
+                </div>
+              </details>
+            </div>
+          </details>
         )}
       </main>
     </>
