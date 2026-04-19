@@ -949,6 +949,13 @@ export default async function AdminPage({
                 </form>
               )}
               {canRefreshNhlData && (
+                <form action="/api/admin/sync-bracket" method="post">
+                  <Button type="submit" variant="secondary">
+                    ↻ Sync bracket
+                  </Button>
+                </form>
+              )}
+              {canRefreshNhlData && (
                 <form action="/api/admin/sync-injuries" method="post">
                   <Button type="submit" variant="secondary">
                     ↻ Sync injuries
