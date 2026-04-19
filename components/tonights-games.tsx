@@ -156,21 +156,14 @@ function GameRow({
     }
   }
 
-  // Group by fantasy team owner, sort players with points first
-  const byOwner = new Map<string, (LeaguePlayer & { stats: { goals: number; assists: number; ot_goals: number } | null })[]>();
-  for (const p of gamePlayers) {
-    const arr = byOwner.get(p.owner) ?? [];
-    arr.push({ ...p, stats: statsMap.get(p.player_id) ?? null });
-    byOwner.set(p.owner, arr);
-  }
-  // Sort each owner's players: those with points first (by G+A desc)
-  for (const [, players] of byOwner) {
-    players.sort((a, b) => {
+  // Sort players: those with points first (by G+A desc)
+  const sortedPlayers = gamePlayers
+    .map((p) => ({ ...p, stats: statsMap.get(p.player_id) ?? null }))
+    .sort((a, b) => {
       const aPts = (a.stats?.goals ?? 0) + (a.stats?.assists ?? 0);
       const bPts = (b.stats?.goals ?? 0) + (b.stats?.assists ?? 0);
       return bPts - aPts;
     });
-  }
 
   // Short last name for compact display
   const lastName = (full: string) => {
@@ -223,31 +216,27 @@ function GameRow({
           )}
         </div>
       </div>
-      {byOwner.size > 0 && (
-        <div className="mt-1.5 space-y-0.5 border-t border-puck-border/40 pt-1.5">
-          {[...byOwner.entries()].map(([owner, players]) => (
-            <div key={owner} className="flex flex-wrap gap-x-1 text-[11px] leading-relaxed">
-              <span className="font-medium text-ice-300">{owner}:</span>
-              {players.map((p, i) => {
-                const parts: string[] = [];
-                if (p.stats?.goals) parts.push(`${p.stats.goals}G`);
-                if (p.stats?.assists) parts.push(`${p.stats.assists}A`);
-                return (
-                  <span key={p.player_id} className="text-ice-400">
-                    {i > 0 && <span className="text-ice-600">,&nbsp;</span>}
-                    <span className={parts.length > 0 ? "text-ice-200" : ""}>
-                      {lastName(p.name)}
-                    </span>
-                    {parts.length > 0 && (
-                      <span className="ml-0.5 text-green-300">
-                        {parts.join(" ")}
-                      </span>
-                    )}
+      {sortedPlayers.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-x-1 border-t border-puck-border/40 pt-1.5 text-[11px] leading-relaxed">
+          <span className="text-ice-500">My players:</span>
+          {sortedPlayers.map((p, i) => {
+            const parts: string[] = [];
+            if (p.stats?.goals) parts.push(`${p.stats.goals}G`);
+            if (p.stats?.assists) parts.push(`${p.stats.assists}A`);
+            return (
+              <span key={p.player_id} className="text-ice-400">
+                {i > 0 && <span className="text-ice-600">,&nbsp;</span>}
+                <span className={parts.length > 0 ? "text-ice-200" : ""}>
+                  {lastName(p.name)}
+                </span>
+                {parts.length > 0 && (
+                  <span className="ml-0.5 text-green-300">
+                    {parts.join(" ")}
                   </span>
-                );
-              })}
-            </div>
-          ))}
+                )}
+              </span>
+            );
+          })}
         </div>
       )}
     </li>

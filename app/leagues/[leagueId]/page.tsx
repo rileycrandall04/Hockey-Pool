@@ -173,32 +173,31 @@ export default async function LeagueStandingsPage({
     rosterByTeam.set(row.team_id, arr);
   }
 
-  // Build league players list for tonight's games display
-  const teamNameById = new Map<string, string>();
-  for (const t of (teams ?? []) as Team[]) {
-    teamNameById.set(t.id, t.name);
-  }
-  const leaguePlayers: {
+  // Build current user's players list for tonight's games display
+  const userTeam = ((teams ?? []) as Team[]).find(
+    (t) => t.owner_id === user.id,
+  );
+  const myPlayers: {
     player_id: number;
     name: string;
     nhl_abbrev: string;
     owner: string;
   }[] = [];
-  for (const row of (rosterRows as RosterEntry[] | null) ?? []) {
-    if (row.nhl_abbrev) {
-      leaguePlayers.push({
-        player_id: row.player_id,
-        name: row.full_name,
-        nhl_abbrev: row.nhl_abbrev,
-        owner: teamNameById.get(row.team_id) ?? "",
-      });
+  if (userTeam) {
+    for (const row of (rosterRows as RosterEntry[] | null) ?? []) {
+      if (row.nhl_abbrev && row.team_id === userTeam.id) {
+        myPlayers.push({
+          player_id: row.player_id,
+          name: row.full_name,
+          nhl_abbrev: row.nhl_abbrev,
+          owner: userTeam.name,
+        });
+      }
     }
   }
 
-  // Fetch per-game stats for league players (for tonight's games)
-  const leaguePlayerIds = [
-    ...new Set(leaguePlayers.map((p) => p.player_id)),
-  ];
+  // Fetch per-game stats for user's players (for tonight's games)
+  const myPlayerIds = myPlayers.map((p) => p.player_id);
   let playerGameStats: {
     game_id: number;
     player_id: number;
@@ -206,12 +205,12 @@ export default async function LeagueStandingsPage({
     assists: number;
     ot_goals: number;
   }[] = [];
-  if (leaguePlayerIds.length > 0) {
+  if (myPlayerIds.length > 0) {
     const svc = createServiceClient();
     const { data: gameStatsData } = await svc
       .from("manual_game_stats")
       .select("game_id, player_id, goals, assists, ot_goals")
-      .in("player_id", leaguePlayerIds);
+      .in("player_id", myPlayerIds);
     playerGameStats = (gameStatsData ?? []) as typeof playerGameStats;
   }
 
@@ -324,7 +323,7 @@ export default async function LeagueStandingsPage({
           series={bracketSeries}
           bracketHref={`/leagues/${league.id}/bracket`}
           teamLogos={teamLogos}
-          leaguePlayers={leaguePlayers}
+          leaguePlayers={myPlayers}
           playerGameStats={playerGameStats}
         />
 
