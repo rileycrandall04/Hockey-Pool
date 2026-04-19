@@ -95,6 +95,10 @@ export async function syncPlayoffBracket(): Promise<BracketSyncResult> {
     }
   }
 
+  // Upsert series metadata but EXCLUDE win counts — those are computed
+  // locally by markFinalAction / updateGameAction when games are finalized.
+  // Including them here would overwrite our manual counts with the NHL
+  // API's values, which may lag or differ.
   const seriesRows = sorted.map((s, idx) => ({
     series_letter: s.seriesLetter,
     season,
@@ -104,24 +108,68 @@ export async function syncPlayoffBracket(): Promise<BracketSyncResult> {
     top_seed_abbrev: s.topSeedAbbrev,
     top_seed_name: s.topSeedName,
     top_seed_logo: s.topSeedLogo,
-    top_seed_wins: s.topSeedWins,
     bottom_seed_abbrev: s.bottomSeedAbbrev,
     bottom_seed_name: s.bottomSeedName,
     bottom_seed_logo: s.bottomSeedLogo,
-    bottom_seed_wins: s.bottomSeedWins,
-    winning_team_abbrev: s.winningTeamAbbrev,
     needed_to_win: s.neededToWin,
     sort_order: idx,
     updated_at: new Date().toISOString(),
   }));
 
-  const { error: seriesError } = await svc
+  // For existing series, only update metadata fields (not wins).
+  // For new series, insert with default 0 wins.
+  const { data: existingSeries } = await svc
     .from("playoff_series")
-    .upsert(seriesRows, { onConflict: "series_letter" });
-  if (seriesError) {
-    result.errors.push(`playoff_series upsert: ${seriesError.message}`);
-    return result;
+    .select("series_letter");
+  const existingLetters = new Set(
+    (existingSeries ?? []).map((r) => r.series_letter as string),
+  );
+
+  const newSeries = seriesRows.filter(
+    (r) => !existingLetters.has(r.series_letter),
+  );
+  const existingSeriesRows = seriesRows.filter((r) =>
+    existingLetters.has(r.series_letter),
+  );
+
+  // Insert brand-new series (wins default to 0 via DB default)
+  if (newSeries.length > 0) {
+    const { error: insertError } = await svc
+      .from("playoff_series")
+      .insert(newSeries);
+    if (insertError) {
+      result.errors.push(`playoff_series insert: ${insertError.message}`);
+      return result;
+    }
   }
+
+  // Update existing series metadata without touching win columns
+  for (const row of existingSeriesRows) {
+    const { error: updateError } = await svc
+      .from("playoff_series")
+      .update({
+        season: row.season,
+        round: row.round,
+        series_title: row.series_title,
+        series_abbrev: row.series_abbrev,
+        top_seed_abbrev: row.top_seed_abbrev,
+        top_seed_name: row.top_seed_name,
+        top_seed_logo: row.top_seed_logo,
+        bottom_seed_abbrev: row.bottom_seed_abbrev,
+        bottom_seed_name: row.bottom_seed_name,
+        bottom_seed_logo: row.bottom_seed_logo,
+        needed_to_win: row.needed_to_win,
+        sort_order: row.sort_order,
+        updated_at: row.updated_at,
+      })
+      .eq("series_letter", row.series_letter);
+    if (updateError) {
+      result.errors.push(
+        `playoff_series update (${row.series_letter}): ${updateError.message}`,
+      );
+    }
+  }
+
   result.series_upserted = seriesRows.length;
 
   // Pull games for each series. We do this sequentially to stay gentle
@@ -200,6 +248,54 @@ export async function syncPlayoffBracket(): Promise<BracketSyncResult> {
           .delete()
           .in("game_id", dupeIds);
       }
+    }
+
+    // Recompute series wins from all FINAL games (the cron may have
+    // brought in new final scores from the NHL API).
+    const { data: seriesInfo } = await svc
+      .from("playoff_series")
+      .select("top_seed_abbrev, bottom_seed_abbrev, needed_to_win")
+      .eq("series_letter", s.seriesLetter)
+      .single();
+
+    if (seriesInfo) {
+      const { data: finalGames } = await svc
+        .from("playoff_games")
+        .select("away_abbrev, home_abbrev, away_score, home_score")
+        .eq("series_letter", s.seriesLetter)
+        .eq("game_state", "FINAL");
+
+      let topWins = 0;
+      let bottomWins = 0;
+      const topAbbrev = (seriesInfo.top_seed_abbrev ?? "").toUpperCase();
+      const bottomAbbrev = (seriesInfo.bottom_seed_abbrev ?? "").toUpperCase();
+      for (const g of finalGames ?? []) {
+        if (g.away_score == null || g.home_score == null) continue;
+        if (g.away_score === 0 && g.home_score === 0) continue;
+        const awayWon = g.away_score > g.home_score;
+        const winner = (
+          awayWon ? g.away_abbrev : g.home_abbrev ?? ""
+        ).toUpperCase();
+        if (winner === topAbbrev) topWins++;
+        else if (winner === bottomAbbrev) bottomWins++;
+      }
+
+      const winningTeam =
+        topWins >= seriesInfo.needed_to_win
+          ? seriesInfo.top_seed_abbrev
+          : bottomWins >= seriesInfo.needed_to_win
+            ? seriesInfo.bottom_seed_abbrev
+            : null;
+
+      await svc
+        .from("playoff_series")
+        .update({
+          top_seed_wins: topWins,
+          bottom_seed_wins: bottomWins,
+          winning_team_abbrev: winningTeam,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("series_letter", s.seriesLetter);
     }
   }
 

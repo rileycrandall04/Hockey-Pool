@@ -35,18 +35,18 @@ export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
   }
 
   // ── Determine which date to show ──────────────────────────────────
-  // Ticker uses 10:00 AM MDT cutover (separate from the app-wide
+  // Ticker uses 10:00 AM Eastern cutover (separate from the app-wide
   // 4:30 AM cutover). Before 10 AM show yesterday, after show today.
   const now = new Date();
-  const mdtStr = now.toLocaleString("en-US", {
-    timeZone: "America/Denver",
+  const etStr = now.toLocaleString("en-US", {
+    timeZone: "America/New_York",
     hour12: false,
     hour: "2-digit",
     minute: "2-digit",
   });
-  const [mdtH, mdtM] = mdtStr.split(":").map(Number);
-  const mdtMinutes = (mdtH ?? 0) * 60 + (mdtM ?? 0);
-  const showToday = mdtMinutes >= 10 * 60; // 10:00 AM MDT
+  const [etH, etM] = etStr.split(":").map(Number);
+  const etMinutes = (etH ?? 0) * 60 + (etM ?? 0);
+  const showToday = etMinutes >= 10 * 60; // 10:00 AM ET
 
   const today = todayEasternISO();
   const yesterdayDate = new Date(`${today}T12:00:00Z`);
@@ -172,10 +172,13 @@ export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
 
 /** Filter games for a date + deduplicate by team matchup. */
 function filterAndDedup(
-  allGames: { game_id: number; away_abbrev: string | null; home_abbrev: string | null; away_score: number | null; home_score: number | null; game_state: string | null; updated_at: string; game_date?: string | null; start_time_utc?: string | null }[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  allGames: any[],
   dateISO: string,
 ) {
-  const filtered = allGames.filter((g) => isGameOnDate(g, dateISO));
+  const filtered = allGames.filter((g: { game_date?: string | null; start_time_utc?: string | null }) =>
+    isGameOnDate(g, dateISO),
+  );
 
   const seen = new Map<string, typeof filtered[0]>();
   for (const g of filtered) {
