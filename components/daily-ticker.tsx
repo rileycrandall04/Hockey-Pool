@@ -24,7 +24,7 @@ function todayEasternISO(): string {
  *   2. Most recent daily_recaps date (last night's NHL data from the cron).
  *   3. Nothing — render null if neither source has data.
  */
-export async function DailyTicker() {
+export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
   const svc = createServiceClient();
   const supabase = await createClient();
   const {
@@ -189,6 +189,7 @@ export async function DailyTicker() {
         isOwner={isOwner}
         teamLogos={teamLogos}
         label="Today"
+        leagueId={leagueId}
       />
     );
   }
@@ -218,6 +219,7 @@ export async function DailyTicker() {
       games={rows}
       isOwner={isOwner}
       teamLogos={teamLogos}
+      leagueId={leagueId}
     />
   );
 }

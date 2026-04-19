@@ -121,7 +121,7 @@ export default async function LeagueTeamsPage({
         draftStatus={league.draft_status}
         isCommissioner={league.commissioner_id === user.id}
       />
-      <DailyTicker />
+      <DailyTicker leagueId={leagueId} />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-6">
           <Link

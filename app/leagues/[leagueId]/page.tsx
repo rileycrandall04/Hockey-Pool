@@ -225,7 +225,7 @@ export default async function LeagueStandingsPage({
         isOwner={ownerFlag}
         alertCount={alertCount}
       />
-      <DailyTicker />
+      <DailyTicker leagueId={leagueId} />
       <main className="mx-auto max-w-4xl px-3 py-6 sm:px-6 sm:py-8">
         <div className="mb-4 flex flex-col items-center gap-1.5 text-center">
           <h1 className="text-2xl font-bold text-ice-50 sm:text-3xl">

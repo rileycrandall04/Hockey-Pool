@@ -17,6 +17,8 @@ interface Props {
   teamLogos?: Record<string, string>;
   /** Override the "Last night" label — e.g. "Today" for live games. */
   label?: string;
+  /** When set, a "Scoreboard" link appears in the ticker header. */
+  leagueId?: string;
 }
 
 /**
@@ -34,7 +36,7 @@ interface Props {
  * - With fewer than 3 games the animation is disabled because the
  *   duplicated content wouldn't overflow the viewport meaningfully.
  */
-export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {}, label }: Props) {
+export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {}, label, leagueId }: Props) {
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
   const selectedGame =
     selectedGameId != null
@@ -55,8 +57,18 @@ export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {}
       <div className="relative">
         <div className="flex items-center justify-between px-3 pt-1.5 text-[10px] uppercase tracking-wider text-ice-400 sm:px-4">
           <span>🏒 {label ?? "Last night"} &middot; {prettyDate(date)}</span>
-          <span className="hidden text-ice-500 sm:inline">
-            {paused ? "paused · tap again or × to resume" : "tap a game for scorers"}
+          <span className="flex items-center gap-2">
+            <span className="hidden text-ice-500 sm:inline">
+              {paused ? "paused · tap again or × to resume" : "tap a game for scorers"}
+            </span>
+            {leagueId && (
+              <Link
+                href={`/leagues/${leagueId}/scoreboard`}
+                className="text-ice-300 underline-offset-2 hover:text-ice-100 hover:underline"
+              >
+                Scoreboard →
+              </Link>
+            )}
           </span>
         </div>
         <div className="overflow-hidden pb-1.5 pt-0.5">

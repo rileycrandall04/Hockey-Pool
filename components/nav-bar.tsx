@@ -143,6 +143,11 @@ export function NavBar({
       label: "Bracket",
       active: isActive(`/leagues/${leagueId}/bracket`),
     });
+    items.push({
+      href: `/leagues/${leagueId}/scoreboard`,
+      label: "Scoreboard",
+      active: isActive(`/leagues/${leagueId}/scoreboard`),
+    });
   }
   if (leagueId && isCommissioner) {
     items.push({

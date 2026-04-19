@@ -46,13 +46,21 @@ export async function createGameAction(formData: FormData) {
 
   const gameId = Date.now();
 
+  // Derive game_date from start time if not provided
+  const startTimeUtc = startTimeRaw ? mdtToUtcIso(startTimeRaw) : null;
+  let gameDate = gameDateRaw || null;
+  if (!gameDate && startTimeRaw) {
+    // Extract YYYY-MM-DD from the local MDT input (YYYY-MM-DDTHH:mm)
+    gameDate = startTimeRaw.slice(0, 10);
+  }
+
   const svc = createServiceClient();
   const { error } = await svc.from("playoff_games").insert({
     game_id: gameId,
     series_letter: seriesLetter,
     game_number: gameNumber,
-    start_time_utc: startTimeRaw ? mdtToUtcIso(startTimeRaw) : null,
-    game_date: gameDateRaw || null,
+    start_time_utc: startTimeUtc,
+    game_date: gameDate,
     venue,
     away_abbrev: awayAbbrev,
     home_abbrev: homeAbbrev,
@@ -62,6 +70,7 @@ export async function createGameAction(formData: FormData) {
   });
 
   revalidatePath(`/leagues/${leagueId}/bracket`);
+  revalidatePath("/", "layout");
   if (error) {
     redirect(
       `/leagues/${leagueId}/bracket?game_error=${encodeURIComponent(error.message)}`,
@@ -91,21 +100,79 @@ export async function updateGameAction(formData: FormData) {
     String(formData.get("game_state") ?? "").trim() || undefined;
 
   const svc = createServiceClient();
+
+  // Build update payload
+  const updates: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (startTimeRaw) {
+    updates.start_time_utc = mdtToUtcIso(startTimeRaw);
+    // Also update game_date from the start time if it was previously null
+    updates.game_date = startTimeRaw.slice(0, 10);
+  }
+  if (venue !== null) updates.venue = venue;
+  if (awayScore !== "") updates.away_score = Number(awayScore);
+  if (homeScore !== "") updates.home_score = Number(homeScore);
+  if (gameState) updates.game_state = gameState;
+
   const { error } = await svc
     .from("playoff_games")
-    .update({
-      ...(startTimeRaw
-        ? { start_time_utc: mdtToUtcIso(startTimeRaw) }
-        : {}),
-      ...(venue !== null ? { venue } : {}),
-      ...(awayScore !== "" ? { away_score: Number(awayScore) } : {}),
-      ...(homeScore !== "" ? { home_score: Number(homeScore) } : {}),
-      ...(gameState ? { game_state: gameState } : {}),
-      updated_at: new Date().toISOString(),
-    })
+    .update(updates)
     .eq("game_id", gameId);
 
+  // Recompute series wins when game state changes to FINAL
+  if (gameState === "FINAL" || gameState === "OFF") {
+    const { data: game } = await svc
+      .from("playoff_games")
+      .select("series_letter")
+      .eq("game_id", gameId)
+      .single();
+
+    if (game) {
+      const { data: series } = await svc
+        .from("playoff_series")
+        .select("top_seed_abbrev, bottom_seed_abbrev, needed_to_win")
+        .eq("series_letter", game.series_letter)
+        .single();
+
+      if (series) {
+        const { data: finalGames } = await svc
+          .from("playoff_games")
+          .select("away_abbrev, home_abbrev, away_score, home_score")
+          .eq("series_letter", game.series_letter)
+          .eq("game_state", "FINAL");
+
+        let topWins = 0;
+        let bottomWins = 0;
+        for (const g of finalGames ?? []) {
+          const awayWon = (g.away_score ?? 0) > (g.home_score ?? 0);
+          const winner = awayWon ? g.away_abbrev : g.home_abbrev;
+          if (winner === series.top_seed_abbrev) topWins++;
+          else if (winner === series.bottom_seed_abbrev) bottomWins++;
+        }
+
+        const winningTeam =
+          topWins >= series.needed_to_win
+            ? series.top_seed_abbrev
+            : bottomWins >= series.needed_to_win
+              ? series.bottom_seed_abbrev
+              : null;
+
+        await svc
+          .from("playoff_series")
+          .update({
+            top_seed_wins: topWins,
+            bottom_seed_wins: bottomWins,
+            winning_team_abbrev: winningTeam,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("series_letter", game.series_letter);
+      }
+    }
+  }
+
   revalidatePath(`/leagues/${leagueId}/bracket`);
+  revalidatePath("/", "layout");
   if (error) {
     redirect(
       `/leagues/${leagueId}/bracket?game_error=${encodeURIComponent(error.message)}`,
@@ -134,6 +201,7 @@ export async function deleteGameAction(formData: FormData) {
     .eq("game_id", gameId);
 
   revalidatePath(`/leagues/${leagueId}/bracket`);
+  revalidatePath("/", "layout");
   if (error) {
     redirect(
       `/leagues/${leagueId}/bracket?game_error=${encodeURIComponent(error.message)}`,

@@ -221,6 +221,7 @@ async function batchUpsertStatsAction(formData: FormData) {
   }
 
   revalidatePath(`/games/${gameId}/stats`);
+  revalidatePath("/", "layout");
   redirect(
     `/games/${gameId}/stats?success=${encodeURIComponent(`Saved ${savedCount} player${savedCount === 1 ? "" : "s"}.`)}`,
   );
@@ -277,6 +278,7 @@ async function deleteStatsAction(formData: FormData) {
   }
 
   revalidatePath(`/games/${gameId}/stats`);
+  revalidatePath("/", "layout");
   redirect(
     `/games/${gameId}/stats?success=${encodeURIComponent("Entry removed")}`,
   );
@@ -354,6 +356,7 @@ async function markFinalAction(formData: FormData) {
   }
 
   revalidatePath(`/games/${gameId}/stats`);
+  revalidatePath("/", "layout");
   redirect(
     `/games/${gameId}/stats?success=${encodeURIComponent(`Game marked as ${newState}.`)}`,
   );

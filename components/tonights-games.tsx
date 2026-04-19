@@ -133,11 +133,17 @@ function GameRow({
         )}
       </div>
       <div className="flex flex-shrink-0 flex-col items-end text-right">
-        {time && <span className="font-mono text-ice-200">{time}</span>}
-        {networks && (
-          <span className="text-xs uppercase tracking-wider text-ice-400">
-            {networks}
-          </span>
+        {isFinal ? (
+          <span className="font-semibold text-green-300">Final</span>
+        ) : (
+          <>
+            {time && <span className="font-mono text-ice-200">{time}</span>}
+            {networks && (
+              <span className="text-xs uppercase tracking-wider text-ice-400">
+                {networks}
+              </span>
+            )}
+          </>
         )}
       </div>
     </li>
