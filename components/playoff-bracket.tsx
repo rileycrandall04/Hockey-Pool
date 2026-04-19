@@ -1,4 +1,4 @@
-import type { PlayoffBroadcast, PlayoffGame, PlayoffSeries } from "@/lib/types";
+import type { PlayoffGame, PlayoffSeries } from "@/lib/types";
 import { SeriesGameEditor } from "@/components/series-game-editor";
 
 interface PlayoffBracketProps {
@@ -439,7 +439,6 @@ export function NextGameLine({ game }: { game: PlayoffGame }) {
     game.away_abbrev && game.home_abbrev
       ? `${game.away_abbrev} @ ${game.home_abbrev}`
       : null;
-  const broadcasts = formatBroadcasts(game.tv_broadcasts);
   const gameNumLabel =
     game.game_number != null ? `Game ${game.game_number}` : "Next game";
 
@@ -456,12 +455,6 @@ export function NextGameLine({ game }: { game: PlayoffGame }) {
         <>
           <span className="text-ice-500">&middot;</span>
           <span className="text-ice-300">{when}</span>
-        </>
-      )}
-      {broadcasts && (
-        <>
-          <span className="text-ice-500">&middot;</span>
-          <span className="text-ice-400">{broadcasts}</span>
         </>
       )}
     </span>
@@ -528,18 +521,3 @@ export function formatGameTime(
   return null;
 }
 
-export function formatBroadcasts(
-  broadcasts: PlayoffBroadcast[] | null | undefined,
-): string | null {
-  if (!broadcasts || broadcasts.length === 0) return null;
-  const seen = new Set<string>();
-  const names: string[] = [];
-  for (const b of broadcasts) {
-    const key = b.network.toUpperCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    names.push(b.network);
-  }
-  if (names.length === 0) return null;
-  return names.join(", ");
-}

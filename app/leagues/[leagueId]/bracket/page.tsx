@@ -335,9 +335,8 @@ export default async function LeagueBracketPage({
         </div>
         {series.length === 0 && (
           <p className="mb-4 rounded-md border border-dashed border-puck-border bg-puck-card/60 px-3 py-2 text-xs text-ice-400">
-            The bracket hasn&rsquo;t been populated yet. Matchups,
-            series scores, and broadcast info will appear here after
-            the next nightly sync.
+            The bracket hasn&rsquo;t been populated yet. Matchups and
+            series scores will appear here after the next nightly sync.
           </p>
         )}
 
