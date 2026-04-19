@@ -116,14 +116,16 @@ function GameRow({
           {awayLogo && <img src={awayLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
           {game.away_abbrev ?? "TBD"}
           {hasScore ? (
-            <span className="font-mono text-ice-100">
-              {game.away_score}–{game.home_score}
-            </span>
+            <>
+              <span className="font-mono text-ice-100">{game.away_score}</span>
+              <span className="text-ice-500">–</span>
+              <span className="font-mono text-ice-100">{game.home_score}</span>
+            </>
           ) : (
             <span className="text-ice-400">@</span>
           )}
-          {homeLogo && <img src={homeLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
           {game.home_abbrev ?? "TBD"}
+          {homeLogo && <img src={homeLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
           {isFinal && (
             <span className="rounded bg-green-500/20 px-1 py-0.5 text-[9px] font-semibold uppercase text-green-300">
               Final

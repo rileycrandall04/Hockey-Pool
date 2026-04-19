@@ -173,10 +173,11 @@ export default async function ScoreboardPage({
       if (ownerIds.length > 0) {
         const { data: ownerProfiles } = await svc
           .from("profiles")
-          .select("id, display_name")
+          .select("id, display_name, email")
           .in("id", ownerIds);
         for (const p of ownerProfiles ?? []) {
-          if (p.display_name) profileMap.set(p.id, p.display_name);
+          const name = p.display_name || p.email || null;
+          if (name) profileMap.set(p.id, name);
         }
       }
       const teamNameMap = new Map<string, string>();
