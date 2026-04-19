@@ -49,3 +49,31 @@ export function isGameOnDate(
 ): boolean {
   return getGameDate(game) === dateISO;
 }
+
+/**
+ * The "effective game day" — the date whose games should be shown by
+ * default. Before 4:30 AM MDT we treat it as yesterday (so late-night
+ * and OT games remain visible). After 4:30 AM MDT we switch to today.
+ *
+ * Returns { date: "YYYY-MM-DD", isToday: boolean }.
+ */
+export function effectiveGameDay(): { date: string; isToday: boolean } {
+  const today = todayEasternISO();
+  const now = new Date();
+  const mdtStr = now.toLocaleString("en-US", {
+    timeZone: "America/Denver",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const [h, m] = mdtStr.split(":").map(Number);
+  const mdtMinutes = (h ?? 0) * 60 + (m ?? 0);
+
+  if (mdtMinutes >= 4 * 60 + 30) {
+    return { date: today, isToday: true };
+  }
+  // Yesterday
+  const d = new Date(`${today}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return { date: d.toISOString().slice(0, 10), isToday: false };
+}

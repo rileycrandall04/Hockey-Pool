@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getLeagueForMember } from "@/lib/league-access";
 import { isAppOwner } from "@/lib/auth";
-import { todayEasternISO, isGameOnDate } from "@/lib/playoff-helpers";
+import { todayEasternISO, isGameOnDate, effectiveGameDay } from "@/lib/playoff-helpers";
 import { NavBar } from "@/components/nav-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { League, PlayoffGame } from "@/lib/types";
@@ -71,9 +71,11 @@ export default async function ScoreboardPage({
     teamIdToAbbrev.set(t.id, t.abbrev);
   }
 
-  // Determine which date to show
+  // Determine which date to show — default to the effective game day
+  // (yesterday before 4:30 AM MDT, today after)
   const today = todayEasternISO();
-  const viewDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : today;
+  const { date: defaultDate } = effectiveGameDay();
+  const viewDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : defaultDate;
   const isToday = viewDate === today;
 
   // Compute prev/next dates

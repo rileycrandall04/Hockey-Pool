@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { isGameOnDate, getGameDate } from "@/lib/playoff-helpers";
+import { isGameOnDate, getGameDate, effectiveGameDay } from "@/lib/playoff-helpers";
 import type { PlayoffBroadcast, PlayoffGame, PlayoffSeries } from "@/lib/types";
 
 interface TonightsGamesProps {
@@ -34,15 +34,17 @@ export function TonightsGames({
   bracketHref,
   teamLogos = {},
 }: TonightsGamesProps) {
-  const today = todayEasternISO();
-  const scheduledTodayRaw = (games ?? []).filter((g) => isGameOnDate(g, today));
+  const { date: effectiveDate, isToday } = effectiveGameDay();
+  const scheduledTodayRaw = (games ?? []).filter((g) => isGameOnDate(g, effectiveDate));
   const scheduledToday = deduplicateGames(scheduledTodayRaw);
   const upcomingLabel =
-    scheduledToday.length > 0 ? "Tonight" : pickNextDateLabel(games, today);
+    scheduledToday.length > 0
+      ? isToday ? "Tonight" : "Last Night"
+      : pickNextDateLabel(games, effectiveDate);
   const shown =
     scheduledToday.length > 0
       ? scheduledToday
-      : deduplicateGames(pickNextDateGames(games, today));
+      : deduplicateGames(pickNextDateGames(games, effectiveDate));
 
   // Build a quick lookup so each game row can pull its parent
   // series' running score + seeded team names.
@@ -175,15 +177,6 @@ function deduplicateGames(list: PlayoffGame[]): PlayoffGame[] {
     }
   }
   return [...seen.values()];
-}
-
-function todayEasternISO(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 }
 
 function sortGamesByStart(games: PlayoffGame[]): PlayoffGame[] {

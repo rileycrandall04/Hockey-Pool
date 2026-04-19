@@ -173,6 +173,8 @@ function GameChip({
   onClick: () => void;
   teamLogos?: Record<string, string>;
 }) {
+  const hasScore = game.game_state !== "FUT" && (game.away_team_score > 0 || game.home_team_score > 0);
+  const isFinal = game.game_state === "FINAL" || game.game_state === "OFF";
   const awayWon = game.away_team_score > game.home_team_score;
   const homeWon = game.home_team_score > game.away_team_score;
   const awayLogo = teamLogos[game.away_team_abbrev];
@@ -188,22 +190,26 @@ function GameChip({
       }`}
     >
       {awayLogo && <img src={awayLogo} alt="" className="h-6 w-6 flex-shrink-0 object-contain" />}
-      <span className={awayWon ? "font-semibold" : "text-ice-400"}>
+      <span className={hasScore && awayWon ? "font-semibold" : "text-ice-400"}>
         {game.away_team_abbrev}
       </span>
-      <span className="font-mono text-ice-100">
-        {game.away_team_score}–{game.home_team_score}
-      </span>
-      <span className={homeWon ? "font-semibold" : "text-ice-400"}>
+      {hasScore ? (
+        <span className="font-mono text-ice-100">
+          {game.away_team_score}–{game.home_team_score}
+        </span>
+      ) : (
+        <span className="text-ice-500">@</span>
+      )}
+      <span className={hasScore && homeWon ? "font-semibold" : "text-ice-400"}>
         {game.home_team_abbrev}
       </span>
       {homeLogo && <img src={homeLogo} alt="" className="h-6 w-6 flex-shrink-0 object-contain" />}
-      {game.was_overtime && (
+      {hasScore && game.was_overtime && (
         <span className="text-xs uppercase text-ice-400">OT</span>
       )}
-      {game.game_state === "FINAL" && (
+      {isFinal && (
         <span className="rounded bg-green-500/20 px-1 py-0.5 text-[9px] font-semibold uppercase text-green-300">
-          F
+          Final
         </span>
       )}
     </button>
