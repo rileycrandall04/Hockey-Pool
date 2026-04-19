@@ -272,19 +272,21 @@ export default async function LeagueStandingsPage({
           <h1 className="text-2xl font-bold text-ice-50 sm:text-3xl">
             {league.name}
           </h1>
-          <p className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-xs text-ice-300 sm:text-sm">
-            <span>Season {league.season}</span>
-            <span aria-hidden="true">&middot;</span>
-            <span className="inline-flex items-center gap-1.5">
-              Join code{" "}
-              <span className="rounded bg-puck-card px-1.5 py-0.5 font-mono text-ice-100">
-                {league.join_code}
+          {league.draft_status !== "complete" && (
+            <p className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-xs text-ice-300 sm:text-sm">
+              <span>Season {league.season}</span>
+              <span aria-hidden="true">&middot;</span>
+              <span className="inline-flex items-center gap-1.5">
+                Join code{" "}
+                <span className="rounded bg-puck-card px-1.5 py-0.5 font-mono text-ice-100">
+                  {league.join_code}
+                </span>
+                <CopyJoinCodeButton code={league.join_code} />
               </span>
-              <CopyJoinCodeButton code={league.join_code} />
-            </span>
-            <span aria-hidden="true">&middot;</span>
-            <span>Draft: {league.draft_status.replace("_", " ")}</span>
-          </p>
+              <span aria-hidden="true">&middot;</span>
+              <span>Draft: {league.draft_status.replace("_", " ")}</span>
+            </p>
+          )}
           <div className="flex flex-wrap items-center justify-center gap-2">
             {league.draft_status !== "complete" && (
               <Link href={`/leagues/${league.id}/draft`}>
@@ -326,6 +328,8 @@ export default async function LeagueStandingsPage({
           leaguePlayers={myPlayers}
           playerGameStats={playerGameStats}
         />
+
+        <div className="mt-6" />
 
         <HotTeams
           deltas={deltas}

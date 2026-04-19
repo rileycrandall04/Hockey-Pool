@@ -58,7 +58,7 @@ export function TonightsGames({
   const scheduledToday = deduplicateGames(scheduledTodayRaw);
   const upcomingLabel =
     scheduledToday.length > 0
-      ? isToday ? "Tonight" : "Last Night"
+      ? "Tonight"
       : pickNextDateLabel(games, effectiveDate);
   const shown =
     scheduledToday.length > 0
