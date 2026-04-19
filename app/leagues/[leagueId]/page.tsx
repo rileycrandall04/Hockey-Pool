@@ -337,6 +337,10 @@ export default async function LeagueStandingsPage({
           leagueAvgDelta={leagueAvgDelta}
         />
 
+        <h2 className="mb-2 text-base font-semibold text-ice-100 sm:text-lg">
+          Standings
+        </h2>
+
         {standings.length === 0 ? (
           <Card>
             <CardContent className="px-4 py-6 text-center text-ice-400">
