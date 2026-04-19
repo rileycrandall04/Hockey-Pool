@@ -2,11 +2,28 @@ import Link from "next/link";
 import { isGameOnDate, getGameDate, effectiveGameDay } from "@/lib/playoff-helpers";
 import type { PlayoffBroadcast, PlayoffGame, PlayoffSeries } from "@/lib/types";
 
+export interface LeaguePlayer {
+  player_id: number;
+  name: string;
+  nhl_abbrev: string;
+  owner: string;
+}
+
+export interface PlayerGameStat {
+  game_id: number;
+  player_id: number;
+  goals: number;
+  assists: number;
+  ot_goals: number;
+}
+
 interface TonightsGamesProps {
   games: PlayoffGame[];
   series: PlayoffSeries[];
   bracketHref: string;
   teamLogos?: Record<string, string>;
+  leaguePlayers?: LeaguePlayer[];
+  playerGameStats?: PlayerGameStat[];
 }
 
 /**
@@ -33,6 +50,8 @@ export function TonightsGames({
   series,
   bracketHref,
   teamLogos = {},
+  leaguePlayers = [],
+  playerGameStats = [],
 }: TonightsGamesProps) {
   const { date: effectiveDate, isToday } = effectiveGameDay();
   const scheduledTodayRaw = (games ?? []).filter((g) => isGameOnDate(g, effectiveDate));
@@ -84,6 +103,8 @@ export function TonightsGames({
               game={g}
               parentSeries={seriesByLetter.get(g.series_letter)}
               teamLogos={teamLogos}
+              leaguePlayers={leaguePlayers}
+              playerGameStats={playerGameStats}
             />
           ))}
         </ul>
@@ -96,10 +117,14 @@ function GameRow({
   game,
   parentSeries,
   teamLogos = {},
+  leaguePlayers = [],
+  playerGameStats = [],
 }: {
   game: PlayoffGame;
   parentSeries: PlayoffSeries | undefined;
   teamLogos?: Record<string, string>;
+  leaguePlayers?: LeaguePlayer[];
+  playerGameStats?: PlayerGameStat[];
 }) {
   const awayLogo = game.away_abbrev ? teamLogos[game.away_abbrev] : undefined;
   const homeLogo = game.home_abbrev ? teamLogos[game.home_abbrev] : undefined;
@@ -109,49 +134,122 @@ function GameRow({
   const hasScore = game.away_score != null && game.home_score != null;
   const isFinal = game.game_state === "FINAL" || game.game_state === "OFF";
 
+  // Find league players in this game
+  const gamePlayers = leaguePlayers.filter(
+    (p) =>
+      p.nhl_abbrev === game.away_abbrev ||
+      p.nhl_abbrev === game.home_abbrev,
+  );
+
+  // Build stats lookup for this specific game
+  const statsMap = new Map<
+    number,
+    { goals: number; assists: number; ot_goals: number }
+  >();
+  for (const s of playerGameStats) {
+    if (s.game_id === game.game_id) {
+      statsMap.set(s.player_id, {
+        goals: s.goals,
+        assists: s.assists,
+        ot_goals: s.ot_goals,
+      });
+    }
+  }
+
+  // Group by fantasy team owner, sort players with points first
+  const byOwner = new Map<string, (LeaguePlayer & { stats: { goals: number; assists: number; ot_goals: number } | null })[]>();
+  for (const p of gamePlayers) {
+    const arr = byOwner.get(p.owner) ?? [];
+    arr.push({ ...p, stats: statsMap.get(p.player_id) ?? null });
+    byOwner.set(p.owner, arr);
+  }
+  // Sort each owner's players: those with points first (by G+A desc)
+  for (const [, players] of byOwner) {
+    players.sort((a, b) => {
+      const aPts = (a.stats?.goals ?? 0) + (a.stats?.assists ?? 0);
+      const bPts = (b.stats?.goals ?? 0) + (b.stats?.assists ?? 0);
+      return bPts - aPts;
+    });
+  }
+
+  // Short last name for compact display
+  const lastName = (full: string) => {
+    const parts = full.split(" ");
+    return parts.length > 1 ? parts[parts.length - 1] : full;
+  };
+
   return (
-    <li className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="flex items-center gap-2 font-semibold text-ice-50">
-          {awayLogo && <img src={awayLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
-          {game.away_abbrev ?? "TBD"}
-          {hasScore ? (
-            <>
-              <span className="font-mono text-ice-100">{game.away_score}</span>
-              <span className="text-ice-500">–</span>
-              <span className="font-mono text-ice-100">{game.home_score}</span>
-            </>
-          ) : (
-            <span className="text-ice-400">@</span>
-          )}
-          {game.home_abbrev ?? "TBD"}
-          {homeLogo && <img src={homeLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
-          {isFinal && (
-            <span className="rounded bg-green-500/20 px-1 py-0.5 text-[9px] font-semibold uppercase text-green-300">
-              Final
-            </span>
-          )}
-        </span>
-        {seriesLine && (
-          <span className="truncate text-xs text-ice-500">
-            {seriesLine}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-shrink-0 flex-col items-end text-right">
-        {isFinal ? (
-          <span className="font-semibold text-green-300">Final</span>
-        ) : hasScore ? null : (
-          <>
-            {time && <span className="font-mono text-ice-200">{time}</span>}
-            {networks && (
-              <span className="text-xs uppercase tracking-wider text-ice-400">
-                {networks}
+    <li className="px-4 py-3 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex items-center gap-2 font-semibold text-ice-50">
+            {awayLogo && <img src={awayLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
+            {game.away_abbrev ?? "TBD"}
+            {hasScore ? (
+              <>
+                <span className="font-mono text-ice-100">{game.away_score}</span>
+                <span className="text-ice-500">&ndash;</span>
+                <span className="font-mono text-ice-100">{game.home_score}</span>
+              </>
+            ) : (
+              <span className="text-ice-400">@</span>
+            )}
+            {game.home_abbrev ?? "TBD"}
+            {homeLogo && <img src={homeLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
+            {isFinal && (
+              <span className="rounded bg-green-500/20 px-1 py-0.5 text-[9px] font-semibold uppercase text-green-300">
+                Final
               </span>
             )}
-          </>
-        )}
+          </span>
+          {seriesLine && (
+            <span className="truncate text-xs text-ice-500">
+              {seriesLine}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-shrink-0 flex-col items-end text-right">
+          {isFinal ? (
+            <span className="font-semibold text-green-300">Final</span>
+          ) : hasScore ? null : (
+            <>
+              {time && <span className="font-mono text-ice-200">{time}</span>}
+              {networks && (
+                <span className="text-xs uppercase tracking-wider text-ice-400">
+                  {networks}
+                </span>
+              )}
+            </>
+          )}
+        </div>
       </div>
+      {byOwner.size > 0 && (
+        <div className="mt-1.5 space-y-0.5 border-t border-puck-border/40 pt-1.5">
+          {[...byOwner.entries()].map(([owner, players]) => (
+            <div key={owner} className="flex flex-wrap gap-x-1 text-[11px] leading-relaxed">
+              <span className="font-medium text-ice-300">{owner}:</span>
+              {players.map((p, i) => {
+                const parts: string[] = [];
+                if (p.stats?.goals) parts.push(`${p.stats.goals}G`);
+                if (p.stats?.assists) parts.push(`${p.stats.assists}A`);
+                return (
+                  <span key={p.player_id} className="text-ice-400">
+                    {i > 0 && <span className="text-ice-600">,&nbsp;</span>}
+                    <span className={parts.length > 0 ? "text-ice-200" : ""}>
+                      {lastName(p.name)}
+                    </span>
+                    {parts.length > 0 && (
+                      <span className="ml-0.5 text-green-300">
+                        {parts.join(" ")}
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
     </li>
   );
 }

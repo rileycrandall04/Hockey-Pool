@@ -173,6 +173,48 @@ export default async function LeagueStandingsPage({
     rosterByTeam.set(row.team_id, arr);
   }
 
+  // Build league players list for tonight's games display
+  const teamNameById = new Map<string, string>();
+  for (const t of (teams ?? []) as Team[]) {
+    teamNameById.set(t.id, t.name);
+  }
+  const leaguePlayers: {
+    player_id: number;
+    name: string;
+    nhl_abbrev: string;
+    owner: string;
+  }[] = [];
+  for (const row of (rosterRows as RosterEntry[] | null) ?? []) {
+    if (row.nhl_abbrev) {
+      leaguePlayers.push({
+        player_id: row.player_id,
+        name: row.full_name,
+        nhl_abbrev: row.nhl_abbrev,
+        owner: teamNameById.get(row.team_id) ?? "",
+      });
+    }
+  }
+
+  // Fetch per-game stats for league players (for tonight's games)
+  const leaguePlayerIds = [
+    ...new Set(leaguePlayers.map((p) => p.player_id)),
+  ];
+  let playerGameStats: {
+    game_id: number;
+    player_id: number;
+    goals: number;
+    assists: number;
+    ot_goals: number;
+  }[] = [];
+  if (leaguePlayerIds.length > 0) {
+    const svc = createServiceClient();
+    const { data: gameStatsData } = await svc
+      .from("manual_game_stats")
+      .select("game_id, player_id, goals, assists, ot_goals")
+      .in("player_id", leaguePlayerIds);
+    playerGameStats = (gameStatsData ?? []) as typeof playerGameStats;
+  }
+
   // Overnight deltas for the up/down/fire indicators. Returns null
   // until we have at least two snapshot dates for this league.
   const overnight = await getOvernightDeltas(leagueId);
@@ -282,6 +324,8 @@ export default async function LeagueStandingsPage({
           series={bracketSeries}
           bracketHref={`/leagues/${league.id}/bracket`}
           teamLogos={teamLogos}
+          leaguePlayers={leaguePlayers}
+          playerGameStats={playerGameStats}
         />
 
         <HotTeams
