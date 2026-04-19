@@ -135,7 +135,7 @@ function GameRow({
       <div className="flex flex-shrink-0 flex-col items-end text-right">
         {isFinal ? (
           <span className="font-semibold text-green-300">Final</span>
-        ) : (
+        ) : hasScore ? null : (
           <>
             {time && <span className="font-mono text-ice-200">{time}</span>}
             {networks && (
