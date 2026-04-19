@@ -1,40 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DailyRecap } from "@/lib/types";
 
 interface Props {
   date: string;
   games: DailyRecap[];
-  /**
-   * When true, the expanded scorers panel renders an "Edit stats →"
-   * link that drops the app owner into /games/[id]/stats so they can
-   * add/correct per-game manual stats. Gated at the server component
-   * level so non-owners never see the link.
-   */
   isOwner?: boolean;
   teamLogos?: Record<string, string>;
-  /** Override the "Last night" label — e.g. "Today" for live games. */
   label?: string;
-  /** When set, a "Scoreboard" link appears in the ticker header. */
   leagueId?: string;
 }
 
 /**
- * Sticky marquee ticker.
+ * Sticky ticker bar showing game chips.
  *
- * - Sticks to `top: 0` via `sticky top-0 z-40`.
- * - Scrolls horizontally via a CSS keyframe (`animate-ticker` in
- *   globals.css). To get a seamless loop, we render the game list
- *   twice in the track and animate translateX from 0 to -50%.
- * - Tapping a game card pauses the animation (by dropping the
- *   `animate-ticker` class) and renders a scorers panel directly
- *   below the scrolling row.
- * - Tapping the same game again, the ×, or outside the ticker
- *   clears the selection and resumes scrolling.
- * - With fewer than 3 games the animation is disabled because the
- *   duplicated content wouldn't overflow the viewport meaningfully.
+ * Only auto-scrolls when the chips overflow the container width.
+ * When they fit, they sit static and centered. Tapping a chip
+ * opens a scorers panel below.
  */
 export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {}, label, leagueId }: Props) {
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
@@ -44,10 +28,25 @@ export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {}
       : null;
   const paused = selectedGame !== null;
 
-  // Duplicate for seamless loop, but only if we actually have enough
-  // content to overflow on wide screens.
-  const shouldAnimate = games.length >= 3;
-  const loopGames = shouldAnimate ? [...games, ...games] : games;
+  // Measure whether the chips overflow the container
+  const containerRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [overflows, setOverflows] = useState(false);
+
+  useEffect(() => {
+    function check() {
+      if (!containerRef.current || !trackRef.current) return;
+      setOverflows(trackRef.current.scrollWidth > containerRef.current.clientWidth);
+    }
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [games.length]);
+
+  // For seamless loop animation we need to duplicate the list,
+  // but ONLY when overflowing and animating.
+  const shouldAnimate = overflows && !paused;
+  const displayGames = shouldAnimate ? [...games, ...games] : games;
 
   const toggleSelected = (gameId: number) =>
     setSelectedGameId((prev) => (prev === gameId ? null : gameId));
@@ -58,9 +57,11 @@ export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {}
         <div className="flex items-center justify-between px-3 pt-1.5 text-[10px] uppercase tracking-wider text-ice-400 sm:px-4">
           <span>🏒 {label ?? "Last night"} &middot; {prettyDate(date)}</span>
           <span className="flex items-center gap-2">
-            <span className="hidden text-ice-500 sm:inline">
-              {paused ? "paused · tap again or × to resume" : "tap a game for scorers"}
-            </span>
+            {paused && (
+              <span className="hidden text-ice-500 sm:inline">
+                tap again or × to close
+              </span>
+            )}
             {leagueId && (
               <Link
                 href={`/leagues/${leagueId}/scoreboard`}
@@ -71,13 +72,14 @@ export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {}
             )}
           </span>
         </div>
-        <div className="overflow-hidden pb-1.5 pt-0.5">
+        <div ref={containerRef} className="overflow-hidden pb-1.5 pt-0.5">
           <div
+            ref={trackRef}
             className={`flex min-w-max gap-2 px-3 sm:px-4 ${
-              shouldAnimate && !paused ? "animate-ticker" : ""
+              shouldAnimate ? "animate-ticker" : ""
             }`}
           >
-            {loopGames.map((g, idx) => (
+            {displayGames.map((g, idx) => (
               <GameChip
                 key={`${g.game_id}-${idx}`}
                 game={g}
