@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isGameOnDate, getGameDate } from "@/lib/playoff-helpers";
 import type { PlayoffBroadcast, PlayoffGame, PlayoffSeries } from "@/lib/types";
 
 interface TonightsGamesProps {
@@ -34,7 +35,7 @@ export function TonightsGames({
   teamLogos = {},
 }: TonightsGamesProps) {
   const today = todayEasternISO();
-  const scheduledToday = (games ?? []).filter((g) => g.game_date === today);
+  const scheduledToday = (games ?? []).filter((g) => isGameOnDate(g, today));
   const upcomingLabel =
     scheduledToday.length > 0 ? "Tonight" : pickNextDateLabel(games, today);
   const shown =
@@ -172,11 +173,14 @@ function pickNextDateGames(
   todayIso: string,
 ): PlayoffGame[] {
   const future = (games ?? [])
-    .filter((g) => g.game_date && g.game_date > todayIso)
-    .sort((a, b) => (a.game_date ?? "").localeCompare(b.game_date ?? ""));
+    .filter((g) => {
+      const d = getGameDate(g);
+      return d != null && d > todayIso;
+    })
+    .sort((a, b) => (getGameDate(a) ?? "").localeCompare(getGameDate(b) ?? ""));
   if (future.length === 0) return [];
-  const firstDate = future[0]!.game_date;
-  return future.filter((g) => g.game_date === firstDate);
+  const firstDate = getGameDate(future[0]!);
+  return future.filter((g) => getGameDate(g) === firstDate);
 }
 
 function pickNextDateLabel(
@@ -185,7 +189,7 @@ function pickNextDateLabel(
 ): string {
   const next = pickNextDateGames(games, todayIso);
   if (next.length === 0) return "Upcoming games";
-  const date = next[0]!.game_date;
+  const date = getGameDate(next[0]!);
   if (!date) return "Upcoming games";
   // Parse YYYY-MM-DD as noon ET so the weekday matches the
   // broadcast date (avoids the UTC midnight = previous day edge).

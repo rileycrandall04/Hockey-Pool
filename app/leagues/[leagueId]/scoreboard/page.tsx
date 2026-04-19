@@ -3,23 +3,12 @@ import Link from "next/link";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getLeagueForMember } from "@/lib/league-access";
 import { isAppOwner } from "@/lib/auth";
+import { todayEasternISO, isGameOnDate } from "@/lib/playoff-helpers";
 import { NavBar } from "@/components/nav-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { League, PlayoffGame } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-/**
- * Resolve today's date in Eastern time as YYYY-MM-DD.
- */
-function todayEasternISO(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
 
 interface GameWithScorers extends PlayoffGame {
   scorers: {
@@ -78,15 +67,16 @@ export default async function ScoreboardPage({
     teamIdToAbbrev.set(t.id, t.abbrev);
   }
 
-  // Fetch today's playoff games
+  // Fetch all playoff games, filter for today in JS (handles null game_date)
   const today = todayEasternISO();
-  const { data: todayGames } = await svc
+  const { data: allPlayoffGames } = await svc
     .from("playoff_games")
     .select("*")
-    .eq("game_date", today)
     .order("game_id", { ascending: true });
 
-  const games = (todayGames ?? []) as PlayoffGame[];
+  const games = ((allPlayoffGames ?? []) as PlayoffGame[]).filter((g) =>
+    isGameOnDate(g, today),
+  );
 
   // Fetch manual stats for all today's games
   const gameIds = games.map((g) => g.game_id);
@@ -278,7 +268,21 @@ export default async function ScoreboardPage({
                           : ""}
                         {ser.top_seed_abbrev &&
                           ser.bottom_seed_abbrev &&
-                          ` · Series ${ser.top_seed_wins}-${ser.bottom_seed_wins}`}
+                          (() => {
+                            const tw = ser.top_seed_wins;
+                            const bw = ser.bottom_seed_wins;
+                            if (tw === 0 && bw === 0) return "";
+                            const leader =
+                              tw === bw ? null : tw > bw ? ser.top_seed_abbrev : ser.bottom_seed_abbrev;
+                            const hi = Math.max(tw, bw);
+                            const lo = Math.min(tw, bw);
+                            return leader
+                              ? ` · Series ${hi}-${lo} ${leader}`
+                              : ` · Series tied ${tw}-${bw}`;
+                          })()}
+                        {!hasScore && !isFinal && g.start_time_utc && (
+                          <> · {formatTimeShort(g.start_time_utc)}</>
+                        )}
                       </p>
                     )}
                   </CardHeader>
@@ -326,9 +330,13 @@ export default async function ScoreboardPage({
                       </div>
                     ) : (
                       <p className="text-sm text-ice-500">
-                        {hasScore
-                          ? "No individual stats entered yet."
-                          : "Game has not started."}
+                        {isFinal
+                          ? "No individual stats entered."
+                          : hasScore
+                            ? "No individual stats entered yet."
+                            : g.start_time_utc
+                              ? `Starts at ${formatTimeShort(g.start_time_utc)}`
+                              : "Game has not started."}
                       </p>
                     )}
                   </CardContent>
@@ -351,4 +359,15 @@ function prettyDate(iso: string): string {
     month: "long",
     day: "numeric",
   }).format(parsed);
+}
+
+function formatTimeShort(startTimeUtc: string): string {
+  const d = new Date(startTimeUtc);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(d);
 }

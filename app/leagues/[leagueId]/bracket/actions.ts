@@ -144,11 +144,15 @@ export async function updateGameAction(formData: FormData) {
 
         let topWins = 0;
         let bottomWins = 0;
+        const topAbbrev = (series.top_seed_abbrev ?? "").toUpperCase();
+        const bottomAbbrev = (series.bottom_seed_abbrev ?? "").toUpperCase();
         for (const g of finalGames ?? []) {
-          const awayWon = (g.away_score ?? 0) > (g.home_score ?? 0);
-          const winner = awayWon ? g.away_abbrev : g.home_abbrev;
-          if (winner === series.top_seed_abbrev) topWins++;
-          else if (winner === series.bottom_seed_abbrev) bottomWins++;
+          if (g.away_score == null || g.home_score == null) continue;
+          if (g.away_score === 0 && g.home_score === 0) continue;
+          const awayWon = g.away_score > g.home_score;
+          const winner = (awayWon ? g.away_abbrev : g.home_abbrev ?? "").toUpperCase();
+          if (winner === topAbbrev) topWins++;
+          else if (winner === bottomAbbrev) bottomWins++;
         }
 
         const winningTeam =

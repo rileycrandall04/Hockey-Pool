@@ -134,9 +134,23 @@ async function batchUpsertStatsAction(formData: FormData) {
   // Fetch game to know which team each player belongs to
   const { data: gameRow } = await svc
     .from("playoff_games")
-    .select("away_abbrev, home_abbrev")
+    .select("away_abbrev, home_abbrev, game_date, start_time_utc")
     .eq("game_id", gameId)
     .maybeSingle();
+
+  // Backfill game_date from start_time_utc if missing
+  if (gameRow && !gameRow.game_date && gameRow.start_time_utc) {
+    const d = new Date(gameRow.start_time_utc);
+    if (!isNaN(d.getTime())) {
+      const dateStr = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/New_York",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d);
+      await svc.from("playoff_games").update({ game_date: dateStr }).eq("game_id", gameId);
+    }
+  }
   // Build player → nhl_team_id lookup for score tallying
   const allPlayerIds = entries.map((e) => e.player_id);
   const { data: playerTeamRows } = await svc
@@ -197,16 +211,27 @@ async function batchUpsertStatsAction(formData: FormData) {
     savedCount++;
   }
 
-  // Auto-compute game scores from all manual stats for this game
+  // Auto-compute game scores from ALL manual stats for this game
   if (awayNhlId != null && homeNhlId != null) {
     const { data: allStats } = await svc
       .from("manual_game_stats")
       .select("player_id, goals")
       .eq("game_id", gameId);
+
+    // Need team IDs for ALL players with stats, not just current submission
+    const allStatPlayerIds = [...new Set((allStats ?? []).map((s) => s.player_id))];
+    const { data: allPlayerTeams } = allStatPlayerIds.length > 0
+      ? await svc.from("players").select("id, nhl_team_id").in("id", allStatPlayerIds)
+      : { data: [] };
+    const fullPlayerTeamMap = new Map<number, number>();
+    for (const p of allPlayerTeams ?? []) {
+      fullPlayerTeamMap.set(p.id, p.nhl_team_id);
+    }
+
     let awayGoals = 0;
     let homeGoals = 0;
     for (const s of allStats ?? []) {
-      const teamId = playerNhlTeam.get(s.player_id);
+      const teamId = fullPlayerTeamMap.get(s.player_id);
       if (teamId === awayNhlId) awayGoals += s.goals;
       else if (teamId === homeNhlId) homeGoals += s.goals;
     }
@@ -329,11 +354,16 @@ async function markFinalAction(formData: FormData) {
 
       let topWins = 0;
       let bottomWins = 0;
+      const topAbbrev = (series.top_seed_abbrev ?? "").toUpperCase();
+      const bottomAbbrev = (series.bottom_seed_abbrev ?? "").toUpperCase();
       for (const g of finalGames ?? []) {
-        const awayWon = (g.away_score ?? 0) > (g.home_score ?? 0);
-        const winner = awayWon ? g.away_abbrev : g.home_abbrev;
-        if (winner === series.top_seed_abbrev) topWins++;
-        else if (winner === series.bottom_seed_abbrev) bottomWins++;
+        // Skip games with no scores
+        if (g.away_score == null || g.home_score == null) continue;
+        if (g.away_score === 0 && g.home_score === 0) continue;
+        const awayWon = g.away_score > g.home_score;
+        const winner = (awayWon ? g.away_abbrev : g.home_abbrev ?? "").toUpperCase();
+        if (winner === topAbbrev) topWins++;
+        else if (winner === bottomAbbrev) bottomWins++;
       }
 
       const winningTeam =

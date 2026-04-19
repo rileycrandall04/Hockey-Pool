@@ -452,13 +452,14 @@ export function pickNextGame(games: PlayoffGame[]): PlayoffGame | null {
     const bt = b.start_time_utc ? Date.parse(b.start_time_utc) : 0;
     return at - bt;
   });
-  const now = Date.now();
+  // Find the first game that hasn't been finalized
   const upcoming = sorted.find((g) => {
-    if (g.game_state === "FUT" || g.game_state === "PRE") return true;
-    if (g.start_time_utc && Date.parse(g.start_time_utc) > now) return true;
-    return false;
+    if (g.game_state === "FINAL" || g.game_state === "OFF") return false;
+    return true;
   });
   if (upcoming) return upcoming;
+  // All games are final — show the most recent final (series card will
+  // render "Series complete" instead if the series has a winner).
   return sorted[sorted.length - 1] ?? null;
 }
 

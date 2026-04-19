@@ -1,26 +1,16 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { isAppOwner } from "@/lib/auth";
+import { todayEasternISO, isGameOnDate } from "@/lib/playoff-helpers";
 import type { DailyRecap } from "@/lib/types";
 import { DailyTickerClient } from "./daily-ticker-client";
-
-/**
- * Resolve today's date in Eastern time as YYYY-MM-DD.
- */
-function todayEasternISO(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
 
 /**
  * Server-side data loader for the daily scores ticker.
  *
  * Priority order:
- *   1. Today's playoff_games that have scores entered via manual stats.
- *      Shown with a "Today" label so the ticker acts as a live scoreboard.
+ *   1. Today's playoff_games — shown whenever ANY today game has scores
+ *      entered via manual stats. All today's games are included (with
+ *      or without scores) so the ticker acts as a live scoreboard.
  *   2. Most recent daily_recaps date (last night's NHL data from the cron).
  *   3. Nothing — render null if neither source has data.
  */
@@ -32,29 +22,38 @@ export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
   } = await supabase.auth.getUser();
   const isOwner = isAppOwner(user?.email);
 
+  // Team logos + id→abbrev lookup
   const { data: nhlTeamRows } = await svc
     .from("nhl_teams")
-    .select("abbrev, logo_url");
+    .select("id, abbrev, logo_url");
   const teamLogos: Record<string, string> = {};
-  for (const t of (nhlTeamRows ?? []) as { abbrev: string; logo_url: string | null }[]) {
+  const teamIdToAbbrev = new Map<number, string>();
+  for (const t of (nhlTeamRows ?? []) as { id: number; abbrev: string; logo_url: string | null }[]) {
     if (t.logo_url) teamLogos[t.abbrev] = t.logo_url;
+    teamIdToAbbrev.set(t.id, t.abbrev);
   }
 
-  // ── Try today's playoff_games first ──────────────────────────────
+  // ── Find today's playoff games ─────────────────────────────────────
   const today = todayEasternISO();
-  const { data: todayGames } = await svc
+
+  // Fetch ALL playoff_games (bracket is small), filter in JS so we
+  // catch games that have game_date = null but start_time_utc today.
+  const { data: allPlayoffGames } = await svc
     .from("playoff_games")
     .select("*")
-    .eq("game_date", today)
     .order("game_id", { ascending: true });
 
-  const gamesWithScores = (todayGames ?? []).filter(
+  const todayGames = (allPlayoffGames ?? []).filter((g) =>
+    isGameOnDate(g, today),
+  );
+
+  const gamesWithScores = todayGames.filter(
     (g: { away_score: number | null; home_score: number | null }) =>
       g.away_score != null && g.home_score != null,
   );
 
   if (gamesWithScores.length > 0) {
-    // Fetch scorer details from manual_game_stats for these games
+    // Fetch scorer details from manual_game_stats for games with scores
     const gameIds = gamesWithScores.map((g: { game_id: number }) => g.game_id);
     const { data: statRows } = await svc
       .from("manual_game_stats")
@@ -76,19 +75,7 @@ export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
       }
     }
 
-    // nhl_team_id → abbrev lookup
-    const teamIdToAbbrev = new Map<number, string>();
-    for (const t of (nhlTeamRows ?? []) as { abbrev: string; id?: number }[]) {
-      // nhl_teams may not have id in this select, fetch separately
-    }
-    const { data: teamIdRows } = await svc
-      .from("nhl_teams")
-      .select("id, abbrev");
-    for (const t of teamIdRows ?? []) {
-      teamIdToAbbrev.set(t.id, t.abbrev);
-    }
-
-    // Build DailyRecap-shaped objects from today's playoff_games
+    // Build DailyRecap-shaped objects from today's games with scores
     const todayRecaps: DailyRecap[] = gamesWithScores.map(
       (g: {
         game_id: number;
@@ -98,6 +85,7 @@ export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
         away_score: number;
         home_score: number;
         game_state: string | null;
+        start_time_utc: string | null;
       }) => {
         const gameStats = (statRows ?? []).filter(
           (s: { game_id: number }) => s.game_id === g.game_id,
@@ -134,7 +122,6 @@ export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
             ) => b.goals + b.assists - (a.goals + a.assists),
           );
 
-        // Detect overtime: any player has ot_goals > 0
         const hasOT = gameStats.some(
           (s: { ot_goals: number }) => s.ot_goals > 0,
         );
@@ -154,8 +141,8 @@ export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
       },
     );
 
-    // Also include today's games WITHOUT scores yet (show as 0-0 scheduled)
-    const allTodayRecaps = (todayGames ?? []).map(
+    // Include ALL today's games (even those without scores yet)
+    const allTodayRecaps = todayGames.map(
       (g: {
         game_id: number;
         game_date: string;
@@ -164,6 +151,7 @@ export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
         away_score: number | null;
         home_score: number | null;
         game_state: string | null;
+        start_time_utc: string | null;
       }) => {
         const existing = todayRecaps.find((r) => r.game_id === g.game_id);
         if (existing) return existing;
