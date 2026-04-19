@@ -111,6 +111,8 @@ export async function updateGameAction(formData: FormData) {
 
   const startTimeRaw = String(formData.get("start_time_utc") ?? "").trim();
   const venue = String(formData.get("venue") ?? "").trim() || null;
+  const awayAbbrev = String(formData.get("away_abbrev") ?? "").trim();
+  const homeAbbrev = String(formData.get("home_abbrev") ?? "").trim();
   const awayScore = String(formData.get("away_score") ?? "").trim();
   const homeScore = String(formData.get("home_score") ?? "").trim();
   const gameState =
@@ -128,6 +130,8 @@ export async function updateGameAction(formData: FormData) {
     updates.game_date = startTimeRaw.slice(0, 10);
   }
   if (venue !== null) updates.venue = venue;
+  if (awayAbbrev) updates.away_abbrev = awayAbbrev;
+  if (homeAbbrev) updates.home_abbrev = homeAbbrev;
   if (awayScore !== "") updates.away_score = Number(awayScore);
   if (homeScore !== "") updates.home_score = Number(homeScore);
   if (gameState) updates.game_state = gameState;

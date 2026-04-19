@@ -81,6 +81,7 @@ export function SeriesGameEditor({
                   key={num}
                   game={game}
                   gameNumber={num}
+                  series={series}
                   leagueId={leagueId}
                   isEditing={editingSlot === num}
                   onToggleEdit={() =>
@@ -116,16 +117,31 @@ export function SeriesGameEditor({
 function FilledGameSlot({
   game,
   gameNumber,
+  series,
   leagueId,
   isEditing,
   onToggleEdit,
 }: {
   game: PlayoffGame;
   gameNumber: number;
+  series: PlayoffSeries;
   leagueId: string;
   isEditing: boolean;
   onToggleEdit: () => void;
 }) {
+  // Build the team option set: prefer the two series seeds, but always
+  // include whatever the game currently has so an existing (possibly
+  // wrong) value remains selectable.
+  const teamOptions = Array.from(
+    new Set(
+      [
+        series.top_seed_abbrev,
+        series.bottom_seed_abbrev,
+        game.away_abbrev,
+        game.home_abbrev,
+      ].filter((a): a is string => Boolean(a)),
+    ),
+  );
   const when = game.start_time_utc
     ? new Intl.DateTimeFormat("en-US", {
         timeZone: "America/Denver",
@@ -233,7 +249,35 @@ function FilledGameSlot({
               </Select>
             </div>
             <div className="space-y-0.5">
-              <Label className="text-[9px]">Away</Label>
+              <Label className="text-[9px]">Away team</Label>
+              <Select
+                name="away_abbrev"
+                defaultValue={game.away_abbrev ?? ""}
+                className="text-[11px] h-7 px-1.5"
+              >
+                {teamOptions.map((abbrev) => (
+                  <option key={abbrev} value={abbrev}>
+                    {abbrev}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-0.5">
+              <Label className="text-[9px]">Home team</Label>
+              <Select
+                name="home_abbrev"
+                defaultValue={game.home_abbrev ?? ""}
+                className="text-[11px] h-7 px-1.5"
+              >
+                {teamOptions.map((abbrev) => (
+                  <option key={abbrev} value={abbrev}>
+                    {abbrev}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-0.5">
+              <Label className="text-[9px]">Away score</Label>
               <Input
                 name="away_score"
                 type="number"
@@ -243,7 +287,7 @@ function FilledGameSlot({
               />
             </div>
             <div className="space-y-0.5">
-              <Label className="text-[9px]">Home</Label>
+              <Label className="text-[9px]">Home score</Label>
               <Input
                 name="home_score"
                 type="number"
