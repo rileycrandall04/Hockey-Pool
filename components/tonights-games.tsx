@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { isGameOnDate, getGameDate, effectiveGameDay } from "@/lib/playoff-helpers";
-import type { PlayoffBroadcast, PlayoffGame, PlayoffSeries } from "@/lib/types";
+import type { PlayoffGame, PlayoffSeries } from "@/lib/types";
 
 export interface LeaguePlayer {
   player_id: number;
@@ -41,9 +41,9 @@ interface TonightsGamesProps {
  *      scheduled playoff games anywhere, render an empty-state
  *      placeholder so the slot is still visible on the page.
  *
- * Each row shows: AWAY @ HOME · start time (ET) · broadcast networks,
- * plus a short series context line ("Series: 2-1 TOR") when we can
- * resolve it from the series table.
+ * Each row shows: AWAY @ HOME · start time (ET), plus a short series
+ * context line ("Series: 2-1 TOR") when we can resolve it from the
+ * series table.
  */
 export function TonightsGames({
   games,
@@ -129,7 +129,6 @@ function GameRow({
   const awayLogo = game.away_abbrev ? teamLogos[game.away_abbrev] : undefined;
   const homeLogo = game.home_abbrev ? teamLogos[game.home_abbrev] : undefined;
   const time = formatGameTimeShort(game.start_time_utc);
-  const networks = formatBroadcasts(game.tv_broadcasts);
   const seriesLine = formatSeriesContext(game, parentSeries);
   const hasScore = game.away_score != null && game.home_score != null;
   const isFinal = game.game_state === "FINAL" || game.game_state === "OFF";
@@ -207,11 +206,6 @@ function GameRow({
           ) : hasScore ? null : (
             <>
               {time && <span className="font-mono text-ice-200">{time}</span>}
-              {networks && (
-                <span className="text-xs uppercase tracking-wider text-ice-400">
-                  {networks}
-                </span>
-              )}
             </>
           )}
         </div>
@@ -322,22 +316,6 @@ function formatGameTimeShort(startTimeUtc: string | null): string | null {
     minute: "2-digit",
     timeZoneName: "short",
   }).format(d);
-}
-
-function formatBroadcasts(
-  broadcasts: PlayoffBroadcast[] | null | undefined,
-): string | null {
-  if (!broadcasts || broadcasts.length === 0) return null;
-  const seen = new Set<string>();
-  const names: string[] = [];
-  for (const b of broadcasts) {
-    const key = b.network.toUpperCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    names.push(b.network);
-  }
-  if (names.length === 0) return null;
-  return names.join(", ");
 }
 
 /**
