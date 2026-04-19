@@ -119,7 +119,11 @@ export default async function ScoreboardPage({
       }
     }
   }
-  const games = [...seen.values()];
+  const games = [...seen.values()].sort((a, b) => {
+    const at = a.start_time_utc ? Date.parse(a.start_time_utc) : Infinity;
+    const bt = b.start_time_utc ? Date.parse(b.start_time_utc) : Infinity;
+    return at - bt;
+  });
 
   // Fetch manual stats for all today's games
   const gameIds = games.map((g) => g.game_id);
