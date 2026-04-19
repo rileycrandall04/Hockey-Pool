@@ -171,6 +171,36 @@ export async function syncPlayoffBracket(): Promise<BracketSyncResult> {
       continue;
     }
     result.games_upserted += rows.length;
+
+    // Clean up manually-created duplicates: if a manually-created row
+    // (game_id from Date.now(), typically 13+ digits) duplicates an
+    // official NHL row (same series + game_number + teams), delete it.
+    const officialIds = new Set(rows.map((r) => r.game_id));
+    const { data: allSeriesGames } = await svc
+      .from("playoff_games")
+      .select("game_id, series_letter, game_number, away_abbrev, home_abbrev")
+      .eq("series_letter", s.seriesLetter);
+    if (allSeriesGames) {
+      const dupeIds: number[] = [];
+      for (const existing of allSeriesGames) {
+        if (officialIds.has(existing.game_id)) continue; // official row
+        // Check if an official row covers this same matchup
+        const matchesOfficial = rows.some(
+          (r) =>
+            r.series_letter === existing.series_letter &&
+            r.game_number === existing.game_number &&
+            r.away_abbrev === existing.away_abbrev &&
+            r.home_abbrev === existing.home_abbrev,
+        );
+        if (matchesOfficial) dupeIds.push(existing.game_id);
+      }
+      if (dupeIds.length > 0) {
+        await svc
+          .from("playoff_games")
+          .delete()
+          .in("game_id", dupeIds);
+      }
+    }
   }
 
   return result;

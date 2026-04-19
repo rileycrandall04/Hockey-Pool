@@ -44,8 +44,6 @@ export async function createGameAction(formData: FormData) {
     );
   }
 
-  const gameId = Date.now();
-
   // Derive game_date from start time if not provided
   const startTimeUtc = startTimeRaw ? mdtToUtcIso(startTimeRaw) : null;
   let gameDate = gameDateRaw || null;
@@ -55,6 +53,25 @@ export async function createGameAction(formData: FormData) {
   }
 
   const svc = createServiceClient();
+
+  // Check for an existing game in the same series with the same game
+  // number (or same team pair) to avoid creating duplicates when the
+  // cron has already synced this game from the NHL API.
+  if (gameNumber != null) {
+    const { data: existing } = await svc
+      .from("playoff_games")
+      .select("game_id")
+      .eq("series_letter", seriesLetter)
+      .eq("game_number", gameNumber)
+      .limit(1);
+    if (existing && existing.length > 0) {
+      redirect(
+        `/leagues/${leagueId}/bracket?game_error=${encodeURIComponent(`Game ${gameNumber} already exists in series ${seriesLetter}.`)}`,
+      );
+    }
+  }
+
+  const gameId = Date.now();
   const { error } = await svc.from("playoff_games").insert({
     game_id: gameId,
     series_letter: seriesLetter,
