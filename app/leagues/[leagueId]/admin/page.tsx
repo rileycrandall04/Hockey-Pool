@@ -10,6 +10,7 @@ import { Input, Label, Select } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { teamOnTheClock, pickMeta } from "@/lib/draft";
 import { isAppOwner } from "@/lib/auth";
+import { syncPlayoffBracket } from "@/lib/sync-bracket";
 import type { League, RosterEntry, Team } from "@/lib/types";
 
 async function assertCommissioner(leagueId: string) {
@@ -698,6 +699,32 @@ async function addMemberAction(formData: FormData) {
   );
 }
 
+async function syncBracketAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id"));
+  const { user } = await assertCommissioner(leagueId);
+  if (!isAppOwner(user.email)) redirect(`/leagues/${leagueId}/admin`);
+
+  try {
+    const result = await syncPlayoffBracket();
+    const msg = `Bracket synced: ${result.series_upserted} series, ${result.games_upserted} games.${result.errors.length > 0 ? ` ${result.errors.length} error(s).` : ""}`;
+    revalidatePath(`/leagues/${leagueId}/bracket`);
+    revalidatePath("/", "layout");
+    redirect(
+      `/leagues/${leagueId}/admin?reset_success=${encodeURIComponent(msg)}`,
+    );
+  } catch (err) {
+    // redirect() throws a NEXT_REDIRECT error — rethrow it
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    // Also check the digest property used by Next.js
+    if (err && typeof err === "object" && "digest" in err) throw err;
+    const message = err instanceof Error ? err.message : "Unknown error";
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(`Bracket sync failed: ${message}`)}`,
+    );
+  }
+}
+
 async function toggleInjuryAction(formData: FormData) {
   "use server";
   const leagueId = String(formData.get("league_id"));
@@ -949,7 +976,8 @@ export default async function AdminPage({
                 </form>
               )}
               {canRefreshNhlData && (
-                <form action="/api/admin/sync-bracket" method="post">
+                <form action={syncBracketAction}>
+                  <input type="hidden" name="league_id" value={leagueId} />
                   <Button type="submit" variant="secondary">
                     ↻ Sync bracket
                   </Button>
