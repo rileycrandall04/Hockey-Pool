@@ -24,10 +24,13 @@ interface GameWithScorers extends PlayoffGame {
 
 export default async function ScoreboardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ leagueId: string }>;
+  searchParams: Promise<{ date?: string }>;
 }) {
   const { leagueId } = await params;
+  const { date: dateParam } = await searchParams;
 
   const supabase = await createClient();
   const {
@@ -68,15 +71,28 @@ export default async function ScoreboardPage({
     teamIdToAbbrev.set(t.id, t.abbrev);
   }
 
-  // Fetch all playoff games, filter for today in JS (handles null game_date)
+  // Determine which date to show
   const today = todayEasternISO();
+  const viewDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : today;
+  const isToday = viewDate === today;
+
+  // Compute prev/next dates
+  const viewDateObj = new Date(`${viewDate}T12:00:00Z`);
+  const prevDate = new Date(viewDateObj);
+  prevDate.setUTCDate(prevDate.getUTCDate() - 1);
+  const nextDate = new Date(viewDateObj);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+  const prevISO = prevDate.toISOString().slice(0, 10);
+  const nextISO = nextDate.toISOString().slice(0, 10);
+
+  // Fetch all playoff games, filter for selected date in JS (handles null game_date)
   const { data: allPlayoffGames } = await svc
     .from("playoff_games")
     .select("*")
     .order("game_id", { ascending: true });
 
   const todayGames = ((allPlayoffGames ?? []) as PlayoffGame[]).filter((g) =>
-    isGameOnDate(g, today),
+    isGameOnDate(g, viewDate),
   );
 
   // Deduplicate: if multiple rows exist for the same matchup on the
@@ -255,10 +271,39 @@ export default async function ScoreboardPage({
             <h1 className="text-2xl font-bold text-ice-50 sm:text-3xl">
               Scoreboard
             </h1>
-            <p className="text-sm text-ice-400">
-              {prettyDate(today)}
-              {!hasAnyScores && games.length > 0 && " — games not started yet"}
-            </p>
+            <div className="flex items-center gap-3 text-sm text-ice-400">
+              <Link
+                href={`/leagues/${leagueId}/scoreboard?date=${prevISO}`}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-ice-300 transition-colors hover:bg-puck-border hover:text-ice-50"
+                aria-label="Previous day"
+              >
+                ←
+              </Link>
+              <span>
+                {prettyDate(viewDate)}
+                {isToday && " (Today)"}
+                {!hasAnyScores && games.length > 0 && " — games not started yet"}
+              </span>
+              <Link
+                href={
+                  nextISO === today
+                    ? `/leagues/${leagueId}/scoreboard`
+                    : `/leagues/${leagueId}/scoreboard?date=${nextISO}`
+                }
+                className="flex h-7 w-7 items-center justify-center rounded-full text-ice-300 transition-colors hover:bg-puck-border hover:text-ice-50"
+                aria-label="Next day"
+              >
+                →
+              </Link>
+              {!isToday && (
+                <Link
+                  href={`/leagues/${leagueId}/scoreboard`}
+                  className="ml-1 rounded bg-puck-border px-2 py-0.5 text-xs text-ice-300 hover:bg-puck-border/80 hover:text-ice-100"
+                >
+                  Today
+                </Link>
+              )}
+            </div>
           </div>
           <Link
             href={`/leagues/${leagueId}/bracket`}
@@ -271,7 +316,7 @@ export default async function ScoreboardPage({
         {games.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-ice-400">
-              No playoff games scheduled for today.
+              No playoff games scheduled for {isToday ? "today" : prettyDate(viewDate)}.
             </CardContent>
           </Card>
         ) : (
