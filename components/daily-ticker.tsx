@@ -43,9 +43,31 @@ export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
     .select("*")
     .order("game_id", { ascending: true });
 
-  const todayGames = (allPlayoffGames ?? []).filter((g) =>
+  const todayGamesRaw = (allPlayoffGames ?? []).filter((g) =>
     isGameOnDate(g, today),
   );
+
+  // Deduplicate by series_letter + game_number (keep scored/final/newest)
+  const dedup = new Map<string, typeof todayGamesRaw[0]>();
+  for (const g of todayGamesRaw) {
+    const key = g.game_number != null
+      ? `${g.series_letter}-G${g.game_number}`
+      : `${g.away_abbrev}-${g.home_abbrev}-${g.game_id}`;
+    const existing = dedup.get(key);
+    if (!existing) {
+      dedup.set(key, g);
+    } else {
+      const eHasScore = existing.away_score != null && existing.home_score != null;
+      const gHasScore = g.away_score != null && g.home_score != null;
+      const eFinal = existing.game_state === "FINAL";
+      const gFinal = g.game_state === "FINAL";
+      if ((!eHasScore && gHasScore) || (!eFinal && gFinal) ||
+          (g.updated_at > existing.updated_at)) {
+        dedup.set(key, g);
+      }
+    }
+  }
+  const todayGames = [...dedup.values()];
 
   const gamesWithScores = todayGames.filter(
     (g: { away_score: number | null; home_score: number | null }) =>

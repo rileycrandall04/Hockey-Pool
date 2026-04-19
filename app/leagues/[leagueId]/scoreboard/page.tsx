@@ -75,9 +75,34 @@ export default async function ScoreboardPage({
     .select("*")
     .order("game_id", { ascending: true });
 
-  const games = ((allPlayoffGames ?? []) as PlayoffGame[]).filter((g) =>
+  const todayGames = ((allPlayoffGames ?? []) as PlayoffGame[]).filter((g) =>
     isGameOnDate(g, today),
   );
+
+  // Deduplicate: if multiple rows exist for the same matchup (same
+  // series_letter + game_number, or same away/home pair on the same day),
+  // keep the one with scores or the most recent update.
+  const seen = new Map<string, PlayoffGame>();
+  for (const g of todayGames) {
+    const key = g.game_number != null
+      ? `${g.series_letter}-G${g.game_number}`
+      : `${g.away_abbrev}-${g.home_abbrev}-${g.game_id}`;
+    const existing = seen.get(key);
+    if (!existing) {
+      seen.set(key, g);
+    } else {
+      // Prefer the one with scores, then FINAL state, then most recent
+      const eHasScore = existing.away_score != null && existing.home_score != null;
+      const gHasScore = g.away_score != null && g.home_score != null;
+      const eFinal = existing.game_state === "FINAL";
+      const gFinal = g.game_state === "FINAL";
+      if ((!eHasScore && gHasScore) || (!eFinal && gFinal) ||
+          (g.updated_at > existing.updated_at)) {
+        seen.set(key, g);
+      }
+    }
+  }
+  const games = [...seen.values()];
 
   // Fetch manual stats for all today's games
   const gameIds = games.map((g) => g.game_id);
