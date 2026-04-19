@@ -79,14 +79,13 @@ export default async function ScoreboardPage({
     isGameOnDate(g, today),
   );
 
-  // Deduplicate: if multiple rows exist for the same matchup (same
-  // series_letter + game_number, or same away/home pair on the same day),
-  // keep the one with scores or the most recent update.
+  // Deduplicate: if multiple rows exist for the same matchup on the
+  // same day, keep the one with scores / FINAL / most recent update.
+  // Key on the two team abbrevs (sorted) so order doesn't matter.
   const seen = new Map<string, PlayoffGame>();
   for (const g of todayGames) {
-    const key = g.game_number != null
-      ? `${g.series_letter}-G${g.game_number}`
-      : `${g.away_abbrev}-${g.home_abbrev}-${g.game_id}`;
+    const pair = [g.away_abbrev ?? "", g.home_abbrev ?? ""].sort().join("-");
+    const key = `${pair}`;
     const existing = seen.get(key);
     if (!existing) {
       seen.set(key, g);
@@ -142,15 +141,29 @@ export default async function ScoreboardPage({
     if (fantasyTeamIds.length > 0) {
       const { data: teamOwnerRows } = await svc
         .from("teams")
-        .select("id, name, owner_id, profiles(display_name)")
+        .select("id, name, owner_id")
         .in("id", fantasyTeamIds);
+      // Fetch owner profiles separately for reliable display names
+      const ownerIds = [
+        ...new Set(
+          (teamOwnerRows ?? [])
+            .map((t: { owner_id: string }) => t.owner_id)
+            .filter(Boolean),
+        ),
+      ];
+      const profileMap = new Map<string, string>();
+      if (ownerIds.length > 0) {
+        const { data: ownerProfiles } = await svc
+          .from("profiles")
+          .select("id, display_name")
+          .in("id", ownerIds);
+        for (const p of ownerProfiles ?? []) {
+          if (p.display_name) profileMap.set(p.id, p.display_name);
+        }
+      }
       const teamNameMap = new Map<string, string>();
       for (const t of teamOwnerRows ?? []) {
-        const ownerRow = Array.isArray(t.profiles)
-          ? t.profiles[0]
-          : t.profiles;
-        const ownerName = (ownerRow as { display_name?: string } | null)
-          ?.display_name ?? t.name;
+        const ownerName = profileMap.get(t.owner_id) ?? t.name;
         teamNameMap.set(t.id, ownerName);
       }
       for (const d of draftRows ?? []) {

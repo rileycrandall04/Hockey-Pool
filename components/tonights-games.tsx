@@ -35,13 +35,14 @@ export function TonightsGames({
   teamLogos = {},
 }: TonightsGamesProps) {
   const today = todayEasternISO();
-  const scheduledToday = (games ?? []).filter((g) => isGameOnDate(g, today));
+  const scheduledTodayRaw = (games ?? []).filter((g) => isGameOnDate(g, today));
+  const scheduledToday = deduplicateGames(scheduledTodayRaw);
   const upcomingLabel =
     scheduledToday.length > 0 ? "Tonight" : pickNextDateLabel(games, today);
   const shown =
     scheduledToday.length > 0
       ? scheduledToday
-      : pickNextDateGames(games, today);
+      : deduplicateGames(pickNextDateGames(games, today));
 
   // Build a quick lookup so each game row can pull its parent
   // series' running score + seeded team names.
@@ -149,6 +150,31 @@ function GameRow({
       </div>
     </li>
   );
+}
+
+/** Keep one row per matchup — prefer scored → FINAL → newest. */
+function deduplicateGames(list: PlayoffGame[]): PlayoffGame[] {
+  const seen = new Map<string, PlayoffGame>();
+  for (const g of list) {
+    const pair = [g.away_abbrev ?? "", g.home_abbrev ?? ""].sort().join("-");
+    const existing = seen.get(pair);
+    if (!existing) {
+      seen.set(pair, g);
+    } else {
+      const eHasScore = existing.away_score != null && existing.home_score != null;
+      const gHasScore = g.away_score != null && g.home_score != null;
+      const eFinal = existing.game_state === "FINAL";
+      const gFinal = g.game_state === "FINAL";
+      if (
+        (!eHasScore && gHasScore) ||
+        (!eFinal && gFinal) ||
+        ((g.updated_at ?? "") > (existing.updated_at ?? ""))
+      ) {
+        seen.set(pair, g);
+      }
+    }
+  }
+  return [...seen.values()];
 }
 
 function todayEasternISO(): string {

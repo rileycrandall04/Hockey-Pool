@@ -47,12 +47,11 @@ export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
     isGameOnDate(g, today),
   );
 
-  // Deduplicate by series_letter + game_number (keep scored/final/newest)
+  // Deduplicate by team matchup (keep scored/final/newest)
   const dedup = new Map<string, typeof todayGamesRaw[0]>();
   for (const g of todayGamesRaw) {
-    const key = g.game_number != null
-      ? `${g.series_letter}-G${g.game_number}`
-      : `${g.away_abbrev}-${g.home_abbrev}-${g.game_id}`;
+    const pair = [g.away_abbrev ?? "", g.home_abbrev ?? ""].sort().join("-");
+    const key = pair;
     const existing = dedup.get(key);
     if (!existing) {
       dedup.set(key, g);
