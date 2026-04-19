@@ -18,6 +18,7 @@ interface GameWithScorers extends PlayoffGame {
     goals: number;
     assists: number;
     ot_goals: number;
+    owner: string | null;
   }[];
 }
 
@@ -102,6 +103,38 @@ export default async function ScoreboardPage({
     }
   }
 
+  // Player → fantasy owner lookup (draft_picks → teams → profiles)
+  const playerOwnerMap = new Map<number, string>();
+  if (playerIds.length > 0) {
+    const { data: draftRows } = await svc
+      .from("draft_picks")
+      .select("player_id, team_id")
+      .eq("league_id", leagueId)
+      .in("player_id", playerIds);
+    const fantasyTeamIds = [
+      ...new Set((draftRows ?? []).map((d: { team_id: string }) => d.team_id)),
+    ];
+    if (fantasyTeamIds.length > 0) {
+      const { data: teamOwnerRows } = await svc
+        .from("teams")
+        .select("id, name, owner_id, profiles(display_name)")
+        .in("id", fantasyTeamIds);
+      const teamNameMap = new Map<string, string>();
+      for (const t of teamOwnerRows ?? []) {
+        const ownerRow = Array.isArray(t.profiles)
+          ? t.profiles[0]
+          : t.profiles;
+        const ownerName = (ownerRow as { display_name?: string } | null)
+          ?.display_name ?? t.name;
+        teamNameMap.set(t.id, ownerName);
+      }
+      for (const d of draftRows ?? []) {
+        const name = teamNameMap.get(d.team_id);
+        if (name) playerOwnerMap.set(d.player_id, name);
+      }
+    }
+  }
+
   // Series context
   const seriesLetters = [...new Set(games.map((g) => g.series_letter))];
   const { data: seriesRows } = seriesLetters.length > 0
@@ -151,6 +184,7 @@ export default async function ScoreboardPage({
             goals: s.goals,
             assists: s.assists,
             ot_goals: s.ot_goals,
+            owner: playerOwnerMap.get(s.player_id) ?? null,
           };
         },
       )
@@ -302,7 +336,7 @@ export default async function ScoreboardPage({
                               key={s.player_id}
                               className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-4 rounded px-1 py-0.5 text-sm odd:bg-puck-bg/40"
                             >
-                              <span className="flex items-center gap-1.5 truncate text-ice-100">
+                              <span className="flex min-w-0 items-center gap-1.5 truncate text-ice-100">
                                 {sLogo && (
                                   <img
                                     src={sLogo}
@@ -313,7 +347,14 @@ export default async function ScoreboardPage({
                                 <span className="text-[10px] text-ice-500">
                                   {s.team_abbrev}
                                 </span>
-                                {s.name}
+                                <span className="truncate">
+                                  {s.name}
+                                  {s.owner && (
+                                    <span className="ml-1 text-[10px] text-ice-600">
+                                      ({s.owner})
+                                    </span>
+                                  )}
+                                </span>
                               </span>
                               <span className="w-8 text-center font-mono text-ice-200">
                                 {s.goals}
