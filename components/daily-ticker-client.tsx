@@ -9,12 +9,14 @@ interface Props {
   games: DailyRecap[];
   /**
    * When true, the expanded scorers panel renders an "Edit stats →"
-   * link that drops the app owner into /games/[id]/edit so they can
+   * link that drops the app owner into /games/[id]/stats so they can
    * add/correct per-game manual stats. Gated at the server component
    * level so non-owners never see the link.
    */
   isOwner?: boolean;
   teamLogos?: Record<string, string>;
+  /** Override the "Last night" label — e.g. "Today" for live games. */
+  label?: string;
 }
 
 /**
@@ -32,7 +34,7 @@ interface Props {
  * - With fewer than 3 games the animation is disabled because the
  *   duplicated content wouldn't overflow the viewport meaningfully.
  */
-export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {} }: Props) {
+export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {}, label }: Props) {
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
   const selectedGame =
     selectedGameId != null
@@ -52,7 +54,7 @@ export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {}
     <section className="sticky top-0 z-40 border-y border-puck-border bg-puck-card/95 shadow-sm backdrop-blur">
       <div className="relative">
         <div className="flex items-center justify-between px-3 pt-1.5 text-[10px] uppercase tracking-wider text-ice-400 sm:px-4">
-          <span>🏒 Last night &middot; {prettyDate(date)}</span>
+          <span>🏒 {label ?? "Last night"} &middot; {prettyDate(date)}</span>
           <span className="hidden text-ice-500 sm:inline">
             {paused ? "paused · tap again or × to resume" : "tap a game for scorers"}
           </span>
@@ -134,7 +136,7 @@ export function DailyTickerClient({ date, games, isOwner = false, teamLogos = {}
             {isOwner && (
               <div className="mt-2 flex justify-end">
                 <Link
-                  href={`/games/${selectedGame.game_id}/edit`}
+                  href={`/games/${selectedGame.game_id}/stats`}
                   className="text-[11px] font-medium text-ice-300 underline-offset-2 hover:text-ice-100 hover:underline"
                 >
                   Edit stats →
@@ -186,6 +188,11 @@ function GameChip({
       {homeLogo && <img src={homeLogo} alt="" className="h-6 w-6 flex-shrink-0 object-contain" />}
       {game.was_overtime && (
         <span className="text-xs uppercase text-ice-400">OT</span>
+      )}
+      {game.game_state === "FINAL" && (
+        <span className="rounded bg-green-500/20 px-1 py-0.5 text-[9px] font-semibold uppercase text-green-300">
+          F
+        </span>
       )}
     </button>
   );

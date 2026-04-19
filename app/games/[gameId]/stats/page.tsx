@@ -304,6 +304,55 @@ async function markFinalAction(formData: FormData) {
     })
     .eq("game_id", gameId);
 
+  // Recompute series wins from all FINAL games in this series
+  const { data: game } = await svc
+    .from("playoff_games")
+    .select("series_letter")
+    .eq("game_id", gameId)
+    .single();
+
+  if (game) {
+    const { data: series } = await svc
+      .from("playoff_series")
+      .select("top_seed_abbrev, bottom_seed_abbrev, needed_to_win")
+      .eq("series_letter", game.series_letter)
+      .single();
+
+    if (series) {
+      const { data: finalGames } = await svc
+        .from("playoff_games")
+        .select("away_abbrev, home_abbrev, away_score, home_score")
+        .eq("series_letter", game.series_letter)
+        .eq("game_state", "FINAL");
+
+      let topWins = 0;
+      let bottomWins = 0;
+      for (const g of finalGames ?? []) {
+        const awayWon = (g.away_score ?? 0) > (g.home_score ?? 0);
+        const winner = awayWon ? g.away_abbrev : g.home_abbrev;
+        if (winner === series.top_seed_abbrev) topWins++;
+        else if (winner === series.bottom_seed_abbrev) bottomWins++;
+      }
+
+      const winningTeam =
+        topWins >= series.needed_to_win
+          ? series.top_seed_abbrev
+          : bottomWins >= series.needed_to_win
+            ? series.bottom_seed_abbrev
+            : null;
+
+      await svc
+        .from("playoff_series")
+        .update({
+          top_seed_wins: topWins,
+          bottom_seed_wins: bottomWins,
+          winning_team_abbrev: winningTeam,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("series_letter", game.series_letter);
+    }
+  }
+
   revalidatePath(`/games/${gameId}/stats`);
   redirect(
     `/games/${gameId}/stats?success=${encodeURIComponent(`Game marked as ${newState}.`)}`,
