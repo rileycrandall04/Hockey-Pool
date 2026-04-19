@@ -159,31 +159,11 @@ export default async function ScoreboardPage({
     if (fantasyTeamIds.length > 0) {
       const { data: teamOwnerRows } = await svc
         .from("teams")
-        .select("id, name, owner_id")
+        .select("id, name")
         .in("id", fantasyTeamIds);
-      // Fetch owner profiles separately for reliable display names
-      const ownerIds = [
-        ...new Set(
-          (teamOwnerRows ?? [])
-            .map((t: { owner_id: string }) => t.owner_id)
-            .filter(Boolean),
-        ),
-      ];
-      const profileMap = new Map<string, string>();
-      if (ownerIds.length > 0) {
-        const { data: ownerProfiles } = await svc
-          .from("profiles")
-          .select("id, display_name, email")
-          .in("id", ownerIds);
-        for (const p of ownerProfiles ?? []) {
-          const name = p.display_name || p.email || null;
-          if (name) profileMap.set(p.id, name);
-        }
-      }
       const teamNameMap = new Map<string, string>();
       for (const t of teamOwnerRows ?? []) {
-        const ownerName = profileMap.get(t.owner_id) ?? t.name;
-        teamNameMap.set(t.id, ownerName);
+        teamNameMap.set(t.id, t.name);
       }
       for (const d of draftRows ?? []) {
         const name = teamNameMap.get(d.team_id);
