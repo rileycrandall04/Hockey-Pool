@@ -214,6 +214,21 @@ export default async function LeagueStandingsPage({
     playerGameStats = (gameStatsData ?? []) as typeof playerGameStats;
   }
 
+  // Any game with ot_goals > 0 across all players — used to label
+  // Final OT on tonight's games. Separate from playerGameStats since
+  // that's restricted to the current user's drafted players.
+  const otGameIds = new Set<number>();
+  {
+    const svc = createServiceClient();
+    const { data: otRows } = await svc
+      .from("manual_game_stats")
+      .select("game_id")
+      .gt("ot_goals", 0);
+    for (const r of (otRows ?? []) as { game_id: number }[]) {
+      otGameIds.add(r.game_id);
+    }
+  }
+
   // Overnight deltas for the up/down/fire indicators. Returns null
   // until we have at least two snapshot dates for this league.
   const overnight = await getOvernightDeltas(leagueId);
@@ -327,6 +342,7 @@ export default async function LeagueStandingsPage({
           teamLogos={teamLogos}
           leaguePlayers={myPlayers}
           playerGameStats={playerGameStats}
+          otGameIds={otGameIds}
         />
 
         <div className="mt-6" />
