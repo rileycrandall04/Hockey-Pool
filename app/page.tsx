@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { DailyTicker } from "@/components/daily-ticker";
 
@@ -8,6 +10,40 @@ export default async function HomePage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Logged-in users skip the marketing landing entirely. If they
+  // belong to any league we send them to the last-visited one (or the
+  // most recently-created one as a fallback). Users with no league go
+  // to the dashboard so they can create or join one.
+  if (user) {
+    const svc = createServiceClient();
+    const [{ data: myTeams }, { data: myCommLeagues }] = await Promise.all([
+      svc.from("teams").select("league_id").eq("owner_id", user.id),
+      svc.from("leagues").select("id").eq("commissioner_id", user.id),
+    ]);
+
+    const leagueIds = new Set<string>();
+    for (const t of myTeams ?? []) leagueIds.add(t.league_id as string);
+    for (const l of myCommLeagues ?? []) leagueIds.add(l.id as string);
+
+    if (leagueIds.size === 0) redirect("/dashboard");
+
+    const cookieStore = await cookies();
+    const cookieLeagueId = cookieStore.get("current_league_id")?.value;
+    if (cookieLeagueId && leagueIds.has(cookieLeagueId)) {
+      redirect(`/leagues/${cookieLeagueId}`);
+    }
+
+    const { data: picks } = await svc
+      .from("leagues")
+      .select("id")
+      .in("id", [...leagueIds])
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (picks && picks.length > 0) redirect(`/leagues/${picks[0].id}`);
+
+    redirect("/dashboard");
+  }
 
   return (
     <>
