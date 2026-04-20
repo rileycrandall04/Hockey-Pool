@@ -123,10 +123,19 @@ export function GameStatsEditor({
     }
   }
 
-  // Count how many players have been edited (non-zero stats)
+  // Count how many players have pending changes vs their saved row.
+  // An edit counts as dirty if the values differ from what's already
+  // saved — including dropping a previously-saved stat back to zero,
+  // which is how the user undoes an accidental goal.
   let dirtyCount = 0;
-  for (const [, v] of edits) {
-    if (v.goals > 0 || v.assists > 0 || v.ot_goals > 0) dirtyCount++;
+  for (const [playerId, v] of edits) {
+    const prev = statsByPlayerId.get(playerId);
+    const prevG = prev?.goals ?? 0;
+    const prevA = prev?.assists ?? 0;
+    const prevOt = prev?.ot_goals ?? 0;
+    if (v.goals !== prevG || v.assists !== prevA || v.ot_goals !== prevOt) {
+      dirtyCount++;
+    }
   }
 
   function updateField(
@@ -144,12 +153,15 @@ export function GameStatsEditor({
 
   function handleSubmit() {
     if (!formRef.current) return;
-    // Build the entries JSON from current edits
+    // Build the entries JSON from current edits. Include zero-valued
+    // entries when the player has a previously-saved row so the server
+    // can delete it (fixes undoing an accidental goal via text edit).
     const entries: { player_id: number; goals: number; assists: number; ot_goals: number }[] = [];
     for (const [playerId, vals] of edits) {
-      if (vals.goals > 0 || vals.assists > 0 || vals.ot_goals > 0) {
-        entries.push({ player_id: playerId, ...vals });
-      }
+      const hadPrev = statsByPlayerId.has(playerId);
+      const isZero = vals.goals === 0 && vals.assists === 0 && vals.ot_goals === 0;
+      if (isZero && !hadPrev) continue;
+      entries.push({ player_id: playerId, ...vals });
     }
     // Set the hidden field and submit
     const entriesInput = formRef.current.querySelector<HTMLInputElement>(
