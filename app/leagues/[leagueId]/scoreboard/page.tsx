@@ -357,7 +357,14 @@ export default async function ScoreboardPage({
                           />
                         )}
                         {isFinal && (
-                          <span className="ml-1 rounded bg-green-500/20 px-1 py-0.5 text-[10px] font-semibold uppercase text-green-300 sm:px-1.5 sm:text-xs">
+                          <span
+                            className={
+                              "ml-1 rounded bg-green-500/20 py-0.5 font-semibold uppercase text-green-300 sm:px-1.5 sm:text-xs " +
+                              (wasOt
+                                ? "px-1 text-[9px]"
+                                : "px-1 text-[10px]")
+                            }
+                          >
                             {wasOt ? "Final OT" : "Final"}
                           </span>
                         )}
