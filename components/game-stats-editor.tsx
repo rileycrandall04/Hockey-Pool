@@ -215,15 +215,6 @@ export function GameStatsEditor({
         </button>
       </div>
 
-      {/* Header row */}
-      <div className="grid grid-cols-[1fr_3.5rem_3.5rem_3.5rem_auto] items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-ice-400">
-        <span>Player</span>
-        <span className="text-center">G</span>
-        <span className="text-center">A</span>
-        <span className="text-center">OT</span>
-        <span></span>
-      </div>
-
       {/* Player rows */}
       {sorted.length === 0 ? (
         <p className="px-2 text-xs text-ice-500">
@@ -246,14 +237,14 @@ export function GameStatsEditor({
               <div
                 key={player.id}
                 className={
-                  "rounded-md border px-2 py-1.5 " +
+                  "rounded-md border px-2 py-2 " +
                   (hasStats
                     ? "border-ice-500/30 bg-ice-500/5"
                     : "border-puck-border/50 bg-puck-bg/40")
                 }
               >
-                <div className="grid grid-cols-[1fr_3.5rem_3.5rem_3.5rem_auto] items-center gap-1.5">
-                  <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
                     <span
                       className={
                         "inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[9px] font-bold " +
@@ -262,8 +253,8 @@ export function GameStatsEditor({
                     >
                       {player.position}
                     </span>
-                    <div className="min-w-0">
-                      <span className="block truncate text-xs text-ice-100">
+                    <div className="min-w-0 flex-1">
+                      <span className="block text-xs text-ice-100">
                         {player.full_name}
                       </span>
                       {hasStats && existing && (
@@ -277,72 +268,41 @@ export function GameStatsEditor({
                       )}
                     </div>
                   </div>
+                  {hasStats && (
+                    <form action={deleteAction} className="flex-shrink-0">
+                      <input type="hidden" name="game_id" value={gameId} />
+                      <input
+                        type="hidden"
+                        name="player_id"
+                        value={player.id}
+                      />
+                      <button
+                        type="submit"
+                        className="h-7 px-1.5 text-[10px] text-red-400 hover:text-red-300"
+                        title="Remove entry"
+                      >
+                        &times;
+                      </button>
+                    </form>
+                  )}
+                </div>
 
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    inputMode="numeric"
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <StatControl
+                    label="G"
                     value={vals.goals}
-                    onChange={(e) =>
-                      updateField(
-                        player.id,
-                        "goals",
-                        Math.max(0, parseInt(e.target.value) || 0),
-                      )
-                    }
-                    className="h-7 px-1 text-center text-xs"
+                    onSet={(v) => updateField(player.id, "goals", v)}
                   />
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    inputMode="numeric"
+                  <StatControl
+                    label="A"
                     value={vals.assists}
-                    onChange={(e) =>
-                      updateField(
-                        player.id,
-                        "assists",
-                        Math.max(0, parseInt(e.target.value) || 0),
-                      )
-                    }
-                    className="h-7 px-1 text-center text-xs"
+                    onSet={(v) => updateField(player.id, "assists", v)}
                   />
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    inputMode="numeric"
+                  <StatControl
+                    label="OT"
                     value={vals.ot_goals}
-                    onChange={(e) =>
-                      updateField(
-                        player.id,
-                        "ot_goals",
-                        Math.max(0, parseInt(e.target.value) || 0),
-                      )
-                    }
-                    className="h-7 px-1 text-center text-xs"
+                    onSet={(v) => updateField(player.id, "ot_goals", v)}
                   />
-
-                  <div className="flex items-center">
-                    {hasStats && (
-                      <form action={deleteAction} className="inline">
-                        <input type="hidden" name="game_id" value={gameId} />
-                        <input
-                          type="hidden"
-                          name="player_id"
-                          value={player.id}
-                        />
-                        <button
-                          type="submit"
-                          className="h-7 px-1 text-[10px] text-red-400 hover:text-red-300"
-                          title="Remove entry"
-                        >
-                          &times;
-                        </button>
-                      </form>
-                    )}
-                  </div>
                 </div>
               </div>
             );
@@ -365,6 +325,43 @@ export function GameStatsEditor({
           Save all ({dirtyCount} player{dirtyCount === 1 ? "" : "s"})
         </Button>
       </div>
+    </div>
+  );
+}
+
+function StatControl({
+  label,
+  value,
+  onSet,
+}: {
+  label: string;
+  value: number;
+  onSet: (v: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="w-6 text-[10px] font-semibold uppercase tracking-wider text-ice-400">
+        {label}
+      </span>
+      <Input
+        type="number"
+        min={0}
+        step={1}
+        inputMode="numeric"
+        value={value === 0 ? "" : value}
+        onChange={(e) =>
+          onSet(Math.max(0, parseInt(e.target.value) || 0))
+        }
+        className="h-8 w-12 px-1 text-center text-sm"
+      />
+      <button
+        type="button"
+        onClick={() => onSet(value + 1)}
+        aria-label={`Add 1 ${label}`}
+        className="h-8 w-8 rounded border border-ice-500/40 bg-ice-500/10 text-base font-bold text-ice-100 hover:bg-ice-500/30"
+      >
+        +
+      </button>
     </div>
   );
 }
