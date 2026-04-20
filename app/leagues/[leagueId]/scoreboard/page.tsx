@@ -325,17 +325,17 @@ export default async function ScoreboardPage({
                 <Card key={g.game_id}>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-lg">
+                      <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
                         {awayLogo && (
                           <img
                             src={awayLogo}
                             alt=""
-                            className="h-7 w-7 object-contain"
+                            className="h-6 w-6 object-contain sm:h-7 sm:w-7"
                           />
                         )}
                         <span>{g.away_abbrev ?? "TBD"}</span>
                         {hasScore ? (
-                          <span className="font-mono text-xl text-ice-50">
+                          <span className="font-mono text-lg text-ice-50 sm:text-xl">
                             {g.away_score}–{g.home_score}
                           </span>
                         ) : (
@@ -346,11 +346,11 @@ export default async function ScoreboardPage({
                           <img
                             src={homeLogo}
                             alt=""
-                            className="h-7 w-7 object-contain"
+                            className="h-6 w-6 object-contain sm:h-7 sm:w-7"
                           />
                         )}
                         {isFinal && (
-                          <span className="ml-1 rounded bg-green-500/20 px-1.5 py-0.5 text-xs font-semibold uppercase text-green-300">
+                          <span className="ml-1 rounded bg-green-500/20 px-1 py-0.5 text-[10px] font-semibold uppercase text-green-300 sm:px-1.5 sm:text-xs">
                             Final
                           </span>
                         )}
