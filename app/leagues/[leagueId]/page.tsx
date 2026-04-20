@@ -96,28 +96,11 @@ export default async function LeagueStandingsPage({
     .select("*")
     .eq("league_id", leagueId);
 
-  // Display name per owner — used to label MVP / Value Pick rows. We
-  // fall back to the team name when a profile has no display_name set.
-  const ownerIds = [
-    ...new Set(((teams ?? []) as Team[]).map((t) => t.owner_id)),
-  ];
+  // Team name per team id — used to label the owner column on the
+  // MVP / Value Pick leaderboards so they match the standings rows.
   const teamOwnerDisplay = new Map<string, string>();
-  if (ownerIds.length > 0) {
-    const svc = createServiceClient();
-    const { data: profileRows } = await svc
-      .from("profiles")
-      .select("id, display_name")
-      .in("id", ownerIds);
-    const displayById = new Map<string, string>();
-    for (const p of (profileRows ?? []) as {
-      id: string;
-      display_name: string | null;
-    }[]) {
-      if (p.display_name) displayById.set(p.id, p.display_name);
-    }
-    for (const t of ((teams ?? []) as Team[])) {
-      teamOwnerDisplay.set(t.id, displayById.get(t.owner_id) ?? t.name);
-    }
+  for (const t of ((teams ?? []) as Team[])) {
+    teamOwnerDisplay.set(t.id, t.name);
   }
 
   const isCommissioner = league.commissioner_id === user.id;
