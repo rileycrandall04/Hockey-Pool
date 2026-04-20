@@ -96,6 +96,30 @@ export default async function LeagueStandingsPage({
     .select("*")
     .eq("league_id", leagueId);
 
+  // Display name per owner — used to label MVP / Value Pick rows. We
+  // fall back to the team name when a profile has no display_name set.
+  const ownerIds = [
+    ...new Set(((teams ?? []) as Team[]).map((t) => t.owner_id)),
+  ];
+  const teamOwnerDisplay = new Map<string, string>();
+  if (ownerIds.length > 0) {
+    const svc = createServiceClient();
+    const { data: profileRows } = await svc
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", ownerIds);
+    const displayById = new Map<string, string>();
+    for (const p of (profileRows ?? []) as {
+      id: string;
+      display_name: string | null;
+    }[]) {
+      if (p.display_name) displayById.set(p.id, p.display_name);
+    }
+    for (const t of ((teams ?? []) as Team[])) {
+      teamOwnerDisplay.set(t.id, displayById.get(t.owner_id) ?? t.name);
+    }
+  }
+
   const isCommissioner = league.commissioner_id === user.id;
   const ownerFlag = isAppOwner(user.email);
 
@@ -270,6 +294,46 @@ export default async function LeagueStandingsPage({
       };
     })
     .sort((a, b) => b.total - a.total);
+
+  // MVP: top scorers across the whole league. Value Pick: players whose
+  // points × draft pick number is highest — rewards late-round picks
+  // who produced. Both filter out zero-point players so a just-drafted
+  // league doesn't show a meaningless list.
+  const allDraftedPlayers = (rosterRows as RosterEntry[] | null) ?? [];
+  type RankedPlayer = {
+    player_id: number;
+    full_name: string;
+    fantasy_points: number;
+    pick_number: number;
+    owner: string;
+  };
+  const toRankedRow = (p: RosterEntry): RankedPlayer => ({
+    player_id: p.player_id,
+    full_name: p.full_name,
+    fantasy_points: p.fantasy_points,
+    pick_number: p.pick_number,
+    owner: teamOwnerDisplay.get(p.team_id) ?? "?",
+  });
+  const mvpTop5 = allDraftedPlayers
+    .filter((p) => p.fantasy_points > 0)
+    .sort((a, b) => {
+      if (b.fantasy_points !== a.fantasy_points)
+        return b.fantasy_points - a.fantasy_points;
+      if (b.goals !== a.goals) return b.goals - a.goals;
+      return b.games_played - a.games_played;
+    })
+    .slice(0, 5)
+    .map(toRankedRow);
+  const valuePickTop5 = allDraftedPlayers
+    .filter((p) => p.fantasy_points > 0)
+    .sort((a, b) => {
+      const av = a.fantasy_points * a.pick_number;
+      const bv = b.fantasy_points * b.pick_number;
+      if (bv !== av) return bv - av;
+      return b.pick_number - a.pick_number;
+    })
+    .slice(0, 5)
+    .map(toRankedRow);
 
   return (
     <>
@@ -447,6 +511,8 @@ export default async function LeagueStandingsPage({
           </div>
         )}
 
+        <PlayerRankings mvp={mvpTop5} valuePick={valuePickTop5} />
+
       </main>
     </>
   );
@@ -456,6 +522,103 @@ export default async function LeagueStandingsPage({
  * Compact card showing which teams scored the most points overnight.
  * Uses the already-fetched overnight deltas — no extra queries.
  */
+interface RankedPlayerRow {
+  player_id: number;
+  full_name: string;
+  fantasy_points: number;
+  pick_number: number;
+  owner: string;
+}
+
+/**
+ * Two side-by-side leaderboards under the standings:
+ *   - MVP: highest playoff fantasy points in the league
+ *   - Value Pick: highest (fantasy_points × pick_number), so a player
+ *     drafted at pick 96 who scored 10 pts beats a player drafted at
+ *     pick 5 who scored 12 pts — rewarding late-round production.
+ */
+function PlayerRankings({
+  mvp,
+  valuePick,
+}: {
+  mvp: RankedPlayerRow[];
+  valuePick: RankedPlayerRow[];
+}) {
+  if (mvp.length === 0 && valuePick.length === 0) return null;
+  return (
+    <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <RankingTable
+        title="MVP"
+        rightLabel="Pts"
+        rows={mvp.map((r) => ({
+          name: r.full_name,
+          owner: r.owner,
+          right: `${r.fantasy_points}`,
+        }))}
+      />
+      <RankingTable
+        title="Value Pick"
+        rightLabel="Pts · Pick"
+        rows={valuePick.map((r) => ({
+          name: r.full_name,
+          owner: r.owner,
+          right: `${r.fantasy_points} · #${r.pick_number}`,
+        }))}
+      />
+    </div>
+  );
+}
+
+function RankingTable({
+  title,
+  rightLabel,
+  rows,
+}: {
+  title: string;
+  rightLabel: string;
+  rows: { name: string; owner: string; right: string }[];
+}) {
+  return (
+    <section className="rounded-md border border-puck-border bg-puck-card">
+      <header className="flex items-baseline justify-between gap-2 border-b border-puck-border px-3 py-2">
+        <h3 className="text-sm font-semibold text-ice-100 sm:text-base">
+          {title}
+        </h3>
+        <span className="text-[10px] uppercase tracking-wider text-ice-500">
+          {rightLabel}
+        </span>
+      </header>
+      {rows.length === 0 ? (
+        <p className="px-3 py-3 text-xs text-ice-400">
+          No scoring players yet.
+        </p>
+      ) : (
+        <ol className="divide-y divide-puck-border/70">
+          {rows.map((r, i) => (
+            <li
+              key={`${i}-${r.name}`}
+              className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs sm:text-sm"
+            >
+              <span className="flex min-w-0 items-baseline gap-2">
+                <span className="w-4 flex-shrink-0 text-right text-ice-500">
+                  {i + 1}.
+                </span>
+                <span className="min-w-0 truncate">
+                  <span className="text-ice-100">{r.name}</span>
+                  <span className="ml-1.5 text-ice-500">({r.owner})</span>
+                </span>
+              </span>
+              <span className="flex-shrink-0 font-mono text-ice-200">
+                {r.right}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 function HotTeams({
   deltas,
   standings,
