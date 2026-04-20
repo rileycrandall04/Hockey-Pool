@@ -87,15 +87,6 @@ async function batchUpsertStatsAction(formData: FormData) {
     redirect(`/games/${gameId}/stats?error=${encodeURIComponent("Invalid data")}`);
   }
 
-  // Filter to only rows with actual stats
-  entries = entries.filter(
-    (e) => e.goals > 0 || e.assists > 0 || e.ot_goals > 0,
-  );
-
-  if (entries.length === 0) {
-    redirect(`/games/${gameId}/stats?error=${encodeURIComponent("No stats to save.")}`);
-  }
-
   for (const e of entries) {
     if (e.ot_goals > e.goals) {
       redirect(
@@ -129,6 +120,18 @@ async function batchUpsertStatsAction(formData: FormData) {
       assists: r.assists,
       ot_goals: r.ot_goals,
     });
+  }
+
+  // Drop zero-valued entries that don't have a saved row — nothing to
+  // do. Keep zero-valued entries that had a prior row so we can delete
+  // them (the "undo an accidental goal by editing back to 0" flow).
+  entries = entries.filter((e) => {
+    const isZero = e.goals === 0 && e.assists === 0 && e.ot_goals === 0;
+    return !isZero || prevByPlayer.has(e.player_id);
+  });
+
+  if (entries.length === 0) {
+    redirect(`/games/${gameId}/stats?error=${encodeURIComponent("No stats to save.")}`);
   }
 
   // Fetch game to know which team each player belongs to
@@ -186,27 +189,46 @@ async function batchUpsertStatsAction(formData: FormData) {
       );
     }
 
-    const { error: upsertError } = await svc.from("manual_game_stats").upsert(
-      {
-        game_id: gameId,
-        player_id: e.player_id,
-        goals: e.goals,
-        assists: e.assists,
-        ot_goals: e.ot_goals,
-        entered_by: user.id,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "game_id,player_id" },
-    );
-    if (upsertError) {
-      await applyPlayerStatsDelta(svc, e.player_id, {
-        goals: -delta.goals,
-        assists: -delta.assists,
-        ot_goals: -delta.ot_goals,
-      });
-      redirect(
-        `/games/${gameId}/stats?error=${encodeURIComponent(`upsert player ${e.player_id}: ${upsertError.message}`)}&success=${encodeURIComponent(`Saved ${savedCount} entries before error.`)}`,
+    const isZero = e.goals === 0 && e.assists === 0 && e.ot_goals === 0;
+    if (isZero) {
+      const { error: deleteError } = await svc
+        .from("manual_game_stats")
+        .delete()
+        .eq("game_id", gameId)
+        .eq("player_id", e.player_id);
+      if (deleteError) {
+        await applyPlayerStatsDelta(svc, e.player_id, {
+          goals: -delta.goals,
+          assists: -delta.assists,
+          ot_goals: -delta.ot_goals,
+        });
+        redirect(
+          `/games/${gameId}/stats?error=${encodeURIComponent(`delete player ${e.player_id}: ${deleteError.message}`)}&success=${encodeURIComponent(`Saved ${savedCount} entries before error.`)}`,
+        );
+      }
+    } else {
+      const { error: upsertError } = await svc.from("manual_game_stats").upsert(
+        {
+          game_id: gameId,
+          player_id: e.player_id,
+          goals: e.goals,
+          assists: e.assists,
+          ot_goals: e.ot_goals,
+          entered_by: user.id,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "game_id,player_id" },
       );
+      if (upsertError) {
+        await applyPlayerStatsDelta(svc, e.player_id, {
+          goals: -delta.goals,
+          assists: -delta.assists,
+          ot_goals: -delta.ot_goals,
+        });
+        redirect(
+          `/games/${gameId}/stats?error=${encodeURIComponent(`upsert player ${e.player_id}: ${upsertError.message}`)}&success=${encodeURIComponent(`Saved ${savedCount} entries before error.`)}`,
+        );
+      }
     }
     savedCount++;
   }
