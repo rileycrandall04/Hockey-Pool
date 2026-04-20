@@ -331,8 +331,8 @@ export default async function ScoreboardPage({
               return (
                 <Card key={g.game_id}>
                   <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-1.5 text-base sm:gap-2 sm:text-lg">
+                    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                      <CardTitle className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-base sm:gap-x-2 sm:text-lg">
                         {awayLogo && (
                           <img
                             src={awayLogo}
@@ -359,7 +359,7 @@ export default async function ScoreboardPage({
                         {isFinal && (
                           <span
                             className={
-                              "ml-1 rounded bg-green-500/20 py-0.5 font-semibold uppercase text-green-300 sm:px-1.5 sm:text-xs " +
+                              "ml-1 whitespace-nowrap rounded bg-green-500/20 py-0.5 font-semibold uppercase text-green-300 sm:px-1.5 sm:text-xs " +
                               (wasOt
                                 ? "px-1 text-[9px]"
                                 : "px-1 text-[10px]")
