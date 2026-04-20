@@ -996,6 +996,116 @@ const ADS: string[] = [
     </a>
   </div>
 </div>`,
+  // Ad 13: Dr. Bob's Physical Training
+  `<div style="width:370px;max-width:95vw;background:#FFF8F0;border:3px solid #E65100;position:relative;">
+  <div style="background:#E65100;padding:5px 10px;display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:#FFE0B2;font-size:9px;letter-spacing:2px;font-weight:bold;">★ SPONSORED — HOCKEY POOL ★</span>
+    <button data-ad-close style="background:#E65100;border:1px solid #FFE0B2;color:#FFE0B2;width:19px;height:19px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;font-weight:900;">✕</button>
+  </div>
+  <div style="padding:14px 20px 16px;text-align:center;">
+    <div style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:13px;color:#E65100;letter-spacing:3px;margin-bottom:0;">Dr. Bob's</div>
+    <div style="font-family:Impact,'Arial Black',sans-serif;font-size:32px;color:#1A1A1A;text-transform:uppercase;letter-spacing:1px;line-height:0.9;margin-bottom:10px;">Physical<br>Training</div>
+    <div style="border:2px solid #E65100;border-radius:4px;overflow:hidden;background:#FFF3E0;margin-bottom:12px;">
+      <svg viewBox="0 0 334 190" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        <rect x="0" y="0" width="334" height="190" fill="#FFF3E0"/>
+        <rect x="0" y="0" width="334" height="130" fill="#FFE0B2"/>
+        <rect x="0" y="130" width="334" height="60" fill="#FFCC80"/>
+        <line x1="0" y1="130" x2="334" y2="130" stroke="#FB8C00" stroke-width="2"/>
+        <line x1="60" y1="130" x2="60" y2="190" stroke="#FB8C00" stroke-width="0.8" opacity="0.4"/>
+        <line x1="120" y1="130" x2="120" y2="190" stroke="#FB8C00" stroke-width="0.8" opacity="0.4"/>
+        <line x1="180" y1="130" x2="180" y2="190" stroke="#FB8C00" stroke-width="0.8" opacity="0.4"/>
+        <line x1="240" y1="130" x2="240" y2="190" stroke="#FB8C00" stroke-width="0.8" opacity="0.4"/>
+        <line x1="300" y1="130" x2="300" y2="190" stroke="#FB8C00" stroke-width="0.8" opacity="0.4"/>
+        <rect x="238" y="14" width="80" height="50" rx="2" fill="white" stroke="#E65100" stroke-width="1.5"/>
+        <rect x="240" y="16" width="76" height="28" rx="1" fill="#E65100" opacity="0.15"/>
+        <text x="278" y="30" text-anchor="middle" font-family="Impact" font-size="9" fill="#E65100">NO PAIN</text>
+        <text x="278" y="41" text-anchor="middle" font-family="Impact" font-size="9" fill="#E65100">NO GAIN</text>
+        <text x="278" y="55" text-anchor="middle" font-family="Georgia" font-size="7" fill="#888" font-style="italic">— Dr. Bob</text>
+        <rect x="14" y="10" width="72" height="56" rx="2" fill="#F5F5F5" stroke="#BDBDBD" stroke-width="1.5"/>
+        <text x="50" y="24" text-anchor="middle" font-family="Impact" font-size="8" fill="#E65100">TODAY'S WOD</text>
+        <text x="50" y="36" text-anchor="middle" font-family="Arial" font-size="7" fill="#333">• Squats x10</text>
+        <text x="50" y="46" text-anchor="middle" font-family="Arial" font-size="7" fill="#333">• Burpees x5</text>
+        <text x="50" y="56" text-anchor="middle" font-family="Arial" font-size="7" fill="#888" font-style="italic">• ??? x∞</text>
+        <g transform="translate(68,90)">
+          <ellipse cx="0" cy="-52" rx="12" ry="13" fill="#FFCCAA"/>
+          <ellipse cx="0" cy="-60" rx="12" ry="7" fill="#5D4037"/>
+          <ellipse cx="-4" cy="-54" rx="2.5" ry="3" fill="white"/>
+          <ellipse cx="4" cy="-54" rx="2.5" ry="3" fill="white"/>
+          <circle cx="-4" cy="-53" r="1.5" fill="#333"/>
+          <circle cx="4" cy="-53" r="1.5" fill="#333"/>
+          <path d="M -3 -46 Q 0 -43 3 -46" fill="none" stroke="#A0522D" stroke-width="1.2"/>
+          <rect x="-14" y="-40" width="28" height="30" rx="5" fill="#FF7043"/>
+          <line x1="-14" y1="-30" x2="-38" y2="-22" stroke="#FF7043" stroke-width="8" stroke-linecap="round"/>
+          <line x1="14" y1="-30" x2="38" y2="-22" stroke="#FF7043" stroke-width="8" stroke-linecap="round"/>
+          <ellipse cx="-40" cy="-20" rx="7" ry="6" fill="#FFCCAA"/>
+          <ellipse cx="40" cy="-20" rx="7" ry="6" fill="#FFCCAA"/>
+          <line x1="-8" y1="-10" x2="-20" y2="14" stroke="#1565C0" stroke-width="9" stroke-linecap="round"/>
+          <line x1="8" y1="-10" x2="20" y2="14" stroke="#1565C0" stroke-width="9" stroke-linecap="round"/>
+          <line x1="-20" y1="14" x2="-14" y2="36" stroke="#1565C0" stroke-width="8" stroke-linecap="round"/>
+          <line x1="20" y1="14" x2="14" y2="36" stroke="#1565C0" stroke-width="8" stroke-linecap="round"/>
+          <rect x="-22" y="34" width="16" height="7" rx="3" fill="#333"/>
+          <rect x="6" y="34" width="16" height="7" rx="3" fill="#333"/>
+        </g>
+        <g transform="translate(180,82)">
+          <line x1="6" y1="10" x2="-8" y2="44" stroke="#ECEFF1" stroke-width="10" stroke-linecap="round"/>
+          <line x1="-8" y1="44" x2="-10" y2="52" stroke="#ECEFF1" stroke-width="9" stroke-linecap="round"/>
+          <rect x="-18" y="50" width="16" height="7" rx="3" fill="#37474F"/>
+          <line x1="-4" y1="10" x2="16" y2="36" stroke="#ECEFF1" stroke-width="10" stroke-linecap="round"/>
+          <line x1="16" y1="36" x2="18" y2="50" stroke="#ECEFF1" stroke-width="9" stroke-linecap="round"/>
+          <rect x="10" y="48" width="16" height="7" rx="3" fill="#37474F"/>
+          <rect x="-18" y="-32" width="36" height="44" rx="6" fill="#ECEFF1"/>
+          <polygon points="-4,-32 -14,-18 -4,-18" fill="white"/>
+          <polygon points="4,-32 14,-18 4,-18" fill="white"/>
+          <rect x="-8" y="-18" width="16" height="30" fill="#E65100" opacity="0.6"/>
+          <line x1="18" y1="-22" x2="46" y2="-44" stroke="#ECEFF1" stroke-width="9" stroke-linecap="round"/>
+          <ellipse cx="48" cy="-46" rx="7" ry="6" fill="#FFCCAA"/>
+          <line x1="52" y1="-50" x2="80" y2="-70" stroke="#8D6E63" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="82" cy="-72" r="3" fill="#E65100"/>
+          <line x1="-18" y1="-20" x2="-42" y2="-12" stroke="#ECEFF1" stroke-width="9" stroke-linecap="round"/>
+          <ellipse cx="-44" cy="-10" rx="7" ry="6" fill="#FFCCAA"/>
+          <rect x="-7" y="-46" width="14" height="16" rx="4" fill="#FFCCAA"/>
+          <ellipse cx="0" cy="-56" rx="18" ry="19" fill="#FFCCAA"/>
+          <ellipse cx="0" cy="-71" rx="19" ry="9" fill="#1A1A1A"/>
+          <rect x="-19" y="-74" width="38" height="13" rx="3" fill="#1A1A1A"/>
+          <ellipse cx="-17" cy="-63" rx="5" ry="11" fill="#1A1A1A"/>
+          <ellipse cx="17" cy="-63" rx="5" ry="11" fill="#1A1A1A"/>
+          <ellipse cx="-3" cy="-74" rx="6" ry="3" fill="#333" opacity="0.6"/>
+          <rect x="-14" y="-62" width="10" height="8" rx="3" fill="none" stroke="#222" stroke-width="1.5"/>
+          <rect x="4" y="-62" width="10" height="8" rx="3" fill="none" stroke="#222" stroke-width="1.5"/>
+          <line x1="-4" y1="-58" x2="4" y2="-58" stroke="#222" stroke-width="1.5"/>
+          <line x1="-18" y1="-58" x2="-22" y2="-60" stroke="#222" stroke-width="1.5"/>
+          <line x1="14" y1="-58" x2="18" y2="-60" stroke="#222" stroke-width="1.5"/>
+          <path d="M -10 -51 C -8 -46 -3 -45 0 -47 C 3 -45 8 -46 10 -51 C 6 -49 3 -48 0 -49 C -3 -48 -6 -49 -10 -51 Z" fill="#1A1A1A"/>
+          <path d="M -4 -46 Q 0 -43 4 -46" fill="none" stroke="#A0522D" stroke-width="1" stroke-linecap="round"/>
+          <rect x="-14" y="-22" width="32" height="12" rx="2" fill="white" stroke="#BDBDBD" stroke-width="0.8"/>
+          <text x="2" y="-13" text-anchor="middle" font-family="Arial" font-size="5.5" fill="#333" font-weight="bold">DR. BOB D.O.</text>
+        </g>
+        <g transform="translate(290,100)">
+          <ellipse cx="0" cy="-38" rx="9" ry="10" fill="#FFCCAA"/>
+          <ellipse cx="0" cy="-46" rx="9" ry="5" fill="#4CAF50"/>
+          <rect x="-10" y="-29" width="20" height="22" rx="4" fill="#4CAF50"/>
+          <line x1="-10" y1="-22" x2="-24" y2="-38" stroke="#4CAF50" stroke-width="7" stroke-linecap="round"/>
+          <line x1="10" y1="-22" x2="24" y2="-38" stroke="#4CAF50" stroke-width="7" stroke-linecap="round"/>
+          <line x1="-4" y1="-8" x2="-16" y2="18" stroke="#333" stroke-width="7" stroke-linecap="round"/>
+          <line x1="4" y1="-8" x2="16" y2="18" stroke="#333" stroke-width="7" stroke-linecap="round"/>
+          <rect x="-22" y="16" width="12" height="5" rx="2" fill="#333"/>
+          <rect x="10" y="16" width="12" height="5" rx="2" fill="#333"/>
+        </g>
+      </svg>
+    </div>
+    <div style="background:#FFF3E0;border-left:3px solid #E65100;padding:8px 12px;text-align:left;margin-bottom:12px;">
+      <div style="font-family:Georgia,serif;font-style:italic;font-size:13px;color:#333;margin-bottom:5px;">✓ &nbsp;You can wear a wig</div>
+      <div style="font-family:Georgia,serif;font-style:italic;font-size:13px;color:#C62828;">✗ &nbsp;No serial killers please</div>
+    </div>
+    <button style="background:#E65100;color:white;border:none;padding:11px 0;font-family:Impact,'Arial Black',sans-serif;font-size:20px;text-transform:uppercase;cursor:pointer;letter-spacing:1px;width:100%;display:block;margin-bottom:8px;">
+      GET TRAINED →
+    </button>
+    <div style="font-size:7.5px;color:#aaa;font-style:italic;margin-bottom:6px;">*Dr. Bob is a D.O. &nbsp;|&nbsp; Wig must be secured during burpees</div>
+    <a href="#" data-ad-close style="font-size:9px;color:#aaa;font-family:Arial;text-decoration:none;display:block;">
+      No thanks, I skip leg day
+    </a>
+  </div>
+</div>`,
 ];
 
 export default function AdOverlay({
