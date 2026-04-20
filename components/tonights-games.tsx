@@ -24,6 +24,7 @@ interface TonightsGamesProps {
   teamLogos?: Record<string, string>;
   leaguePlayers?: LeaguePlayer[];
   playerGameStats?: PlayerGameStat[];
+  otGameIds?: Set<number>;
 }
 
 /**
@@ -52,6 +53,7 @@ export function TonightsGames({
   teamLogos = {},
   leaguePlayers = [],
   playerGameStats = [],
+  otGameIds,
 }: TonightsGamesProps) {
   const { date: effectiveDate, isToday } = effectiveGameDay();
   const scheduledTodayRaw = (games ?? []).filter((g) => isGameOnDate(g, effectiveDate));
@@ -105,6 +107,7 @@ export function TonightsGames({
               teamLogos={teamLogos}
               leaguePlayers={leaguePlayers}
               playerGameStats={playerGameStats}
+              wasOt={otGameIds?.has(g.game_id) ?? false}
             />
           ))}
         </ul>
@@ -119,12 +122,14 @@ function GameRow({
   teamLogos = {},
   leaguePlayers = [],
   playerGameStats = [],
+  wasOt = false,
 }: {
   game: PlayoffGame;
   parentSeries: PlayoffSeries | undefined;
   teamLogos?: Record<string, string>;
   leaguePlayers?: LeaguePlayer[];
   playerGameStats?: PlayerGameStat[];
+  wasOt?: boolean;
 }) {
   const awayLogo = game.away_abbrev ? teamLogos[game.away_abbrev] : undefined;
   const homeLogo = game.home_abbrev ? teamLogos[game.home_abbrev] : undefined;
@@ -189,8 +194,13 @@ function GameRow({
             {game.home_abbrev ?? "TBD"}
             {homeLogo && <img src={homeLogo} alt="" className="h-5 w-5 flex-shrink-0 object-contain" />}
             {isFinal && (
-              <span className="rounded bg-green-500/20 px-1 py-0.5 text-[9px] font-semibold uppercase text-green-300">
-                Final
+              <span
+                className={
+                  "rounded bg-green-500/20 px-1 py-0.5 font-semibold uppercase text-green-300 " +
+                  (wasOt ? "text-[8px]" : "text-[9px]")
+                }
+              >
+                {wasOt ? "Final OT" : "Final"}
               </span>
             )}
           </span>
@@ -202,7 +212,9 @@ function GameRow({
         </div>
         <div className="flex flex-shrink-0 flex-col items-end text-right">
           {isFinal ? (
-            <span className="font-semibold text-green-300">Final</span>
+            <span className="font-semibold text-green-300">
+              {wasOt ? "Final OT" : "Final"}
+            </span>
           ) : hasScore ? null : (
             <>
               {time && <span className="font-mono text-ice-200">{time}</span>}
