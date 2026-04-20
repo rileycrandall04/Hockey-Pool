@@ -134,6 +134,12 @@ export default async function ScoreboardPage({
         .in("game_id", gameIds)
     : { data: [] };
 
+  // Any game with a player ot_goals > 0 went to overtime.
+  const gamesWithOt = new Set<number>();
+  for (const s of (statRows ?? []) as { game_id: number; ot_goals: number }[]) {
+    if (s.ot_goals > 0) gamesWithOt.add(s.game_id);
+  }
+
   // Player name lookup
   const playerIds = [
     ...new Set((statRows ?? []).map((s: { player_id: number }) => s.player_id)),
@@ -314,6 +320,7 @@ export default async function ScoreboardPage({
                 g.away_score != null && g.home_score != null;
               const isFinal =
                 g.game_state === "FINAL" || g.game_state === "OFF";
+              const wasOt = gamesWithOt.has(g.game_id);
               const awayLogo = g.away_abbrev
                 ? teamLogos[g.away_abbrev]
                 : undefined;
@@ -351,7 +358,7 @@ export default async function ScoreboardPage({
                         )}
                         {isFinal && (
                           <span className="ml-1 rounded bg-green-500/20 px-1 py-0.5 text-[10px] font-semibold uppercase text-green-300 sm:px-1.5 sm:text-xs">
-                            Final
+                            {wasOt ? "Final OT" : "Final"}
                           </span>
                         )}
                       </CardTitle>
