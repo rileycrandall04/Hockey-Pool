@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getLeagueForMember } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
@@ -8,55 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { scoreTeam } from "@/lib/scoring";
+import {
+  renameTeamAction,
+  TEAM_RENAME_MAX_LEN,
+} from "@/app/leagues/[leagueId]/team-actions";
 import type { RosterEntry, Team } from "@/lib/types";
-
-const TEAM_NAME_MAX_LEN = 60;
-
-async function renameTeamAction(formData: FormData) {
-  "use server";
-  const leagueId = String(formData.get("league_id") ?? "");
-  const teamId = String(formData.get("team_id") ?? "");
-  const rawName = String(formData.get("team_name") ?? "");
-  const name = rawName.trim();
-
-  const backUrl = `/leagues/${leagueId}/team/${teamId}`;
-  if (!leagueId || !teamId) {
-    redirect(`${backUrl}?rename_error=${encodeURIComponent("Missing team.")}`);
-  }
-  if (name.length === 0) {
-    redirect(
-      `${backUrl}?rename_error=${encodeURIComponent("Team name can't be empty.")}`,
-    );
-  }
-  if (name.length > TEAM_NAME_MAX_LEN) {
-    redirect(
-      `${backUrl}?rename_error=${encodeURIComponent(
-        `Team name must be ${TEAM_NAME_MAX_LEN} characters or fewer.`,
-      )}`,
-    );
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  // RLS already restricts updates to the team owner or the league
-  // commissioner, so we rely on that rather than re-checking here.
-  const { error } = await supabase
-    .from("teams")
-    .update({ name })
-    .eq("id", teamId);
-
-  if (error) {
-    redirect(`${backUrl}?rename_error=${encodeURIComponent(error.message)}`);
-  }
-
-  revalidatePath(`/leagues/${leagueId}`);
-  revalidatePath(backUrl);
-  redirect(`${backUrl}?rename_success=${encodeURIComponent("Team name updated.")}`);
-}
 
 export default async function TeamPage({
   params,
@@ -146,7 +101,7 @@ export default async function TeamPage({
                   <Input
                     name="team_name"
                     defaultValue={team.name}
-                    maxLength={TEAM_NAME_MAX_LEN}
+                    maxLength={TEAM_RENAME_MAX_LEN}
                     required
                     className="w-64"
                     aria-label="Team name"

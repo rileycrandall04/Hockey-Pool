@@ -14,7 +14,12 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { CopyJoinCodeButton } from "@/components/copy-join-code-button";
+import {
+  renameTeamAction,
+  TEAM_RENAME_MAX_LEN,
+} from "@/app/leagues/[leagueId]/team-actions";
 import { DailyTicker } from "@/components/daily-ticker";
 import { TonightsGames } from "@/components/tonights-games";
 import { scoreTeam } from "@/lib/scoring";
@@ -72,10 +77,14 @@ async function toggleDraftWatchAction(formData: FormData) {
 
 export default async function LeagueStandingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ leagueId: string }>;
+  searchParams: Promise<{ rename_success?: string; rename_error?: string }>;
 }) {
   const { leagueId } = await params;
+  const { rename_success: renameSuccess, rename_error: renameError } =
+    await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -404,6 +413,17 @@ export default async function LeagueStandingsPage({
           Standings
         </h2>
 
+        {renameSuccess && (
+          <div className="mb-2 rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-xs text-green-200 sm:text-sm">
+            {renameSuccess}
+          </div>
+        )}
+        {renameError && (
+          <div className="mb-2 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200 sm:text-sm">
+            {renameError}
+          </div>
+        )}
+
         {standings.length === 0 ? (
           <Card>
             <CardContent className="px-4 py-6 text-center text-ice-400">
@@ -486,6 +506,37 @@ export default async function LeagueStandingsPage({
                       footerPlayers={row.bench}
                       adjustment={row.adjustment}
                     />
+                  )}
+                  {(row.team.owner_id === user.id || isCommissioner) && (
+                    <form
+                      action={renameTeamAction}
+                      className="mt-3 flex flex-wrap items-center gap-2 border-t border-puck-border pt-3"
+                    >
+                      <input type="hidden" name="league_id" value={leagueId} />
+                      <input type="hidden" name="team_id" value={row.team.id} />
+                      <input
+                        type="hidden"
+                        name="return_url"
+                        value={`/leagues/${leagueId}`}
+                      />
+                      <label
+                        htmlFor={`rename-${row.team.id}`}
+                        className="text-ice-400"
+                      >
+                        Rename team:
+                      </label>
+                      <Input
+                        id={`rename-${row.team.id}`}
+                        name="team_name"
+                        defaultValue={row.team.name}
+                        maxLength={TEAM_RENAME_MAX_LEN}
+                        required
+                        className="w-56"
+                      />
+                      <Button type="submit" size="sm">
+                        Save
+                      </Button>
+                    </form>
                   )}
                 </div>
               </details>
