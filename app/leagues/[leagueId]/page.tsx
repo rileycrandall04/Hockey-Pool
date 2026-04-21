@@ -16,10 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { CopyJoinCodeButton } from "@/components/copy-join-code-button";
-import {
-  renameTeamAction,
-  TEAM_RENAME_MAX_LEN,
-} from "@/app/leagues/[leagueId]/team-actions";
+import { renameTeamAction } from "@/app/leagues/[leagueId]/team-actions";
+import { TEAM_RENAME_MAX_LEN } from "@/app/leagues/[leagueId]/team-constants";
 import { DailyTicker } from "@/components/daily-ticker";
 import { TonightsGames } from "@/components/tonights-games";
 import { scoreTeam } from "@/lib/scoring";

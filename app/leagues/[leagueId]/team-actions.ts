@@ -3,8 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-
-const TEAM_NAME_MAX_LEN = 60;
+import { TEAM_RENAME_MAX_LEN } from "./team-constants";
 
 /**
  * Rename a team the caller owns (or commissions). The form is expected
@@ -39,10 +38,10 @@ export async function renameTeamAction(formData: FormData) {
       )}`,
     );
   }
-  if (name.length > TEAM_NAME_MAX_LEN) {
+  if (name.length > TEAM_RENAME_MAX_LEN) {
     redirect(
       `${returnUrl}${sep}rename_error=${encodeURIComponent(
-        `Team name must be ${TEAM_NAME_MAX_LEN} characters or fewer.`,
+        `Team name must be ${TEAM_RENAME_MAX_LEN} characters or fewer.`,
       )}`,
     );
   }
@@ -70,5 +69,3 @@ export async function renameTeamAction(formData: FormData) {
     `${returnUrl}${sep}rename_success=${encodeURIComponent("Team name updated.")}`,
   );
 }
-
-export const TEAM_RENAME_MAX_LEN = TEAM_NAME_MAX_LEN;
