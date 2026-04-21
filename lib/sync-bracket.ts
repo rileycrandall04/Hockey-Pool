@@ -263,7 +263,7 @@ export async function syncPlayoffBracket(): Promise<BracketSyncResult> {
         .from("playoff_games")
         .select("away_abbrev, home_abbrev, away_score, home_score")
         .eq("series_letter", s.seriesLetter)
-        .eq("game_state", "FINAL");
+        .in("game_state", ["FINAL", "OFF"]);
 
       let topWins = 0;
       let bottomWins = 0;

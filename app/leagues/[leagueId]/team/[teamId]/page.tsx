@@ -1,18 +1,73 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getLeagueForMember } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { scoreTeam } from "@/lib/scoring";
-import type { League, RosterEntry, Team } from "@/lib/types";
+import type { RosterEntry, Team } from "@/lib/types";
+
+const TEAM_NAME_MAX_LEN = 60;
+
+async function renameTeamAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  const teamId = String(formData.get("team_id") ?? "");
+  const rawName = String(formData.get("team_name") ?? "");
+  const name = rawName.trim();
+
+  const backUrl = `/leagues/${leagueId}/team/${teamId}`;
+  if (!leagueId || !teamId) {
+    redirect(`${backUrl}?rename_error=${encodeURIComponent("Missing team.")}`);
+  }
+  if (name.length === 0) {
+    redirect(
+      `${backUrl}?rename_error=${encodeURIComponent("Team name can't be empty.")}`,
+    );
+  }
+  if (name.length > TEAM_NAME_MAX_LEN) {
+    redirect(
+      `${backUrl}?rename_error=${encodeURIComponent(
+        `Team name must be ${TEAM_NAME_MAX_LEN} characters or fewer.`,
+      )}`,
+    );
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  // RLS already restricts updates to the team owner or the league
+  // commissioner, so we rely on that rather than re-checking here.
+  const { error } = await supabase
+    .from("teams")
+    .update({ name })
+    .eq("id", teamId);
+
+  if (error) {
+    redirect(`${backUrl}?rename_error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(backUrl);
+  redirect(`${backUrl}?rename_success=${encodeURIComponent("Team name updated.")}`);
+}
 
 export default async function TeamPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ leagueId: string; teamId: string }>;
+  searchParams: Promise<{ rename_success?: string; rename_error?: string }>;
 }) {
   const { leagueId, teamId } = await params;
+  const { rename_success: renameSuccess, rename_error: renameError } =
+    await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -28,6 +83,9 @@ export default async function TeamPage({
     .eq("id", teamId)
     .single<Team>();
   if (!team) notFound();
+
+  const isCommissioner = league.commissioner_id === user.id;
+  const canRename = team.owner_id === user.id || isCommissioner;
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -62,7 +120,7 @@ export default async function TeamPage({
         displayName={profile?.display_name ?? user.email ?? "Player"}
         leagueId={leagueId}
         draftStatus={league.draft_status}
-        isCommissioner={league.commissioner_id === user.id}
+        isCommissioner={isCommissioner}
       />
       <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
@@ -74,6 +132,37 @@ export default async function TeamPage({
               ← {league.name}
             </Link>
             <h1 className="text-3xl font-bold text-ice-50">{team.name}</h1>
+            {canRename && (
+              <details className="mt-2 text-sm">
+                <summary className="cursor-pointer text-ice-400 hover:text-ice-200">
+                  Rename team
+                </summary>
+                <form
+                  action={renameTeamAction}
+                  className="mt-2 flex flex-wrap items-center gap-2"
+                >
+                  <input type="hidden" name="league_id" value={leagueId} />
+                  <input type="hidden" name="team_id" value={teamId} />
+                  <Input
+                    name="team_name"
+                    defaultValue={team.name}
+                    maxLength={TEAM_NAME_MAX_LEN}
+                    required
+                    className="w-64"
+                    aria-label="Team name"
+                  />
+                  <Button type="submit" size="sm">
+                    Save
+                  </Button>
+                </form>
+                {renameSuccess && (
+                  <p className="mt-2 text-xs text-green-300">{renameSuccess}</p>
+                )}
+                {renameError && (
+                  <p className="mt-2 text-xs text-red-300">{renameError}</p>
+                )}
+              </details>
+            )}
           </div>
           <div className="rounded-xl border border-puck-border bg-puck-card px-5 py-3 text-right">
             <div className="text-xs uppercase tracking-wide text-ice-400">
