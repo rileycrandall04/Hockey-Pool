@@ -12,7 +12,9 @@ import {
 } from "@/components/ui/card";
 import { DailyTicker } from "@/components/daily-ticker";
 import { scoreTeam } from "@/lib/scoring";
-import type { League, RosterEntry, Team } from "@/lib/types";
+import { TeamNameEditor } from "@/components/team-name-editor";
+import { TEAM_RENAME_MAX_LEN } from "@/app/leagues/[leagueId]/team-actions";
+import type { RosterEntry, Team } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +29,14 @@ export const dynamic = "force-dynamic";
  */
 export default async function LeagueTeamsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ leagueId: string }>;
+  searchParams: Promise<{ rename_success?: string; rename_error?: string }>;
 }) {
   const { leagueId } = await params;
+  const { rename_success: renameSuccess, rename_error: renameError } =
+    await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -140,12 +146,39 @@ export default async function LeagueTeamsPage({
           </p>
         </div>
 
+        {renameSuccess && (
+          <div className="mb-4 rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+            {renameSuccess}
+          </div>
+        )}
+        {renameError && (
+          <div className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            {renameError}
+          </div>
+        )}
+
         <div className="grid gap-4 lg:grid-cols-2">
-          {teamCards.map((row) => (
+          {teamCards.map((row) => {
+            const canRename =
+              row.team.owner_id === user.id ||
+              league.commissioner_id === user.id;
+            return (
             <Card key={row.team.id}>
               <CardHeader>
                 <div className="flex items-center justify-between gap-2">
-                  <CardTitle>{row.team.name}</CardTitle>
+                  <CardTitle>
+                    {canRename ? (
+                      <TeamNameEditor
+                        teamId={row.team.id}
+                        leagueId={leagueId}
+                        initialName={row.team.name}
+                        returnUrl={`/leagues/${leagueId}/teams`}
+                        maxLength={TEAM_RENAME_MAX_LEN}
+                      />
+                    ) : (
+                      row.team.name
+                    )}
+                  </CardTitle>
                   <span className="text-2xl font-bold text-ice-50">
                     {row.total}
                     <span className="ml-1 text-xs font-normal uppercase text-ice-400">
@@ -199,7 +232,8 @@ export default async function LeagueTeamsPage({
                 )}
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       </main>
     </>
