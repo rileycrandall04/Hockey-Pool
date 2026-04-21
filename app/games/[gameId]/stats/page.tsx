@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { recomputeSeriesWinsForGame } from "@/lib/recompute-series-wins";
 import { isAppOwner } from "@/lib/auth";
 import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";
@@ -267,6 +268,8 @@ async function batchUpsertStatsAction(formData: FormData) {
       .eq("game_id", gameId);
   }
 
+  await recomputeSeriesWinsForGame(svc, gameId);
+
   revalidatePath(`/games/${gameId}/stats`);
   revalidatePath("/", "layout");
   redirect(
@@ -353,59 +356,7 @@ async function markFinalAction(formData: FormData) {
     })
     .eq("game_id", gameId);
 
-  // Recompute series wins from all FINAL games in this series
-  const { data: game } = await svc
-    .from("playoff_games")
-    .select("series_letter")
-    .eq("game_id", gameId)
-    .single();
-
-  if (game) {
-    const { data: series } = await svc
-      .from("playoff_series")
-      .select("top_seed_abbrev, bottom_seed_abbrev, needed_to_win")
-      .eq("series_letter", game.series_letter)
-      .single();
-
-    if (series) {
-      const { data: finalGames } = await svc
-        .from("playoff_games")
-        .select("away_abbrev, home_abbrev, away_score, home_score")
-        .eq("series_letter", game.series_letter)
-        .eq("game_state", "FINAL");
-
-      let topWins = 0;
-      let bottomWins = 0;
-      const topAbbrev = (series.top_seed_abbrev ?? "").toUpperCase();
-      const bottomAbbrev = (series.bottom_seed_abbrev ?? "").toUpperCase();
-      for (const g of finalGames ?? []) {
-        // Skip games with no scores
-        if (g.away_score == null || g.home_score == null) continue;
-        if (g.away_score === 0 && g.home_score === 0) continue;
-        const awayWon = g.away_score > g.home_score;
-        const winner = (awayWon ? g.away_abbrev : g.home_abbrev ?? "").toUpperCase();
-        if (winner === topAbbrev) topWins++;
-        else if (winner === bottomAbbrev) bottomWins++;
-      }
-
-      const winningTeam =
-        topWins >= series.needed_to_win
-          ? series.top_seed_abbrev
-          : bottomWins >= series.needed_to_win
-            ? series.bottom_seed_abbrev
-            : null;
-
-      await svc
-        .from("playoff_series")
-        .update({
-          top_seed_wins: topWins,
-          bottom_seed_wins: bottomWins,
-          winning_team_abbrev: winningTeam,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("series_letter", game.series_letter);
-    }
-  }
+  await recomputeSeriesWinsForGame(svc, gameId);
 
   revalidatePath(`/games/${gameId}/stats`);
   revalidatePath("/", "layout");
