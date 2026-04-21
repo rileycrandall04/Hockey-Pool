@@ -13,7 +13,7 @@ import {
 import { DailyTicker } from "@/components/daily-ticker";
 import { scoreTeam } from "@/lib/scoring";
 import { TeamNameEditor } from "@/components/team-name-editor";
-import { TEAM_RENAME_MAX_LEN } from "@/app/leagues/[leagueId]/team-actions";
+import { TEAM_RENAME_MAX_LEN } from "@/app/leagues/[leagueId]/team-constants";
 import type { RosterEntry, Team } from "@/lib/types";
 
 export const dynamic = "force-dynamic";

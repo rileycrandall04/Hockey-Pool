@@ -7,10 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { scoreTeam } from "@/lib/scoring";
-import {
-  renameTeamAction,
-  TEAM_RENAME_MAX_LEN,
-} from "@/app/leagues/[leagueId]/team-actions";
+import { renameTeamAction } from "@/app/leagues/[leagueId]/team-actions";
+import { TEAM_RENAME_MAX_LEN } from "@/app/leagues/[leagueId]/team-constants";
 import type { RosterEntry, Team } from "@/lib/types";
 
 export default async function TeamPage({
