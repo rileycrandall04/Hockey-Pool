@@ -34,7 +34,7 @@ export async function recomputeSeriesWinsForGame(
     .from("playoff_games")
     .select("away_abbrev, home_abbrev, away_score, home_score")
     .eq("series_letter", game.series_letter)
-    .eq("game_state", "FINAL");
+    .in("game_state", ["FINAL", "OFF"]);
 
   let topWins = 0;
   let bottomWins = 0;
