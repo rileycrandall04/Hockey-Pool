@@ -325,6 +325,29 @@ export default async function LeagueStandingsPage({
     .slice(0, 5)
     .map(toRankedRow);
 
+  // Biggest busts: draftees picked in the top half of the draft who
+  // produced the fewest points. Filtering to the top half keeps this
+  // meaningful — a late-round pick scoring zero isn't a bust, it's
+  // just a late-round pick. Ties break to the earliest pick (the
+  // bigger the draft slot wasted, the worse the bust).
+  const maxPickNumber = allDraftedPlayers.reduce(
+    (m, p) => Math.max(m, p.pick_number),
+    0,
+  );
+  const bustCutoff = Math.ceil(maxPickNumber / 2);
+  const bustsTop5 =
+    maxPickNumber === 0
+      ? []
+      : allDraftedPlayers
+          .filter((p) => p.pick_number > 0 && p.pick_number <= bustCutoff)
+          .sort((a, b) => {
+            if (a.fantasy_points !== b.fantasy_points)
+              return a.fantasy_points - b.fantasy_points;
+            return a.pick_number - b.pick_number;
+          })
+          .slice(0, 5)
+          .map(toRankedRow);
+
   return (
     <>
       <NavBar
@@ -543,7 +566,11 @@ export default async function LeagueStandingsPage({
           </div>
         )}
 
-        <PlayerRankings mvp={mvpTop5} valuePick={valuePickTop5} />
+        <PlayerRankings
+          mvp={mvpTop5}
+          valuePick={valuePickTop5}
+          busts={bustsTop5}
+        />
 
       </main>
     </>
@@ -563,22 +590,27 @@ interface RankedPlayerRow {
 }
 
 /**
- * Two side-by-side leaderboards under the standings:
+ * Three side-by-side leaderboards under the standings:
  *   - MVP: highest playoff fantasy points in the league
  *   - Value Pick: highest (fantasy_points × pick_number), so a player
  *     drafted at pick 96 who scored 10 pts beats a player drafted at
  *     pick 5 who scored 12 pts — rewarding late-round production.
+ *   - Biggest Busts: top-half draft picks with the fewest points —
+ *     the inverse of Value Pick, calling out wasted early picks.
  */
 function PlayerRankings({
   mvp,
   valuePick,
+  busts,
 }: {
   mvp: RankedPlayerRow[];
   valuePick: RankedPlayerRow[];
+  busts: RankedPlayerRow[];
 }) {
-  if (mvp.length === 0 && valuePick.length === 0) return null;
+  if (mvp.length === 0 && valuePick.length === 0 && busts.length === 0)
+    return null;
   return (
-    <div className="mt-6 grid gap-4 sm:grid-cols-2">
+    <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <RankingTable
         title="MVP"
         rightLabel="Pts"
@@ -592,6 +624,15 @@ function PlayerRankings({
         title="Value Pick"
         rightLabel="Pts · Pick"
         rows={valuePick.map((r) => ({
+          name: r.full_name,
+          owner: r.owner,
+          right: `${r.fantasy_points} · #${r.pick_number}`,
+        }))}
+      />
+      <RankingTable
+        title="Biggest Busts"
+        rightLabel="Pts · Pick"
+        rows={busts.map((r) => ({
           name: r.full_name,
           owner: r.owner,
           right: `${r.fantasy_points} · #${r.pick_number}`,
