@@ -52,12 +52,41 @@ export default async function DraftDataPage({
     .select("id, name")
     .eq("league_id", leagueId);
 
+  // Undrafted pool: every active player on a non-eliminated NHL team
+  // who wasn't picked in this league. Same filter as the draft room
+  // so the two views stay consistent. Stats join pulls fantasy_points
+  // which is a generated column on player_stats.
+  const { data: poolRows } = await supabase
+    .from("players")
+    .select(
+      "id, nhl_teams!inner(eliminated), player_stats(fantasy_points)",
+    )
+    .eq("active", true)
+    .eq("nhl_teams.eliminated", false)
+    .limit(2000);
+
   const teamName = new Map<string, string>();
   for (const t of teamRows ?? []) teamName.set(t.id, t.name);
 
   const roster = ((rosterRows as RosterEntry[] | null) ?? []).filter(
     (r) => Number.isFinite(r.pick_number),
   );
+
+  // Compute undrafted aggregates. `player_stats` comes back as an
+  // array from Supabase's join syntax even though it's a 1:1 — grab
+  // the first entry if present.
+  type PoolRow = {
+    id: number;
+    player_stats: { fantasy_points: number }[] | null;
+  };
+  const draftedIds = new Set(roster.map((r) => r.player_id));
+  const undraftedPoints = ((poolRows as unknown as PoolRow[] | null) ?? [])
+    .filter((p) => !draftedIds.has(p.id))
+    .map((p) => p.player_stats?.[0]?.fantasy_points ?? 0);
+  const undraftedCount = undraftedPoints.length;
+  const undraftedTotal = undraftedPoints.reduce((s, v) => s + v, 0);
+  const undraftedAvg =
+    undraftedCount === 0 ? 0 : undraftedTotal / undraftedCount;
 
   // Per-round aggregates: total, count, avg. Round numbers come
   // straight from the draft_picks row so snake-draft math already
@@ -89,8 +118,21 @@ export default async function DraftDataPage({
   for (const r of rounds) {
     r.avg = r.count === 0 ? 0 : r.total / r.count;
   }
-  const maxAvg = rounds.reduce((m, r) => Math.max(m, r.avg), 0);
-  const maxTotal = rounds.reduce((m, r) => Math.max(m, r.total), 0);
+  const maxAvg = Math.max(
+    ...rounds.map((r) => r.avg),
+    undraftedAvg,
+    0,
+  );
+  const maxTotal = Math.max(
+    ...rounds.map((r) => r.total),
+    undraftedTotal,
+    0,
+  );
+  const undrafted = {
+    count: undraftedCount,
+    total: undraftedTotal,
+    avg: undraftedAvg,
+  };
 
   const byPick = [...roster].sort(
     (a, b) => a.pick_number - b.pick_number,
@@ -136,12 +178,20 @@ export default async function DraftDataPage({
                 <CardTitle>Average points per pick, by round</CardTitle>
                 <CardDescription>
                   League-wide average is {leagueAvg.toFixed(1)} pts per
-                  drafted player. Taller bars = better-producing rounds.
+                  drafted player. The grey <strong>UD</strong> bar at the
+                  end shows the average for undrafted pool players —
+                  handy for spotting rounds that underperformed the
+                  waiver wire.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <RoundBarChart rounds={rounds} metric="avg" max={maxAvg} />
-                <RoundLabels rounds={rounds} />
+                <RoundBarChart
+                  rounds={rounds}
+                  metric="avg"
+                  max={maxAvg}
+                  undrafted={undrafted}
+                />
+                <RoundLabels rounds={rounds} showUndrafted />
               </CardContent>
             </Card>
 
@@ -151,12 +201,19 @@ export default async function DraftDataPage({
                 <CardDescription>
                   Raw volume per round. Early rounds have the same
                   number of picks as late rounds, so taller bars here
-                  are genuine hotspots.
+                  are genuine hotspots. The grey <strong>UD</strong>
+                  bar is the combined total for every undrafted pool
+                  player — usually bigger by sheer headcount.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <RoundBarChart rounds={rounds} metric="total" max={maxTotal} />
-                <RoundLabels rounds={rounds} />
+                <RoundBarChart
+                  rounds={rounds}
+                  metric="total"
+                  max={maxTotal}
+                  undrafted={undrafted}
+                />
+                <RoundLabels rounds={rounds} showUndrafted />
               </CardContent>
             </Card>
 
@@ -205,10 +262,12 @@ function RoundBarChart({
   rounds,
   metric,
   max,
+  undrafted,
 }: {
   rounds: { round: number; count: number; total: number; avg: number }[];
   metric: "avg" | "total";
   max: number;
+  undrafted?: { count: number; total: number; avg: number };
 }) {
   if (rounds.length === 0) {
     return <p className="text-sm text-ice-400">No picks yet.</p>;
@@ -254,6 +313,24 @@ function RoundBarChart({
               </div>
             );
           })}
+          {undrafted && (
+            <div
+              className="group flex min-w-0 flex-1 items-end justify-center"
+              title={`Undrafted · ${undrafted.count} players · ${undrafted.total} total pts · ${undrafted.avg.toFixed(1)} avg`}
+            >
+              <div
+                className="w-full rounded-t bg-gradient-to-t from-slate-600 to-slate-400 transition-opacity group-hover:opacity-90"
+                style={{
+                  height: `${
+                    ((metric === "avg" ? undrafted.avg : undrafted.total) /
+                      yMax) *
+                    100
+                  }%`,
+                  minHeight: 2,
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
       {/* Right padding to match axis column so bars center correctly */}
@@ -263,8 +340,10 @@ function RoundBarChart({
 
 function RoundLabels({
   rounds,
+  showUndrafted = false,
 }: {
   rounds: { round: number }[];
+  showUndrafted?: boolean;
 }) {
   return (
     <div className="mt-1 flex gap-2">
@@ -278,6 +357,11 @@ function RoundLabels({
             R{r.round}
           </span>
         ))}
+        {showUndrafted && (
+          <span className="min-w-0 flex-1 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-300">
+            UD
+          </span>
+        )}
       </div>
     </div>
   );
