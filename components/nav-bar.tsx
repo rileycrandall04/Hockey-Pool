@@ -148,6 +148,11 @@ export function NavBar({
       label: "Scoreboard",
       active: isActive(`/leagues/${leagueId}/scoreboard`),
     });
+    items.push({
+      href: `/leagues/${leagueId}/draft-data`,
+      label: "Draft Data",
+      active: isActive(`/leagues/${leagueId}/draft-data`),
+    });
   }
   if (leagueId && isCommissioner) {
     items.push({

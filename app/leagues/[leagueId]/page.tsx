@@ -883,9 +883,15 @@ function PlayerRow({
         )}
       </span>
       <span
-        className={`flex-shrink-0 font-semibold ${muted ? "text-ice-400" : "text-ice-50"}`}
+        className={`flex flex-shrink-0 items-baseline gap-2 font-semibold ${muted ? "text-ice-400" : "text-ice-50"}`}
       >
-        {p.fantasy_points}
+        <span>{p.fantasy_points}</span>
+        <span
+          title={`Drafted at pick #${p.pick_number}`}
+          className="w-10 text-right font-mono text-[10px] font-normal text-ice-500"
+        >
+          #{p.pick_number}
+        </span>
       </span>
     </Link>
   );
