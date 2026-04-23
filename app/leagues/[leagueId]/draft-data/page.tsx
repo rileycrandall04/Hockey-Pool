@@ -184,7 +184,7 @@ export default async function DraftDataPage({
                   waiver wire.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-2 sm:px-5">
                 <RoundBarChart
                   rounds={rounds}
                   metric="avg"
@@ -205,7 +205,7 @@ export default async function DraftDataPage({
                   player — usually bigger by sheer headcount.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-2 sm:px-5">
                 <RoundBarChart
                   rounds={rounds}
                   metric="total"
@@ -300,15 +300,18 @@ function RoundBarChart({
   }
 
   return (
-    <div className="flex w-full gap-2">
+    <div className="flex w-full gap-1 sm:gap-2">
       {/* Y-axis: each tick absolutely positioned at its own percent
           so the label's vertical center sits on the gridline,
           regardless of how many ticks we draw. */}
-      <div className="relative w-8" style={{ height: 260 }}>
+      <div
+        className="relative w-6 flex-shrink-0 sm:w-8"
+        style={{ height: 260 }}
+      >
         {ticks.map((t) => (
           <span
             key={t}
-            className="absolute right-0 translate-y-1/2 text-right text-[10px] font-mono leading-none text-ice-500"
+            className="absolute right-0 translate-y-1/2 whitespace-nowrap text-right font-mono leading-none text-[9px] text-ice-500 sm:text-[10px]"
             style={{ bottom: `${(t / yMax) * 100}%` }}
           >
             {formatTick(t)}
@@ -355,7 +358,7 @@ function RoundBarChart({
             <span
               key={c.key}
               className={
-                "min-w-0 flex-1 text-center text-[10px] " +
+                "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-center text-[9px] sm:text-[10px] " +
                 (c.isUndrafted
                   ? "font-semibold uppercase tracking-wider text-slate-300"
                   : "text-ice-500")
@@ -370,7 +373,7 @@ function RoundBarChart({
           {columns.map((c) => (
             <span
               key={c.key}
-              className="min-w-0 flex-1 text-center font-mono text-[10px] font-semibold text-ice-200"
+              className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-center font-mono text-[9px] font-semibold text-ice-200 sm:text-[10px]"
             >
               {formatValue(c.value)}
             </span>
