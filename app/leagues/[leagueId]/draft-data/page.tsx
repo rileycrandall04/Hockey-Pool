@@ -141,6 +141,7 @@ export default async function DraftDataPage({
               </CardHeader>
               <CardContent>
                 <RoundBarChart rounds={rounds} metric="avg" max={maxAvg} />
+                <RoundLabels rounds={rounds} />
               </CardContent>
             </Card>
 
@@ -155,6 +156,7 @@ export default async function DraftDataPage({
               </CardHeader>
               <CardContent>
                 <RoundBarChart rounds={rounds} metric="total" max={maxTotal} />
+                <RoundLabels rounds={rounds} />
               </CardContent>
             </Card>
 
@@ -181,6 +183,24 @@ export default async function DraftDataPage({
   );
 }
 
+/**
+ * Pick a "nice" upper bound ≥ max that's easy to tick against —
+ * e.g., 47 → 50, 4.2 → 5, 113 → 120. Keeps the Y-axis labels
+ * rounded so bars sit against a readable grid instead of against
+ * the raw max value.
+ */
+function niceMax(raw: number): number {
+  if (raw <= 0) return 1;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
+  const normalized = raw / magnitude;
+  let nice: number;
+  if (normalized <= 1) nice = 1;
+  else if (normalized <= 2) nice = 2;
+  else if (normalized <= 5) nice = 5;
+  else nice = 10;
+  return nice * magnitude;
+}
+
 function RoundBarChart({
   rounds,
   metric,
@@ -193,31 +213,72 @@ function RoundBarChart({
   if (rounds.length === 0) {
     return <p className="text-sm text-ice-400">No picks yet.</p>;
   }
-  const safeMax = max === 0 ? 1 : max;
+  const yMax = niceMax(max);
+  const ticks = [0, yMax / 2, yMax];
+  const formatTick = (v: number) =>
+    metric === "avg" ? v.toFixed(v < 1 ? 1 : 0) : Math.round(v).toString();
   return (
-    <div className="flex items-end gap-1 sm:gap-2" style={{ height: 180 }}>
-      {rounds.map((r) => {
-        const value = metric === "avg" ? r.avg : r.total;
-        const heightPct = (value / safeMax) * 100;
-        const display =
-          metric === "avg" ? value.toFixed(1) : value.toString();
-        return (
-          <div
-            key={r.round}
-            className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"
-            title={`Round ${r.round} · ${r.count} picks · ${r.total} total pts · ${r.avg.toFixed(1)} avg`}
-          >
-            <span className="text-[10px] font-mono text-ice-300">
-              {display}
-            </span>
+    <div className="flex w-full gap-2" style={{ height: 260 }}>
+      {/* Y-axis */}
+      <div className="flex w-8 flex-col justify-between text-right text-[10px] font-mono text-ice-500">
+        {[...ticks].reverse().map((t) => (
+          <span key={t}>{formatTick(t)}</span>
+        ))}
+      </div>
+      {/* Plot area */}
+      <div className="relative min-w-0 flex-1">
+        {/* Grid lines */}
+        <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+          {ticks.map((t) => (
             <div
-              className="w-full rounded-t bg-gradient-to-t from-ice-600 to-ice-400"
-              style={{ height: `${heightPct}%`, minHeight: 2 }}
+              key={t}
+              className="border-t border-dashed border-puck-border/50"
             />
-            <span className="text-[10px] text-ice-500">R{r.round}</span>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+        {/* Bars */}
+        <div className="absolute inset-0 flex items-end gap-[2px] sm:gap-1">
+          {rounds.map((r) => {
+            const value = metric === "avg" ? r.avg : r.total;
+            const heightPct = (value / yMax) * 100;
+            return (
+              <div
+                key={r.round}
+                className="group flex min-w-0 flex-1 items-end justify-center"
+                title={`Round ${r.round} · ${r.count} picks · ${r.total} total pts · ${r.avg.toFixed(1)} avg`}
+              >
+                <div
+                  className="w-full rounded-t bg-gradient-to-t from-ice-600 to-ice-400 transition-opacity group-hover:opacity-90"
+                  style={{ height: `${heightPct}%`, minHeight: 2 }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {/* Right padding to match axis column so bars center correctly */}
+    </div>
+  );
+}
+
+function RoundLabels({
+  rounds,
+}: {
+  rounds: { round: number }[];
+}) {
+  return (
+    <div className="mt-1 flex gap-2">
+      <div className="w-8" />
+      <div className="flex min-w-0 flex-1 gap-[2px] sm:gap-1">
+        {rounds.map((r) => (
+          <span
+            key={r.round}
+            className="min-w-0 flex-1 text-center text-[10px] text-ice-500"
+          >
+            R{r.round}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -232,7 +293,8 @@ function PickTable({
   teamName: Map<string, string>;
 }) {
   return (
-    <table className="w-full text-sm">
+    <div className="overflow-x-auto">
+    <table className="w-full min-w-[520px] text-sm">
       <thead>
         <tr className="border-b border-puck-border text-left text-[10px] uppercase tracking-wider text-ice-400">
           <th className="px-3 py-2">Pick</th>
@@ -297,5 +359,6 @@ function PickTable({
         })}
       </tbody>
     </table>
+    </div>
   );
 }
