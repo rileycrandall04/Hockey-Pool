@@ -301,27 +301,31 @@ function RoundBarChart({
 
   return (
     <div className="flex w-full gap-2">
-      {/* Y-axis */}
-      <div
-        className="flex w-8 flex-col justify-between text-right text-[10px] font-mono text-ice-500"
-        style={{ height: 260 }}
-      >
-        {[...ticks].reverse().map((t) => (
-          <span key={t}>{formatTick(t)}</span>
+      {/* Y-axis: each tick absolutely positioned at its own percent
+          so the label's vertical center sits on the gridline,
+          regardless of how many ticks we draw. */}
+      <div className="relative w-8" style={{ height: 260 }}>
+        {ticks.map((t) => (
+          <span
+            key={t}
+            className="absolute right-0 translate-y-1/2 text-right text-[10px] font-mono leading-none text-ice-500"
+            style={{ bottom: `${(t / yMax) * 100}%` }}
+          >
+            {formatTick(t)}
+          </span>
         ))}
       </div>
       {/* Columns: bar, round label, value */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Plot area */}
         <div className="relative" style={{ height: 260 }}>
-          <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-            {ticks.map((t) => (
-              <div
-                key={t}
-                className="border-t border-dashed border-puck-border/50"
-              />
-            ))}
-          </div>
+          {ticks.map((t) => (
+            <div
+              key={t}
+              className="pointer-events-none absolute inset-x-0 border-t border-dashed border-puck-border/50"
+              style={{ bottom: `${(t / yMax) * 100}%` }}
+            />
+          ))}
           <div className="absolute inset-0 flex items-end gap-[2px] sm:gap-1">
             {columns.map((c) => (
               <div
