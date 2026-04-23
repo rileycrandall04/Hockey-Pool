@@ -21,6 +21,7 @@ import { TEAM_RENAME_MAX_LEN } from "@/app/leagues/[leagueId]/team-constants";
 import { DailyTicker } from "@/components/daily-ticker";
 import { TonightsGames } from "@/components/tonights-games";
 import { scoreTeam } from "@/lib/scoring";
+import { effectiveGameDay, isGameOnDate } from "@/lib/playoff-helpers";
 import { getOvernightDeltas } from "@/lib/snapshot-standings";
 import type { OvernightDelta } from "@/lib/snapshot-standings";
 import type {
@@ -185,6 +186,26 @@ export default async function LeagueStandingsPage({
     const arr = rosterByTeam.get(row.team_id) ?? [];
     arr.push(row);
     rosterByTeam.set(row.team_id, arr);
+  }
+
+  // NHL teams with a game on tonight's effective date — used to show
+  // "in play" counts on each standings row. Uses the same date helper
+  // as the Tonight's Games card so the two stay in sync (and so late-
+  // night games still count before 4:30 AM Eastern).
+  const { date: tonightDate } = effectiveGameDay();
+  const inPlayAbbrevs = new Set<string>();
+  for (const g of bracketGames) {
+    if (!isGameOnDate(g, tonightDate)) continue;
+    if (g.away_abbrev) inPlayAbbrevs.add(g.away_abbrev);
+    if (g.home_abbrev) inPlayAbbrevs.add(g.home_abbrev);
+  }
+  const inPlayByTeam = new Map<string, number>();
+  for (const [teamId, roster] of rosterByTeam) {
+    let count = 0;
+    for (const r of roster) {
+      if (r.nhl_abbrev && inPlayAbbrevs.has(r.nhl_abbrev)) count++;
+    }
+    if (count > 0) inPlayByTeam.set(teamId, count);
   }
 
   // Build current user's players list for tonight's games display
@@ -469,6 +490,7 @@ export default async function LeagueStandingsPage({
               const rankTitle = delta
                 ? `Was #${delta.rank_from} yesterday (${delta.delta_points >= 0 ? "+" : ""}${delta.delta_points} pts overnight)`
                 : undefined;
+              const inPlayCount = inPlayByTeam.get(row.team.id) ?? 0;
               return (
               <details
                 key={row.team.id}
@@ -511,10 +533,20 @@ export default async function LeagueStandingsPage({
                       </span>
                     )}
                   </span>
-                  <span className="flex-shrink-0 text-base font-bold text-ice-50 sm:text-lg">
-                    {row.total}
-                    <span className="ml-0.5 text-[9px] font-normal uppercase text-ice-400 sm:ml-1 sm:text-xs">
-                      pts
+                  <span className="flex flex-shrink-0 items-baseline gap-1.5 sm:gap-2">
+                    {inPlayCount > 0 && (
+                      <span
+                        title={`${inPlayCount} ${inPlayCount === 1 ? "player" : "players"} on a team playing tonight`}
+                        className="whitespace-nowrap rounded-full border border-ice-500/40 bg-ice-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-ice-200 sm:px-2 sm:text-[10px]"
+                      >
+                        {inPlayCount} in play
+                      </span>
+                    )}
+                    <span className="text-base font-bold text-ice-50 sm:text-lg">
+                      {row.total}
+                      <span className="ml-0.5 text-[9px] font-normal uppercase text-ice-400 sm:ml-1 sm:text-xs">
+                        pts
+                      </span>
                     </span>
                   </span>
                 </summary>
