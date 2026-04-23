@@ -558,6 +558,7 @@ export default async function LeagueStandingsPage({
                       players={row.scoring}
                       footerPlayers={row.bench}
                       adjustment={row.adjustment}
+                      inPlayAbbrevs={inPlayAbbrevs}
                     />
                   )}
                   {(row.team.owner_id === user.id || isCommissioner) && (
@@ -789,15 +790,19 @@ function RosterList({
   players,
   footerPlayers,
   adjustment,
+  inPlayAbbrevs,
 }: {
   players: RosterEntry[];
   footerPlayers: RosterEntry[];
   adjustment: number;
+  inPlayAbbrevs: Set<string>;
 }) {
+  const isInPlay = (p: RosterEntry) =>
+    Boolean(p.nhl_abbrev && inPlayAbbrevs.has(p.nhl_abbrev));
   return (
     <div className="space-y-1">
       {players.map((p) => (
-        <PlayerRow key={p.player_id} p={p} />
+        <PlayerRow key={p.player_id} p={p} inPlay={isInPlay(p)} />
       ))}
       {footerPlayers.length > 0 && (
         <>
@@ -806,7 +811,7 @@ function RosterList({
             Bench &middot; not counted
           </p>
           {footerPlayers.map((p) => (
-            <PlayerRow key={p.player_id} p={p} muted />
+            <PlayerRow key={p.player_id} p={p} muted inPlay={isInPlay(p)} />
           ))}
         </>
       )}
@@ -830,14 +835,22 @@ function RosterList({
 function PlayerRow({
   p,
   muted = false,
+  inPlay = false,
 }: {
   p: RosterEntry;
   muted?: boolean;
+  inPlay?: boolean;
 }) {
   return (
     <Link
       href={`/players/${p.player_id}`}
-      className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-puck-border/40"
+      className={
+        "flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-puck-border/40 " +
+        (inPlay
+          ? "border-l-2 border-ice-400 bg-ice-500/10 pl-1.5"
+          : "")
+      }
+      title={inPlay ? "Playing tonight" : undefined}
     >
       <span className="flex min-w-0 items-center gap-2">
         <span
@@ -860,6 +873,14 @@ function PlayerRow({
         <span className="text-[10px] text-ice-500">
           {p.nhl_abbrev ?? "—"}
         </span>
+        {inPlay && (
+          <span
+            aria-label="Playing tonight"
+            className="flex-shrink-0 text-[10px] leading-none text-ice-300"
+          >
+            ●
+          </span>
+        )}
       </span>
       <span
         className={`flex-shrink-0 font-semibold ${muted ? "text-ice-400" : "text-ice-50"}`}
