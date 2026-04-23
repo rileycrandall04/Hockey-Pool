@@ -191,7 +191,6 @@ export default async function DraftDataPage({
                   max={maxAvg}
                   undrafted={undrafted}
                 />
-                <RoundLabels rounds={rounds} showUndrafted />
               </CardContent>
             </Card>
 
@@ -213,7 +212,6 @@ export default async function DraftDataPage({
                   max={maxTotal}
                   undrafted={undrafted}
                 />
-                <RoundLabels rounds={rounds} showUndrafted />
               </CardContent>
             </Card>
 
@@ -241,20 +239,17 @@ export default async function DraftDataPage({
 }
 
 /**
- * Pick a "nice" upper bound ≥ max that's easy to tick against —
- * e.g., 47 → 50, 4.2 → 5, 113 → 120. Keeps the Y-axis labels
- * rounded so bars sit against a readable grid instead of against
- * the raw max value.
+ * Pick a "nice" upper bound just above max so the scale stays tight
+ * (bars look tall) but the Y-axis ticks still land on readable
+ * numbers. Uses a fine-grained nice-number sequence so a max of 53
+ * rounds to 60 rather than 100.
  */
 function niceMax(raw: number): number {
   if (raw <= 0) return 1;
   const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
   const normalized = raw / magnitude;
-  let nice: number;
-  if (normalized <= 1) nice = 1;
-  else if (normalized <= 2) nice = 2;
-  else if (normalized <= 5) nice = 5;
-  else nice = 10;
+  const steps = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+  const nice = steps.find((s) => s >= normalized) ?? 10;
   return nice * magnitude;
 }
 
@@ -276,92 +271,107 @@ function RoundBarChart({
   const ticks = [0, yMax / 2, yMax];
   const formatTick = (v: number) =>
     metric === "avg" ? v.toFixed(v < 1 ? 1 : 0) : Math.round(v).toString();
+  const formatValue = (v: number) =>
+    metric === "avg" ? v.toFixed(1) : Math.round(v).toString();
+
+  // Build a single list so the bar, round label, and numeric value
+  // below stay visually aligned in the same flex cell.
+  const columns: {
+    key: string;
+    label: string;
+    value: number;
+    title: string;
+    isUndrafted: boolean;
+  }[] = rounds.map((r) => ({
+    key: `r${r.round}`,
+    label: `R${r.round}`,
+    value: metric === "avg" ? r.avg : r.total,
+    title: `Round ${r.round} · ${r.count} picks · ${r.total} total pts · ${r.avg.toFixed(1)} avg`,
+    isUndrafted: false,
+  }));
+  if (undrafted) {
+    columns.push({
+      key: "ud",
+      label: "UD",
+      value: metric === "avg" ? undrafted.avg : undrafted.total,
+      title: `Undrafted · ${undrafted.count} players · ${undrafted.total} total pts · ${undrafted.avg.toFixed(1)} avg`,
+      isUndrafted: true,
+    });
+  }
+
   return (
-    <div className="flex w-full gap-2" style={{ height: 260 }}>
+    <div className="flex w-full gap-2">
       {/* Y-axis */}
-      <div className="flex w-8 flex-col justify-between text-right text-[10px] font-mono text-ice-500">
+      <div
+        className="flex w-8 flex-col justify-between text-right text-[10px] font-mono text-ice-500"
+        style={{ height: 260 }}
+      >
         {[...ticks].reverse().map((t) => (
           <span key={t}>{formatTick(t)}</span>
         ))}
       </div>
-      {/* Plot area */}
-      <div className="relative min-w-0 flex-1">
-        {/* Grid lines */}
-        <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-          {ticks.map((t) => (
-            <div
-              key={t}
-              className="border-t border-dashed border-puck-border/50"
-            />
-          ))}
-        </div>
-        {/* Bars */}
-        <div className="absolute inset-0 flex items-end gap-[2px] sm:gap-1">
-          {rounds.map((r) => {
-            const value = metric === "avg" ? r.avg : r.total;
-            const heightPct = (value / yMax) * 100;
-            return (
+      {/* Columns: bar, round label, value */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Plot area */}
+        <div className="relative" style={{ height: 260 }}>
+          <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+            {ticks.map((t) => (
               <div
-                key={r.round}
+                key={t}
+                className="border-t border-dashed border-puck-border/50"
+              />
+            ))}
+          </div>
+          <div className="absolute inset-0 flex items-end gap-[2px] sm:gap-1">
+            {columns.map((c) => (
+              <div
+                key={c.key}
                 className="group flex min-w-0 flex-1 items-end justify-center"
-                title={`Round ${r.round} · ${r.count} picks · ${r.total} total pts · ${r.avg.toFixed(1)} avg`}
+                title={c.title}
               >
                 <div
-                  className="w-full rounded-t bg-gradient-to-t from-ice-600 to-ice-400 transition-opacity group-hover:opacity-90"
-                  style={{ height: `${heightPct}%`, minHeight: 2 }}
+                  className={
+                    "w-full rounded-t transition-opacity group-hover:opacity-90 " +
+                    (c.isUndrafted
+                      ? "bg-gradient-to-t from-slate-600 to-slate-400"
+                      : "bg-gradient-to-t from-ice-600 to-ice-400")
+                  }
+                  style={{
+                    height: `${(c.value / yMax) * 100}%`,
+                    minHeight: 2,
+                  }}
                 />
               </div>
-            );
-          })}
-          {undrafted && (
-            <div
-              className="group flex min-w-0 flex-1 items-end justify-center"
-              title={`Undrafted · ${undrafted.count} players · ${undrafted.total} total pts · ${undrafted.avg.toFixed(1)} avg`}
-            >
-              <div
-                className="w-full rounded-t bg-gradient-to-t from-slate-600 to-slate-400 transition-opacity group-hover:opacity-90"
-                style={{
-                  height: `${
-                    ((metric === "avg" ? undrafted.avg : undrafted.total) /
-                      yMax) *
-                    100
-                  }%`,
-                  minHeight: 2,
-                }}
-              />
-            </div>
-          )}
+            ))}
+          </div>
         </div>
-      </div>
-      {/* Right padding to match axis column so bars center correctly */}
-    </div>
-  );
-}
-
-function RoundLabels({
-  rounds,
-  showUndrafted = false,
-}: {
-  rounds: { round: number }[];
-  showUndrafted?: boolean;
-}) {
-  return (
-    <div className="mt-1 flex gap-2">
-      <div className="w-8" />
-      <div className="flex min-w-0 flex-1 gap-[2px] sm:gap-1">
-        {rounds.map((r) => (
-          <span
-            key={r.round}
-            className="min-w-0 flex-1 text-center text-[10px] text-ice-500"
-          >
-            R{r.round}
-          </span>
-        ))}
-        {showUndrafted && (
-          <span className="min-w-0 flex-1 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-300">
-            UD
-          </span>
-        )}
+        {/* Round labels */}
+        <div className="mt-1 flex gap-[2px] sm:gap-1">
+          {columns.map((c) => (
+            <span
+              key={c.key}
+              className={
+                "min-w-0 flex-1 text-center text-[10px] " +
+                (c.isUndrafted
+                  ? "font-semibold uppercase tracking-wider text-slate-300"
+                  : "text-ice-500")
+              }
+            >
+              {c.label}
+            </span>
+          ))}
+        </div>
+        {/* Numeric values below labels */}
+        <div className="flex gap-[2px] sm:gap-1">
+          {columns.map((c) => (
+            <span
+              key={c.key}
+              className="min-w-0 flex-1 text-center font-mono text-[10px] font-semibold text-ice-200"
+            >
+              {formatValue(c.value)}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
