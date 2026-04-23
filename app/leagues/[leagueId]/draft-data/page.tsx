@@ -326,11 +326,11 @@ function RoundBarChart({
               style={{ bottom: `${(t / yMax) * 100}%` }}
             />
           ))}
-          <div className="absolute inset-0 flex items-end gap-[2px] sm:gap-1">
+          <div className="absolute inset-0 flex gap-[2px] sm:gap-1">
             {columns.map((c) => (
               <div
                 key={c.key}
-                className="group flex min-w-0 flex-1 items-end justify-center"
+                className="group flex h-full min-w-0 flex-1 flex-col justify-end"
                 title={c.title}
               >
                 <div
