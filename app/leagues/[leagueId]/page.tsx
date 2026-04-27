@@ -150,13 +150,19 @@ export default async function LeagueStandingsPage({
     .order("start_time_utc", { ascending: true });
   const { data: nhlTeamRows } = await supabase
     .from("nhl_teams")
-    .select("abbrev, logo_url");
+    .select("abbrev, logo_url, eliminated");
   const bracketSeries = (bracketSeriesRows ?? []) as PlayoffSeries[];
   const bracketGames = (bracketGameRows ?? []) as PlayoffGame[];
   // Abbreviation → logo URL lookup for game components
   const teamLogos: Record<string, string> = {};
-  for (const t of (nhlTeamRows ?? []) as { abbrev: string; logo_url: string | null }[]) {
+  const eliminatedAbbrevs = new Set<string>();
+  for (const t of (nhlTeamRows ?? []) as {
+    abbrev: string;
+    logo_url: string | null;
+    eliminated: boolean | null;
+  }[]) {
     if (t.logo_url) teamLogos[t.abbrev] = t.logo_url;
+    if (t.eliminated) eliminatedAbbrevs.add(t.abbrev);
   }
 
   // Is the current user watching this league for draft stall alerts?
@@ -491,6 +497,13 @@ export default async function LeagueStandingsPage({
                 ? `Was #${delta.rank_from} yesterday (${delta.delta_points >= 0 ? "+" : ""}${delta.delta_points} pts overnight)`
                 : undefined;
               const inPlayCount = inPlayByTeam.get(row.team.id) ?? 0;
+              const teamRoster =
+                rosterByTeam.get(row.team.id) ?? [];
+              const aliveCount = teamRoster.reduce(
+                (n, p) =>
+                  n + (p.nhl_abbrev && eliminatedAbbrevs.has(p.nhl_abbrev) ? 0 : 1),
+                0,
+              );
               return (
               <details
                 key={row.team.id}
@@ -522,6 +535,19 @@ export default async function LeagueStandingsPage({
                     )}
                     <span className="truncate font-medium text-ice-50">
                       {row.team.name}
+                    </span>
+                    <span
+                      title={`${aliveCount} of ${teamRoster.length} players still on a non-eliminated team`}
+                      className={
+                        "flex-shrink-0 font-mono text-[10px] sm:text-xs " +
+                        (aliveCount === teamRoster.length
+                          ? "text-ice-500"
+                          : aliveCount === 0
+                            ? "text-red-400"
+                            : "text-amber-300")
+                      }
+                    >
+                      ({aliveCount}/{teamRoster.length})
                     </span>
                     {hot && (
                       <span
@@ -559,6 +585,7 @@ export default async function LeagueStandingsPage({
                       footerPlayers={row.bench}
                       adjustment={row.adjustment}
                       inPlayAbbrevs={inPlayAbbrevs}
+                      eliminatedAbbrevs={eliminatedAbbrevs}
                     />
                   )}
                   {(row.team.owner_id === user.id || isCommissioner) && (
@@ -791,18 +818,27 @@ function RosterList({
   footerPlayers,
   adjustment,
   inPlayAbbrevs,
+  eliminatedAbbrevs,
 }: {
   players: RosterEntry[];
   footerPlayers: RosterEntry[];
   adjustment: number;
   inPlayAbbrevs: Set<string>;
+  eliminatedAbbrevs: Set<string>;
 }) {
   const isInPlay = (p: RosterEntry) =>
     Boolean(p.nhl_abbrev && inPlayAbbrevs.has(p.nhl_abbrev));
+  const isEliminated = (p: RosterEntry) =>
+    Boolean(p.nhl_abbrev && eliminatedAbbrevs.has(p.nhl_abbrev));
   return (
     <div className="space-y-1">
       {players.map((p) => (
-        <PlayerRow key={p.player_id} p={p} inPlay={isInPlay(p)} />
+        <PlayerRow
+          key={p.player_id}
+          p={p}
+          inPlay={isInPlay(p)}
+          eliminated={isEliminated(p)}
+        />
       ))}
       {footerPlayers.length > 0 && (
         <>
@@ -811,7 +847,13 @@ function RosterList({
             Bench &middot; not counted
           </p>
           {footerPlayers.map((p) => (
-            <PlayerRow key={p.player_id} p={p} muted inPlay={isInPlay(p)} />
+            <PlayerRow
+              key={p.player_id}
+              p={p}
+              muted
+              inPlay={isInPlay(p)}
+              eliminated={isEliminated(p)}
+            />
           ))}
         </>
       )}
@@ -836,21 +878,28 @@ function PlayerRow({
   p,
   muted = false,
   inPlay = false,
+  eliminated = false,
 }: {
   p: RosterEntry;
   muted?: boolean;
   inPlay?: boolean;
+  eliminated?: boolean;
 }) {
+  const titleParts = [
+    inPlay ? "Playing tonight" : null,
+    eliminated ? "Team eliminated" : null,
+  ].filter(Boolean);
   return (
     <Link
       href={`/players/${p.player_id}`}
       className={
         "flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-puck-border/40 " +
         (inPlay
-          ? "border-l-2 border-ice-400 bg-ice-500/10 pl-1.5"
-          : "")
+          ? "border-l-2 border-ice-400 bg-ice-500/10 pl-1.5 "
+          : "") +
+        (eliminated ? "opacity-60" : "")
       }
-      title={inPlay ? "Playing tonight" : undefined}
+      title={titleParts.length > 0 ? titleParts.join(" · ") : undefined}
     >
       <span className="flex min-w-0 items-center gap-2">
         <span
@@ -866,7 +915,11 @@ function PlayerRow({
           <img src={p.nhl_logo} alt="" className="h-4 w-4 flex-shrink-0 object-contain" />
         )}
         <span
-          className={`truncate ${muted ? "text-ice-400" : "text-ice-100"}`}
+          className={
+            "truncate " +
+            (muted ? "text-ice-400 " : "text-ice-100 ") +
+            (eliminated ? "line-through decoration-red-400/70" : "")
+          }
         >
           {p.full_name}
         </span>

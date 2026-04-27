@@ -51,6 +51,14 @@ export default async function TeamPage({
     .select("*")
     .eq("team_id", teamId);
 
+  const { data: nhlTeamRows } = await supabase
+    .from("nhl_teams")
+    .select("abbrev, eliminated");
+  const eliminatedAbbrevs = new Set<string>();
+  for (const t of nhlTeamRows ?? []) {
+    if (t.eliminated) eliminatedAbbrevs.add(t.abbrev);
+  }
+
   const { data: adjustments } = await supabase
     .from("score_adjustments")
     .select("delta_points, reason")
@@ -66,6 +74,11 @@ export default async function TeamPage({
   });
 
   const rosterTotal = scored.totalPoints + adjTotal;
+  const allRoster = (rosterRows as RosterEntry[] | null) ?? [];
+  const aliveCount = allRoster.reduce(
+    (n, p) => n + (p.nhl_abbrev && eliminatedAbbrevs.has(p.nhl_abbrev) ? 0 : 1),
+    0,
+  );
 
   return (
     <>
@@ -84,7 +97,24 @@ export default async function TeamPage({
             >
               ← {league.name}
             </Link>
-            <h1 className="text-3xl font-bold text-ice-50">{team.name}</h1>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h1 className="text-3xl font-bold text-ice-50">{team.name}</h1>
+              {allRoster.length > 0 && (
+                <span
+                  title={`${aliveCount} of ${allRoster.length} players still on a non-eliminated team`}
+                  className={
+                    "font-mono text-sm " +
+                    (aliveCount === allRoster.length
+                      ? "text-ice-500"
+                      : aliveCount === 0
+                        ? "text-red-400"
+                        : "text-amber-300")
+                  }
+                >
+                  ({aliveCount}/{allRoster.length})
+                </span>
+              )}
+            </div>
             {canRename && (
               <details className="mt-2 text-sm">
                 <summary className="cursor-pointer text-ice-400 hover:text-ice-200">
@@ -139,7 +169,11 @@ export default async function TeamPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <RosterTable rows={scored.scoring} highlight />
+              <RosterTable
+                rows={scored.scoring}
+                highlight
+                eliminatedAbbrevs={eliminatedAbbrevs}
+              />
             </CardContent>
           </Card>
 
@@ -153,7 +187,10 @@ export default async function TeamPage({
                   No bench players yet.
                 </div>
               ) : (
-                <RosterTable rows={scored.bench} />
+                <RosterTable
+                  rows={scored.bench}
+                  eliminatedAbbrevs={eliminatedAbbrevs}
+                />
               )}
             </CardContent>
           </Card>
@@ -196,9 +233,11 @@ export default async function TeamPage({
 function RosterTable({
   rows,
   highlight = false,
+  eliminatedAbbrevs,
 }: {
   rows: RosterEntry[];
   highlight?: boolean;
+  eliminatedAbbrevs: Set<string>;
 }) {
   return (
     <table className="w-full text-sm">
@@ -215,15 +254,24 @@ function RosterTable({
         </tr>
       </thead>
       <tbody>
-        {rows.map((r) => (
+        {rows.map((r) => {
+          const eliminated = !!r.nhl_abbrev && eliminatedAbbrevs.has(r.nhl_abbrev);
+          return (
           <tr
             key={r.player_id}
-            className="border-b border-puck-border last:border-0"
+            className={
+              "border-b border-puck-border last:border-0 " +
+              (eliminated ? "opacity-60" : "")
+            }
+            title={eliminated ? "Team eliminated" : undefined}
           >
             <td className="px-4 py-2 font-medium text-ice-100">
               <Link
                 href={`/players/${r.player_id}`}
-                className="hover:underline"
+                className={
+                  "hover:underline " +
+                  (eliminated ? "line-through decoration-red-400/70" : "")
+                }
               >
                 {r.full_name}
               </Link>
@@ -254,7 +302,8 @@ function RosterTable({
               {r.fantasy_points}
             </td>
           </tr>
-        ))}
+          );
+        })}
       </tbody>
     </table>
   );

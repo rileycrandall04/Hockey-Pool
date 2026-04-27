@@ -65,12 +65,14 @@ export default async function LeagueTeamsPage({
       .eq("league_id", leagueId),
     supabase
       .from("nhl_teams")
-      .select("abbrev, logo_url"),
+      .select("abbrev, logo_url, eliminated"),
   ]);
 
   const logoByAbbrev = new Map<string, string>();
+  const eliminatedAbbrevs = new Set<string>();
   for (const t of nhlTeamRows ?? []) {
     if (t.logo_url) logoByAbbrev.set(t.abbrev, t.logo_url);
+    if (t.eliminated) eliminatedAbbrevs.add(t.abbrev);
   }
 
   const { data: adjustments } = await supabase
@@ -162,23 +164,48 @@ export default async function LeagueTeamsPage({
             const canRename =
               row.team.owner_id === user.id ||
               league.commissioner_id === user.id;
+            const totalRoster = row.scoring.length + row.bench.length;
+            const aliveCount =
+              row.scoring.filter(
+                (p) => !p.nhl_abbrev || !eliminatedAbbrevs.has(p.nhl_abbrev),
+              ).length +
+              row.bench.filter(
+                (p) => !p.nhl_abbrev || !eliminatedAbbrevs.has(p.nhl_abbrev),
+              ).length;
             return (
             <Card key={row.team.id}>
               <CardHeader>
                 <div className="flex items-center justify-between gap-2">
-                  <CardTitle>
-                    {canRename ? (
-                      <TeamNameEditor
-                        teamId={row.team.id}
-                        leagueId={leagueId}
-                        initialName={row.team.name}
-                        returnUrl={`/leagues/${leagueId}/teams`}
-                        maxLength={TEAM_RENAME_MAX_LEN}
-                      />
-                    ) : (
-                      row.team.name
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-2">
+                    <CardTitle>
+                      {canRename ? (
+                        <TeamNameEditor
+                          teamId={row.team.id}
+                          leagueId={leagueId}
+                          initialName={row.team.name}
+                          returnUrl={`/leagues/${leagueId}/teams`}
+                          maxLength={TEAM_RENAME_MAX_LEN}
+                        />
+                      ) : (
+                        row.team.name
+                      )}
+                    </CardTitle>
+                    {totalRoster > 0 && (
+                      <span
+                        title={`${aliveCount} of ${totalRoster} players still on a non-eliminated team`}
+                        className={
+                          "font-mono text-xs " +
+                          (aliveCount === totalRoster
+                            ? "text-ice-500"
+                            : aliveCount === 0
+                              ? "text-red-400"
+                              : "text-amber-300")
+                        }
+                      >
+                        ({aliveCount}/{totalRoster})
+                      </span>
                     )}
-                  </CardTitle>
+                  </div>
                   <span className="text-2xl font-bold text-ice-50">
                     {row.total}
                     <span className="ml-1 text-xs font-normal uppercase text-ice-400">
@@ -215,7 +242,14 @@ export default async function LeagueTeamsPage({
                 ) : (
                   <ul className="space-y-1 text-sm">
                     {row.scoring.map((p) => (
-                      <PlayerLine key={p.player_id} p={p} logoByAbbrev={logoByAbbrev} />
+                      <PlayerLine
+                        key={p.player_id}
+                        p={p}
+                        logoByAbbrev={logoByAbbrev}
+                        eliminated={
+                          !!p.nhl_abbrev && eliminatedAbbrevs.has(p.nhl_abbrev)
+                        }
+                      />
                     ))}
                     {row.bench.length > 0 && (
                       <>
@@ -224,7 +258,16 @@ export default async function LeagueTeamsPage({
                           Bench &middot; not counted
                         </li>
                         {row.bench.map((p) => (
-                          <PlayerLine key={p.player_id} p={p} muted logoByAbbrev={logoByAbbrev} />
+                          <PlayerLine
+                            key={p.player_id}
+                            p={p}
+                            muted
+                            logoByAbbrev={logoByAbbrev}
+                            eliminated={
+                              !!p.nhl_abbrev &&
+                              eliminatedAbbrevs.has(p.nhl_abbrev)
+                            }
+                          />
                         ))}
                       </>
                     )}
@@ -244,17 +287,23 @@ function PlayerLine({
   p,
   muted = false,
   logoByAbbrev,
+  eliminated = false,
 }: {
   p: RosterEntry;
   muted?: boolean;
   logoByAbbrev: Map<string, string>;
+  eliminated?: boolean;
 }) {
   const logo = p.nhl_abbrev ? logoByAbbrev.get(p.nhl_abbrev) : undefined;
   return (
     <li>
       <Link
         href={`/players/${p.player_id}`}
-        className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-puck-border/40"
+        className={
+          "flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-puck-border/40 " +
+          (eliminated ? "opacity-60" : "")
+        }
+        title={eliminated ? "Team eliminated" : undefined}
       >
         <span className="flex min-w-0 items-center gap-2">
           <span
@@ -272,7 +321,11 @@ function PlayerLine({
             <span className="inline-block h-5 w-5 flex-shrink-0 rounded bg-puck-border/40" />
           )}
           <span
-            className={`truncate ${muted ? "text-ice-400" : "text-ice-100"}`}
+            className={
+              "truncate " +
+              (muted ? "text-ice-400 " : "text-ice-100 ") +
+              (eliminated ? "line-through decoration-red-400/70" : "")
+            }
           >
             {p.full_name}
           </span>
