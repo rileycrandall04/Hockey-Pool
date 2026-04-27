@@ -14,7 +14,8 @@ import { DailyTicker } from "@/components/daily-ticker";
 import { scoreTeam } from "@/lib/scoring";
 import { TeamNameEditor } from "@/components/team-name-editor";
 import { TEAM_RENAME_MAX_LEN } from "@/app/leagues/[leagueId]/team-constants";
-import type { RosterEntry, Team } from "@/lib/types";
+import { eliminatedAbbrevsFromSeries } from "@/lib/eliminated";
+import type { PlayoffSeries, RosterEntry, Team } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -68,11 +69,20 @@ export default async function LeagueTeamsPage({
       .select("abbrev, logo_url, eliminated"),
   ]);
 
+  const { data: seriesRows } = await supabase
+    .from("playoff_series")
+    .select("*");
+
   const logoByAbbrev = new Map<string, string>();
   const eliminatedAbbrevs = new Set<string>();
   for (const t of nhlTeamRows ?? []) {
     if (t.logo_url) logoByAbbrev.set(t.abbrev, t.logo_url);
     if (t.eliminated) eliminatedAbbrevs.add(t.abbrev);
+  }
+  for (const a of eliminatedAbbrevsFromSeries(
+    (seriesRows ?? []) as PlayoffSeries[],
+  )) {
+    eliminatedAbbrevs.add(a);
   }
 
   const { data: adjustments } = await supabase

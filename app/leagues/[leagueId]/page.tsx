@@ -22,6 +22,7 @@ import { DailyTicker } from "@/components/daily-ticker";
 import { TonightsGames } from "@/components/tonights-games";
 import { scoreTeam } from "@/lib/scoring";
 import { effectiveGameDay, isGameOnDate } from "@/lib/playoff-helpers";
+import { eliminatedAbbrevsFromSeries } from "@/lib/eliminated";
 import { getOvernightDeltas } from "@/lib/snapshot-standings";
 import type { OvernightDelta } from "@/lib/snapshot-standings";
 import type {
@@ -163,6 +164,11 @@ export default async function LeagueStandingsPage({
   }[]) {
     if (t.logo_url) teamLogos[t.abbrev] = t.logo_url;
     if (t.eliminated) eliminatedAbbrevs.add(t.abbrev);
+  }
+  // Also derive elimination from bracket state so a team disappears
+  // the moment its series is clinched, not on the next cron run.
+  for (const a of eliminatedAbbrevsFromSeries(bracketSeries)) {
+    eliminatedAbbrevs.add(a);
   }
 
   // Is the current user watching this league for draft stall alerts?
