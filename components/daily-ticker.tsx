@@ -1,7 +1,8 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { isAppOwner } from "@/lib/auth";
 import { todayEasternISO, isGameOnDate } from "@/lib/playoff-helpers";
-import type { DailyRecap } from "@/lib/types";
+import { finishedSeriesLetters } from "@/lib/eliminated";
+import type { DailyRecap, PlayoffSeries } from "@/lib/types";
 import { DailyTickerClient } from "./daily-ticker-client";
 
 /**
@@ -64,7 +65,20 @@ export async function DailyTicker({ leagueId }: { leagueId?: string } = {}) {
     .select("*")
     .order("game_id", { ascending: true });
 
-  const allGames = (allPlayoffGames ?? []);
+  // Drop games whose parent series is over so the ticker doesn't
+  // show stale matchups.
+  const { data: seriesRows } = await svc
+    .from("playoff_series")
+    .select(
+      "series_letter, top_seed_wins, bottom_seed_wins, needed_to_win, winning_team_abbrev",
+    );
+  const finishedLetters = finishedSeriesLetters(
+    (seriesRows ?? []) as PlayoffSeries[],
+  );
+  const allGames = (allPlayoffGames ?? []).filter(
+    (g: { series_letter: string }) =>
+      !finishedLetters.has(g.series_letter),
+  );
 
   // Try primary date first, fall back if no games
   let targetDate = primaryDate;

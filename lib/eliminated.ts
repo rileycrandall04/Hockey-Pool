@@ -1,6 +1,39 @@
 import type { PlayoffSeries } from "@/lib/types";
 
 /**
+ * A series is "finished" if either seed has reached `needed_to_win`
+ * (typically 4) or the row already carries `winning_team_abbrev`.
+ */
+export function isSeriesFinished(s: {
+  top_seed_wins: number;
+  bottom_seed_wins: number;
+  needed_to_win: number;
+  winning_team_abbrev: string | null;
+}): boolean {
+  const needed = s.needed_to_win ?? 4;
+  return (
+    !!s.winning_team_abbrev ||
+    s.top_seed_wins >= needed ||
+    s.bottom_seed_wins >= needed
+  );
+}
+
+/**
+ * Set of `series_letter` values whose series is over. Use this to
+ * filter games (Tonight's Games card, scoreboard, daily ticker) so
+ * clinched matchups stop showing once the series ends.
+ */
+export function finishedSeriesLetters(
+  series: PlayoffSeries[],
+): Set<string> {
+  const out = new Set<string>();
+  for (const s of series) {
+    if (isSeriesFinished(s)) out.add(s.series_letter);
+  }
+  return out;
+}
+
+/**
  * Derive the set of NHL team abbrevs eliminated from the playoffs
  * directly from the `playoff_series` table. A team is considered
  * eliminated as soon as the OTHER seed in its series has reached
