@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { isGameOnDate, getGameDate, effectiveGameDay } from "@/lib/playoff-helpers";
+import { finishedSeriesLetters } from "@/lib/eliminated";
 import type { PlayoffGame, PlayoffSeries } from "@/lib/types";
 
 export interface LeaguePlayer {
@@ -61,19 +62,9 @@ export function TonightsGames({
   // play in a series after it's over (the NHL drops the unplayed
   // games), but the bracket sometimes still carries those rows for
   // a beat after the deciding game is finalized.
-  const completedSeriesLetters = new Set<string>();
-  for (const s of series ?? []) {
-    const needed = s.needed_to_win ?? 4;
-    if (
-      s.winning_team_abbrev ||
-      s.top_seed_wins >= needed ||
-      s.bottom_seed_wins >= needed
-    ) {
-      completedSeriesLetters.add(s.series_letter);
-    }
-  }
+  const finishedLetters = finishedSeriesLetters(series ?? []);
   const liveGames = (games ?? []).filter(
-    (g) => !completedSeriesLetters.has(g.series_letter),
+    (g) => !finishedLetters.has(g.series_letter),
   );
 
   const scheduledTodayRaw = liveGames.filter((g) => isGameOnDate(g, effectiveDate));

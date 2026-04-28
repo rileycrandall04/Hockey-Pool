@@ -4,9 +4,10 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getLeagueForMember } from "@/lib/league-access";
 import { isAppOwner } from "@/lib/auth";
 import { todayEasternISO, isGameOnDate, effectiveGameDay } from "@/lib/playoff-helpers";
+import { finishedSeriesLetters } from "@/lib/eliminated";
 import { NavBar } from "@/components/nav-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { League, PlayoffGame } from "@/lib/types";
+import type { League, PlayoffGame, PlayoffSeries } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -93,9 +94,21 @@ export default async function ScoreboardPage({
     .select("*")
     .order("game_id", { ascending: true });
 
-  const todayGames = ((allPlayoffGames ?? []) as PlayoffGame[]).filter((g) =>
-    isGameOnDate(g, viewDate),
+  // Drop games whose parent series is already over so the scoreboard
+  // doesn't keep surfacing dead matchups.
+  const { data: allSeriesRows } = await svc
+    .from("playoff_series")
+    .select(
+      "series_letter, top_seed_wins, bottom_seed_wins, needed_to_win, winning_team_abbrev",
+    );
+  const finishedLetters = finishedSeriesLetters(
+    (allSeriesRows ?? []) as PlayoffSeries[],
   );
+  const liveOnly = ((allPlayoffGames ?? []) as PlayoffGame[]).filter(
+    (g) => !finishedLetters.has(g.series_letter),
+  );
+
+  const todayGames = liveOnly.filter((g) => isGameOnDate(g, viewDate));
 
   // Deduplicate: if multiple rows exist for the same matchup on the
   // same day, keep the one with scores / FINAL / most recent update.
