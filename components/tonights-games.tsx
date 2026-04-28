@@ -56,16 +56,36 @@ export function TonightsGames({
   otGameIds,
 }: TonightsGamesProps) {
   const { date: effectiveDate, isToday } = effectiveGameDay();
-  const scheduledTodayRaw = (games ?? []).filter((g) => isGameOnDate(g, effectiveDate));
+
+  // Hide games whose series has already been clinched. A team can't
+  // play in a series after it's over (the NHL drops the unplayed
+  // games), but the bracket sometimes still carries those rows for
+  // a beat after the deciding game is finalized.
+  const completedSeriesLetters = new Set<string>();
+  for (const s of series ?? []) {
+    const needed = s.needed_to_win ?? 4;
+    if (
+      s.winning_team_abbrev ||
+      s.top_seed_wins >= needed ||
+      s.bottom_seed_wins >= needed
+    ) {
+      completedSeriesLetters.add(s.series_letter);
+    }
+  }
+  const liveGames = (games ?? []).filter(
+    (g) => !completedSeriesLetters.has(g.series_letter),
+  );
+
+  const scheduledTodayRaw = liveGames.filter((g) => isGameOnDate(g, effectiveDate));
   const scheduledToday = deduplicateGames(scheduledTodayRaw);
   const upcomingLabel =
     scheduledToday.length > 0
       ? "Tonight"
-      : pickNextDateLabel(games, effectiveDate);
+      : pickNextDateLabel(liveGames, effectiveDate);
   const shown =
     scheduledToday.length > 0
       ? scheduledToday
-      : deduplicateGames(pickNextDateGames(games, effectiveDate));
+      : deduplicateGames(pickNextDateGames(liveGames, effectiveDate));
 
   // Build a quick lookup so each game row can pull its parent
   // series' running score + seeded team names.
