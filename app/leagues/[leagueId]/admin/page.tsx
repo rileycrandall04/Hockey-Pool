@@ -725,6 +725,65 @@ async function syncBracketAction(formData: FormData) {
   }
 }
 
+/**
+ * Delete unplayed (FUT/PRE/LIVE/null) playoff_games rows whose
+ * series has already been clinched. Keeps every actually-played
+ * game (FINAL/OFF) intact so scoreboards and stats are untouched.
+ */
+async function sweepFinishedSeriesAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id"));
+  const { user } = await assertCommissioner(leagueId);
+  if (!isAppOwner(user.email)) redirect(`/leagues/${leagueId}/admin`);
+
+  try {
+    const svc = createServiceClient();
+    const { data: series } = await svc
+      .from("playoff_series")
+      .select(
+        "series_letter, top_seed_wins, bottom_seed_wins, needed_to_win, winning_team_abbrev",
+      );
+    const finishedLetters = (series ?? [])
+      .filter((s) => {
+        const needed = s.needed_to_win ?? 4;
+        return (
+          !!s.winning_team_abbrev ||
+          s.top_seed_wins >= needed ||
+          s.bottom_seed_wins >= needed
+        );
+      })
+      .map((s) => s.series_letter);
+
+    let deletedCount = 0;
+    if (finishedLetters.length > 0) {
+      const { count, error } = await svc
+        .from("playoff_games")
+        .delete({ count: "exact" })
+        .in("series_letter", finishedLetters)
+        .not("game_state", "in", "(FINAL,OFF)");
+      if (error) throw error;
+      deletedCount = count ?? 0;
+    }
+
+    revalidatePath(`/leagues/${leagueId}`);
+    revalidatePath(`/leagues/${leagueId}/bracket`);
+    revalidatePath(`/leagues/${leagueId}/scoreboard`);
+    revalidatePath("/", "layout");
+    redirect(
+      `/leagues/${leagueId}/admin?reset_success=${encodeURIComponent(
+        `Swept ${deletedCount} unplayed game${deletedCount === 1 ? "" : "s"} from ${finishedLetters.length} finished series.`,
+      )}`,
+    );
+  } catch (err) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    if (err && typeof err === "object" && "digest" in err) throw err;
+    const message = err instanceof Error ? err.message : "Unknown error";
+    redirect(
+      `/leagues/${leagueId}/admin?reset_error=${encodeURIComponent(`Sweep failed: ${message}`)}`,
+    );
+  }
+}
+
 async function toggleInjuryAction(formData: FormData) {
   "use server";
   const leagueId = String(formData.get("league_id"));
@@ -987,6 +1046,14 @@ export default async function AdminPage({
                 <form action="/api/admin/sync-injuries" method="post">
                   <Button type="submit" variant="secondary">
                     ↻ Sync injuries
+                  </Button>
+                </form>
+              )}
+              {canRefreshNhlData && (
+                <form action={sweepFinishedSeriesAction}>
+                  <input type="hidden" name="league_id" value={leagueId} />
+                  <Button type="submit" variant="secondary">
+                    🧹 Sweep finished series
                   </Button>
                 </form>
               )}
