@@ -34,6 +34,26 @@ export function finishedSeriesLetters(
 }
 
 /**
+ * Filter helper used by every game-list view (Tonight's Games,
+ * scoreboard, daily ticker). The rule is:
+ *
+ *   - Played games (FINAL/OFF) always stay, so the deciding game of
+ *     a series is still visible on the night it's played.
+ *   - Unplayed games (FUT/PRE/LIVE/null) drop out as soon as their
+ *     series is clinched, so leftover Game 5/6/7 placeholders don't
+ *     keep cluttering the page.
+ */
+export function shouldShowGame(
+  game: { series_letter: string; game_state?: string | null },
+  finishedLetters: Set<string>,
+): boolean {
+  const played =
+    game.game_state === "FINAL" || game.game_state === "OFF";
+  if (played) return true;
+  return !finishedLetters.has(game.series_letter);
+}
+
+/**
  * Derive the set of NHL team abbrevs eliminated from the playoffs
  * directly from the `playoff_series` table. A team is considered
  * eliminated as soon as the OTHER seed in its series has reached

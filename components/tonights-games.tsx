@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { isGameOnDate, getGameDate, effectiveGameDay } from "@/lib/playoff-helpers";
-import { finishedSeriesLetters } from "@/lib/eliminated";
+import { finishedSeriesLetters, shouldShowGame } from "@/lib/eliminated";
 import type { PlayoffGame, PlayoffSeries } from "@/lib/types";
 
 export interface LeaguePlayer {
@@ -58,13 +58,12 @@ export function TonightsGames({
 }: TonightsGamesProps) {
   const { date: effectiveDate, isToday } = effectiveGameDay();
 
-  // Hide games whose series has already been clinched. A team can't
-  // play in a series after it's over (the NHL drops the unplayed
-  // games), but the bracket sometimes still carries those rows for
-  // a beat after the deciding game is finalized.
+  // Drop unplayed games whose parent series is clinched, but keep
+  // any played game (FINAL/OFF) so the night-of clincher is still
+  // visible on its own date.
   const finishedLetters = finishedSeriesLetters(series ?? []);
-  const liveGames = (games ?? []).filter(
-    (g) => !finishedLetters.has(g.series_letter),
+  const liveGames = (games ?? []).filter((g) =>
+    shouldShowGame(g, finishedLetters),
   );
 
   const scheduledTodayRaw = liveGames.filter((g) => isGameOnDate(g, effectiveDate));
