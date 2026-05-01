@@ -21,11 +21,10 @@ import { TEAM_RENAME_MAX_LEN } from "@/app/leagues/[leagueId]/team-constants";
 import { DailyTicker } from "@/components/daily-ticker";
 import { TonightsGames } from "@/components/tonights-games";
 import { scoreTeam } from "@/lib/scoring";
-import { effectiveGameDay, isGameOnDate } from "@/lib/playoff-helpers";
+import { effectiveGameDay } from "@/lib/playoff-helpers";
 import {
   eliminatedAbbrevsFromSeries,
-  finishedSeriesLetters,
-  shouldShowGame,
+  gamesScheduledTonight,
 } from "@/lib/eliminated";
 import { getOvernightDeltas } from "@/lib/snapshot-standings";
 import type { OvernightDelta } from "@/lib/snapshot-standings";
@@ -205,19 +204,18 @@ export default async function LeagueStandingsPage({
   }
 
   // NHL teams with a game on tonight's effective date — used to show
-  // "in play" counts on each standings row. Uses the same date helper
-  // as the Tonight's Games card so the two stay in sync (and so late-
-  // night games still count before 4:30 AM Eastern).
-  //
-  // Skip unplayed games from clinched series so a team waiting on its
-  // next-round opponent isn't flagged as "in play" because of a stale
-  // Game 5/6/7 placeholder still sitting in the bracket.
+  // "in play" counts on each standings row. Pulls from the SAME helper
+  // the Tonight's Games card uses to pick its rows, so the badge can
+  // never disagree with what the card displays (no more "FLA shown as
+  // in play tonight while waiting on a second-round opponent").
   const { date: tonightDate } = effectiveGameDay();
-  const finishedLetters = finishedSeriesLetters(bracketSeries);
+  const tonightGames = gamesScheduledTonight(
+    bracketGames,
+    bracketSeries,
+    tonightDate,
+  );
   const inPlayAbbrevs = new Set<string>();
-  for (const g of bracketGames) {
-    if (!isGameOnDate(g, tonightDate)) continue;
-    if (!shouldShowGame(g, finishedLetters)) continue;
+  for (const g of tonightGames) {
     if (g.away_abbrev) inPlayAbbrevs.add(g.away_abbrev);
     if (g.home_abbrev) inPlayAbbrevs.add(g.home_abbrev);
   }
