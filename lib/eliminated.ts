@@ -1,4 +1,5 @@
-import type { PlayoffSeries } from "@/lib/types";
+import { isGameOnDate } from "@/lib/playoff-helpers";
+import type { PlayoffGame, PlayoffSeries } from "@/lib/types";
 
 /**
  * A series is "finished" if either seed has reached `needed_to_win`
@@ -51,6 +52,54 @@ export function shouldShowGame(
     game.game_state === "FINAL" || game.game_state === "OFF";
   if (played) return true;
   return !finishedLetters.has(game.series_letter);
+}
+
+/**
+ * Single source of truth for "what games are showing tonight." Used
+ * both by the Tonight's Games card and by the standings page's
+ * "in play" computation, so the two can never disagree about which
+ * teams are actually playing.
+ *
+ * Applies the same three filters in order:
+ *   1. Drop games whose series is clinched (unless the game itself
+ *      was played — see shouldShowGame).
+ *   2. Keep only games whose game_date / start_time_utc resolves to
+ *      the supplied effective date in Eastern time.
+ *   3. Deduplicate by the away/home abbrev pair so a stale and a
+ *      live row for the same matchup count once.
+ */
+export function gamesScheduledTonight(
+  games: PlayoffGame[],
+  series: PlayoffSeries[],
+  effectiveDate: string,
+): PlayoffGame[] {
+  const finished = finishedSeriesLetters(series);
+  const live = games.filter((g) => shouldShowGame(g, finished));
+  const onDate = live.filter((g) => isGameOnDate(g, effectiveDate));
+
+  // Prefer scored → FINAL → newest, same logic the Tonight's Games
+  // card was using internally.
+  const seen = new Map<string, PlayoffGame>();
+  for (const g of onDate) {
+    const pair = [g.away_abbrev ?? "", g.home_abbrev ?? ""].sort().join("-");
+    const existing = seen.get(pair);
+    if (!existing) {
+      seen.set(pair, g);
+      continue;
+    }
+    const eHasScore = existing.away_score != null && existing.home_score != null;
+    const gHasScore = g.away_score != null && g.home_score != null;
+    const eFinal = existing.game_state === "FINAL";
+    const gFinal = g.game_state === "FINAL";
+    if (
+      (!eHasScore && gHasScore) ||
+      (!eFinal && gFinal) ||
+      (g.updated_at ?? "") > (existing.updated_at ?? "")
+    ) {
+      seen.set(pair, g);
+    }
+  }
+  return [...seen.values()];
 }
 
 /**

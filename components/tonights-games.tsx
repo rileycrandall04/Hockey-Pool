@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { isGameOnDate, getGameDate, effectiveGameDay } from "@/lib/playoff-helpers";
-import { finishedSeriesLetters, shouldShowGame } from "@/lib/eliminated";
+import { getGameDate, effectiveGameDay } from "@/lib/playoff-helpers";
+import { gamesScheduledTonight, shouldShowGame, finishedSeriesLetters } from "@/lib/eliminated";
 import type { PlayoffGame, PlayoffSeries } from "@/lib/types";
 
 export interface LeaguePlayer {
@@ -58,16 +58,22 @@ export function TonightsGames({
 }: TonightsGamesProps) {
   const { date: effectiveDate, isToday } = effectiveGameDay();
 
-  // Drop unplayed games whose parent series is clinched, but keep
-  // any played game (FINAL/OFF) so the night-of clincher is still
-  // visible on its own date.
+  // Tonight's slate comes from the same helper the standings page
+  // uses to compute in-play, so the badge and the card always agree
+  // about who's actually playing tonight.
+  const scheduledToday = gamesScheduledTonight(
+    games ?? [],
+    series ?? [],
+    effectiveDate,
+  );
+
+  // Fallback list (next future date with games) — only used when
+  // tonight is empty. Reuses the same finished-series filter so
+  // clinched-series placeholders never bubble up here either.
   const finishedLetters = finishedSeriesLetters(series ?? []);
   const liveGames = (games ?? []).filter((g) =>
     shouldShowGame(g, finishedLetters),
   );
-
-  const scheduledTodayRaw = liveGames.filter((g) => isGameOnDate(g, effectiveDate));
-  const scheduledToday = deduplicateGames(scheduledTodayRaw);
   const upcomingLabel =
     scheduledToday.length > 0
       ? "Tonight"
