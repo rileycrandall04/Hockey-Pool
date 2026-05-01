@@ -22,7 +22,11 @@ import { DailyTicker } from "@/components/daily-ticker";
 import { TonightsGames } from "@/components/tonights-games";
 import { scoreTeam } from "@/lib/scoring";
 import { effectiveGameDay, isGameOnDate } from "@/lib/playoff-helpers";
-import { eliminatedAbbrevsFromSeries } from "@/lib/eliminated";
+import {
+  eliminatedAbbrevsFromSeries,
+  finishedSeriesLetters,
+  shouldShowGame,
+} from "@/lib/eliminated";
 import { getOvernightDeltas } from "@/lib/snapshot-standings";
 import type { OvernightDelta } from "@/lib/snapshot-standings";
 import type {
@@ -204,10 +208,16 @@ export default async function LeagueStandingsPage({
   // "in play" counts on each standings row. Uses the same date helper
   // as the Tonight's Games card so the two stay in sync (and so late-
   // night games still count before 4:30 AM Eastern).
+  //
+  // Skip unplayed games from clinched series so a team waiting on its
+  // next-round opponent isn't flagged as "in play" because of a stale
+  // Game 5/6/7 placeholder still sitting in the bracket.
   const { date: tonightDate } = effectiveGameDay();
+  const finishedLetters = finishedSeriesLetters(bracketSeries);
   const inPlayAbbrevs = new Set<string>();
   for (const g of bracketGames) {
     if (!isGameOnDate(g, tonightDate)) continue;
+    if (!shouldShowGame(g, finishedLetters)) continue;
     if (g.away_abbrev) inPlayAbbrevs.add(g.away_abbrev);
     if (g.home_abbrev) inPlayAbbrevs.add(g.home_abbrev);
   }
