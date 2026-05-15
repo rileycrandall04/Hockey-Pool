@@ -1058,6 +1058,11 @@ export default async function AdminPage({
                 </form>
               )}
               {canRefreshNhlData && (
+                <Link href="/admin/reconcile-stats">
+                  <Button variant="secondary">↻ Reconcile NHL stats</Button>
+                </Link>
+              )}
+              {canRefreshNhlData && (
                 <Link href="/debug/nhl">
                   <Button variant="secondary">Debug NHL endpoints</Button>
                 </Link>
