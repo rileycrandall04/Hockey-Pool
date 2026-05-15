@@ -27,7 +27,10 @@ import {
   gamesScheduledTonight,
 } from "@/lib/eliminated";
 import { getOvernightDeltas } from "@/lib/snapshot-standings";
-import { fetchLastGameStats, type LastGameStat } from "@/lib/last-game-stats";
+import {
+  fetchPointsForLatestGameDay,
+  type LastGameStat,
+} from "@/lib/last-game-stats";
 import type { OvernightDelta } from "@/lib/snapshot-standings";
 import type {
   League,
@@ -204,16 +207,17 @@ export default async function LeagueStandingsPage({
     rosterByTeam.set(row.team_id, arr);
   }
 
-  // Per-player most recent game stats — used to display the "+N from
-  // last game" green pill next to each row and a team subtotal in the
-  // expand-out section.
+  // Per-player stats from the latest league-wide game day — green
+  // pills next to each row and the team subtotal in the expand-out
+  // section. Players who didn't play on that date aren't in the map.
   const allRosterPlayerIds = ((rosterRows as RosterEntry[] | null) ?? []).map(
     (r) => r.player_id,
   );
-  const lastGameByPlayer = await fetchLastGameStats(
-    createServiceClient(),
-    allRosterPlayerIds,
-  );
+  const { date: latestGameDay, byPlayer: lastGameByPlayer } =
+    await fetchPointsForLatestGameDay(
+      createServiceClient(),
+      allRosterPlayerIds,
+    );
 
   // NHL teams with a game on tonight's effective date — used to show
   // "in play" counts on each standings row. Pulls from the SAME helper
@@ -610,7 +614,7 @@ export default async function LeagueStandingsPage({
                 <div className="border-t border-puck-border px-2.5 py-2 text-[11px] sm:px-3 sm:text-sm">
                   {lastGameSubtotal > 0 && (
                     <div className="mb-2 text-xs font-semibold text-green-300">
-                      +{lastGameSubtotal} from last game
+                      +{lastGameSubtotal} from {latestGameDay ?? "last game"}
                     </div>
                   )}
                   {row.scoring.length === 0 ? (
