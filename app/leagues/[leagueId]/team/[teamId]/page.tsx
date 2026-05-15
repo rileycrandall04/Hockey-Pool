@@ -10,7 +10,10 @@ import { scoreTeam } from "@/lib/scoring";
 import { renameTeamAction } from "@/app/leagues/[leagueId]/team-actions";
 import { TEAM_RENAME_MAX_LEN } from "@/app/leagues/[leagueId]/team-constants";
 import { eliminatedAbbrevsFromSeries } from "@/lib/eliminated";
-import { fetchLastGameStats, type LastGameStat } from "@/lib/last-game-stats";
+import {
+  fetchPointsForLatestGameDay,
+  type LastGameStat,
+} from "@/lib/last-game-stats";
 import type { PlayoffSeries, RosterEntry, Team } from "@/lib/types";
 
 export default async function TeamPage({
@@ -88,13 +91,15 @@ export default async function TeamPage({
     0,
   );
 
-  // Per-player most recent game stats — used both for the green
-  // pill next to each row and the "from last game" team subtotal.
+  // Per-player stats from the latest league-wide game day — fuels
+  // both the green pill next to each row and the "from <date>" team
+  // subtotal beside the headline.
   const svc = createServiceClient();
-  const lastGameByPlayer = await fetchLastGameStats(
-    svc,
-    allRoster.map((p) => p.player_id),
-  );
+  const { date: latestGameDay, byPlayer: lastGameByPlayer } =
+    await fetchPointsForLatestGameDay(
+      svc,
+      allRoster.map((p) => p.player_id),
+    );
   const lastGameSubtotal = [...lastGameByPlayer.values()].reduce(
     (s, l) => s + l.fantasy_points,
     0,
@@ -180,7 +185,7 @@ export default async function TeamPage({
             )}
             {lastGameSubtotal > 0 && (
               <div className="mt-1 text-xs font-semibold text-green-300">
-                +{lastGameSubtotal} from last game
+                +{lastGameSubtotal} from {latestGameDay ?? "last game"}
               </div>
             )}
           </div>
