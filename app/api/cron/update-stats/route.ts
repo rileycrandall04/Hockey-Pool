@@ -9,6 +9,7 @@ import {
 import { syncInjuries } from "@/lib/sync-injuries";
 import { snapshotAllLeagues } from "@/lib/snapshot-standings";
 import { syncPlayoffBracket } from "@/lib/sync-bracket";
+import { reconcilePlayerTotals } from "@/lib/reconcile-totals";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -64,6 +65,8 @@ export async function POST(request: Request) {
     bracket_series: 0,
     bracket_games: 0,
     bracket_errors: [] as string[],
+    totals_reconciled: 0,
+    totals_errors: [] as string[],
   };
 
   // -------------------------------------------------------------------
@@ -246,6 +249,24 @@ export async function POST(request: Request) {
       }
     }
     summary.stats_updated = updates.length;
+  }
+
+  // -------------------------------------------------------------------
+  // 2.5. Self-heal: rebuild player_stats from the sum of every
+  // player's manual_game_stats rows. The delta-based dual-write
+  // pattern can drift if any single write (cron, editor, or
+  // reconciliation page) partially fails — this runs unconditionally
+  // so cumulative totals snap back to truth at least once a day.
+  // -------------------------------------------------------------------
+  try {
+    const recon = await reconcilePlayerTotals(svc);
+    summary.totals_reconciled = recon.players_updated;
+    if (recon.errors.length > 0) summary.totals_errors = recon.errors;
+  } catch (err) {
+    console.error("Failed to reconcile player totals", err);
+    summary.totals_errors = [
+      err instanceof Error ? err.message : String(err),
+    ];
   }
 
   // -------------------------------------------------------------------
