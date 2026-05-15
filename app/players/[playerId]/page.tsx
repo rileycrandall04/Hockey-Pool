@@ -14,6 +14,7 @@ import {
 import { InjuryBadge } from "@/components/injury-badge";
 import { BackButton } from "@/components/back-button";
 import { getCurrentLeagueContext } from "@/lib/current-league";
+import { fetchLastGameStats } from "@/lib/last-game-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -249,6 +250,12 @@ export default async function PlayerPage({
   const playoffPpg =
     playoffGames > 0 ? (playoffFp / playoffGames).toFixed(2) : "—";
 
+  const lastGameByPlayer = await fetchLastGameStats(
+    createServiceClient(),
+    [id],
+  );
+  const lastGame = lastGameByPlayer.get(id);
+
   const injuryUpdatedAt = player.injury_updated_at as string | null;
 
   return (
@@ -338,6 +345,39 @@ export default async function PlayerPage({
               is worth 3 total since the OT goal is also counted as a
               regular goal.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Last game
+              {lastGame?.game_date && (
+                <span className="ml-2 text-xs font-normal text-ice-400">
+                  {lastGame.game_date} ·{" "}
+                  {lastGame.away_abbrev ?? "?"} @ {lastGame.home_abbrev ?? "?"}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {lastGame ? (
+              <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                <Stat label="Goals" value={lastGame.goals} />
+                <Stat label="Assists" value={lastGame.assists} />
+                <Stat label="OT Goals" value={lastGame.ot_goals} />
+                <Stat
+                  label="Pool PTS"
+                  value={lastGame.fantasy_points}
+                  highlight
+                />
+              </dl>
+            ) : (
+              <p className="text-sm text-ice-400">
+                No game stats yet — comes online once a stat is recorded
+                in this player&rsquo;s game.
+              </p>
+            )}
           </CardContent>
         </Card>
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getLeagueForMember } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { scoreTeam } from "@/lib/scoring";
 import { renameTeamAction } from "@/app/leagues/[leagueId]/team-actions";
 import { TEAM_RENAME_MAX_LEN } from "@/app/leagues/[leagueId]/team-constants";
 import { eliminatedAbbrevsFromSeries } from "@/lib/eliminated";
+import { fetchLastGameStats, type LastGameStat } from "@/lib/last-game-stats";
 import type { PlayoffSeries, RosterEntry, Team } from "@/lib/types";
 
 export default async function TeamPage({
@@ -84,6 +85,18 @@ export default async function TeamPage({
   const allRoster = (rosterRows as RosterEntry[] | null) ?? [];
   const aliveCount = allRoster.reduce(
     (n, p) => n + (p.nhl_abbrev && eliminatedAbbrevs.has(p.nhl_abbrev) ? 0 : 1),
+    0,
+  );
+
+  // Per-player most recent game stats — used both for the green
+  // pill next to each row and the "from last game" team subtotal.
+  const svc = createServiceClient();
+  const lastGameByPlayer = await fetchLastGameStats(
+    svc,
+    allRoster.map((p) => p.player_id),
+  );
+  const lastGameSubtotal = [...lastGameByPlayer.values()].reduce(
+    (s, l) => s + l.fantasy_points,
     0,
   );
 
@@ -165,6 +178,11 @@ export default async function TeamPage({
                 {adjTotal} from adjustments
               </div>
             )}
+            {lastGameSubtotal > 0 && (
+              <div className="mt-1 text-xs font-semibold text-green-300">
+                +{lastGameSubtotal} from last game
+              </div>
+            )}
           </div>
         </div>
 
@@ -180,6 +198,7 @@ export default async function TeamPage({
                 rows={scored.scoring}
                 highlight
                 eliminatedAbbrevs={eliminatedAbbrevs}
+                lastGameByPlayer={lastGameByPlayer}
               />
             </CardContent>
           </Card>
@@ -197,6 +216,7 @@ export default async function TeamPage({
                 <RosterTable
                   rows={scored.bench}
                   eliminatedAbbrevs={eliminatedAbbrevs}
+                  lastGameByPlayer={lastGameByPlayer}
                 />
               )}
             </CardContent>
@@ -241,10 +261,12 @@ function RosterTable({
   rows,
   highlight = false,
   eliminatedAbbrevs,
+  lastGameByPlayer,
 }: {
   rows: RosterEntry[];
   highlight?: boolean;
   eliminatedAbbrevs: Set<string>;
+  lastGameByPlayer: Map<number, LastGameStat>;
 }) {
   return (
     <table className="w-full text-sm">
@@ -257,12 +279,18 @@ function RosterTable({
           <th className="px-2 py-2 text-right">G</th>
           <th className="px-2 py-2 text-right">A</th>
           <th className="px-2 py-2 text-right">OT</th>
+          <th className="px-2 py-2 text-right">Last</th>
           <th className="px-4 py-2 text-right">PTS</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((r) => {
           const eliminated = !!r.nhl_abbrev && eliminatedAbbrevs.has(r.nhl_abbrev);
+          const last = lastGameByPlayer.get(r.player_id);
+          const lastPts = last?.fantasy_points ?? 0;
+          const lastTitle = last
+            ? `Last game ${last.game_date ?? ""} (${last.away_abbrev ?? "?"} @ ${last.home_abbrev ?? "?"}): ${last.goals}G ${last.assists}A ${last.ot_goals}OT`
+            : "No game stats yet";
           return (
           <tr
             key={r.player_id}
@@ -301,6 +329,16 @@ function RosterTable({
             <td className="px-2 py-2 text-right text-ice-300">{r.goals}</td>
             <td className="px-2 py-2 text-right text-ice-300">{r.assists}</td>
             <td className="px-2 py-2 text-right text-ice-300">{r.ot_goals}</td>
+            <td
+              className="px-2 py-2 text-right font-semibold"
+              title={lastTitle}
+            >
+              {lastPts > 0 ? (
+                <span className="text-green-300">+{lastPts}</span>
+              ) : (
+                <span className="text-ice-500">—</span>
+              )}
+            </td>
             <td
               className={`px-4 py-2 text-right font-semibold ${
                 highlight ? "text-ice-50" : "text-ice-200"
