@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { reconcilePlayerTotals } from "@/lib/reconcile-totals";
 
 export const dynamic = "force-dynamic";
 
@@ -196,64 +197,10 @@ async function applyTotalsAction(formData: FormData) {
     );
   }
 
-  // Recompute the expected totals for the selected players.
-  const { data: manualRows } = await svc
-    .from("manual_game_stats")
-    .select("player_id, game_id, goals, assists, ot_goals")
-    .in("player_id", playerIds);
-
-  interface Agg {
-    goals: number;
-    assists: number;
-    ot_goals: number;
-    games: Set<number>;
-  }
-  const byPlayer = new Map<number, Agg>();
-  for (const r of manualRows ?? []) {
-    let agg = byPlayer.get(r.player_id);
-    if (!agg) {
-      agg = { goals: 0, assists: 0, ot_goals: 0, games: new Set() };
-      byPlayer.set(r.player_id, agg);
-    }
-    agg.goals += r.goals;
-    agg.assists += r.assists;
-    agg.ot_goals += r.ot_goals;
-    if (r.goals > 0 || r.assists > 0 || r.ot_goals > 0) {
-      agg.games.add(r.game_id);
-    }
-  }
-
-  const updates = playerIds.map((pid) => {
-    const a = byPlayer.get(pid) ?? {
-      goals: 0,
-      assists: 0,
-      ot_goals: 0,
-      games: new Set<number>(),
-    };
-    return {
-      player_id: pid,
-      goals: a.goals,
-      assists: a.assists,
-      ot_goals: Math.min(a.ot_goals, a.goals),
-      games_played: a.games.size,
-      updated_at: new Date().toISOString(),
-    };
-  });
-
-  let applied = 0;
-  const errors: string[] = [];
-  const chunkSize = 500;
-  for (let i = 0; i < updates.length; i += chunkSize) {
-    const chunk = updates.slice(i, i + chunkSize);
-    const { error } = await svc
-      .from("player_stats")
-      .upsert(chunk, { onConflict: "player_id" });
-    if (error) {
-      errors.push(error.message);
-    } else {
-      applied += chunk.length;
-    }
-  }
+  const { players_updated: applied, errors } = await reconcilePlayerTotals(
+    svc,
+    { playerIds },
+  );
 
   revalidatePath("/admin/reconcile-totals");
   revalidatePath("/", "layout");
