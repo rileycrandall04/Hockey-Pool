@@ -27,6 +27,7 @@ import {
   gamesScheduledTonight,
 } from "@/lib/eliminated";
 import { getOvernightDeltas } from "@/lib/snapshot-standings";
+import { fetchLastGameStats, type LastGameStat } from "@/lib/last-game-stats";
 import type { OvernightDelta } from "@/lib/snapshot-standings";
 import type {
   League,
@@ -202,6 +203,17 @@ export default async function LeagueStandingsPage({
     arr.push(row);
     rosterByTeam.set(row.team_id, arr);
   }
+
+  // Per-player most recent game stats — used to display the "+N from
+  // last game" green pill next to each row and a team subtotal in the
+  // expand-out section.
+  const allRosterPlayerIds = ((rosterRows as RosterEntry[] | null) ?? []).map(
+    (r) => r.player_id,
+  );
+  const lastGameByPlayer = await fetchLastGameStats(
+    createServiceClient(),
+    allRosterPlayerIds,
+  );
 
   // NHL teams with a game on tonight's effective date — used to show
   // "in play" counts on each standings row. Pulls from the SAME helper
@@ -518,6 +530,11 @@ export default async function LeagueStandingsPage({
                   n + (p.nhl_abbrev && eliminatedAbbrevs.has(p.nhl_abbrev) ? 0 : 1),
                 0,
               );
+              const lastGameSubtotal = teamRoster.reduce(
+                (s, p) =>
+                  s + (lastGameByPlayer.get(p.player_id)?.fantasy_points ?? 0),
+                0,
+              );
               return (
               <details
                 key={row.team.id}
@@ -591,6 +608,11 @@ export default async function LeagueStandingsPage({
                   </span>
                 </summary>
                 <div className="border-t border-puck-border px-2.5 py-2 text-[11px] sm:px-3 sm:text-sm">
+                  {lastGameSubtotal > 0 && (
+                    <div className="mb-2 text-xs font-semibold text-green-300">
+                      +{lastGameSubtotal} from last game
+                    </div>
+                  )}
                   {row.scoring.length === 0 ? (
                     <p className="text-ice-400">No players drafted yet.</p>
                   ) : (
@@ -600,6 +622,7 @@ export default async function LeagueStandingsPage({
                       adjustment={row.adjustment}
                       inPlayAbbrevs={inPlayAbbrevs}
                       eliminatedAbbrevs={eliminatedAbbrevs}
+                      lastGameByPlayer={lastGameByPlayer}
                     />
                   )}
                   {(row.team.owner_id === user.id || isCommissioner) && (
@@ -833,12 +856,14 @@ function RosterList({
   adjustment,
   inPlayAbbrevs,
   eliminatedAbbrevs,
+  lastGameByPlayer,
 }: {
   players: RosterEntry[];
   footerPlayers: RosterEntry[];
   adjustment: number;
   inPlayAbbrevs: Set<string>;
   eliminatedAbbrevs: Set<string>;
+  lastGameByPlayer: Map<number, LastGameStat>;
 }) {
   const isInPlay = (p: RosterEntry) =>
     Boolean(p.nhl_abbrev && inPlayAbbrevs.has(p.nhl_abbrev));
@@ -852,6 +877,7 @@ function RosterList({
           p={p}
           inPlay={isInPlay(p)}
           eliminated={isEliminated(p)}
+          lastGame={lastGameByPlayer.get(p.player_id)}
         />
       ))}
       {footerPlayers.length > 0 && (
@@ -867,6 +893,7 @@ function RosterList({
               muted
               inPlay={isInPlay(p)}
               eliminated={isEliminated(p)}
+              lastGame={lastGameByPlayer.get(p.player_id)}
             />
           ))}
         </>
@@ -893,15 +920,20 @@ function PlayerRow({
   muted = false,
   inPlay = false,
   eliminated = false,
+  lastGame,
 }: {
   p: RosterEntry;
   muted?: boolean;
   inPlay?: boolean;
   eliminated?: boolean;
+  lastGame?: LastGameStat;
 }) {
   const titleParts = [
     inPlay ? "Playing tonight" : null,
     eliminated ? "Team eliminated" : null,
+    lastGame
+      ? `Last game ${lastGame.game_date ?? ""}: ${lastGame.goals}G ${lastGame.assists}A ${lastGame.ot_goals}OT`
+      : null,
   ].filter(Boolean);
   return (
     <Link
@@ -952,6 +984,11 @@ function PlayerRow({
       <span
         className={`flex flex-shrink-0 items-baseline gap-2 font-semibold ${muted ? "text-ice-400" : "text-ice-50"}`}
       >
+        {lastGame && lastGame.fantasy_points > 0 && (
+          <span className="font-mono text-[10px] font-semibold text-green-300">
+            +{lastGame.fantasy_points}
+          </span>
+        )}
         <span>{p.fantasy_points}</span>
         <span
           title={`Drafted at pick #${p.pick_number}`}
