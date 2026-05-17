@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Manual NHL reconciliation page. Pulls fresh per-game NHL stats
- * for every FINAL/OFF playoff game from the season start (Apr 18,
+ * for every FINAL/OFF playoff game from the playoffs start (Apr 18,
  * 2026) onward and shows them side-by-side with our manual_game_stats
  * rows.
  *
@@ -28,7 +28,10 @@ export const dynamic = "force-dynamic";
  * alone so a user-marked OT is never silently dropped.
  */
 
-const SEASON_START = "2026-04-18";
+// First day of the 2026 Stanley Cup Playoffs. The reconciliation
+// only ever looks at games on/after this date — regular-season
+// games are never pulled or compared.
+const PLAYOFFS_START = "2026-04-18";
 
 interface StatsTriple {
   goals: number;
@@ -111,8 +114,9 @@ interface CompareRow {
 }
 
 /**
- * Pull NHL stats for every FINAL/OFF playoff game since the season
- * start and build a per-(game, player) comparison row. Shared between
+ * Pull NHL stats for every FINAL/OFF playoff game since the
+ * playoffs started and build a per-(game, player) comparison row.
+ * Shared between
  * the page render and the "Apply all differences" server action so
  * both views agree on what's a diff.
  */
@@ -124,7 +128,7 @@ async function buildComparison(
     .select(
       "game_id, game_date, start_time_utc, away_abbrev, home_abbrev, game_state",
     )
-    .gte("game_date", SEASON_START)
+    .gte("game_date", PLAYOFFS_START)
     .in("game_state", ["FINAL", "OFF"])
     .order("game_date", { ascending: false });
 
@@ -448,10 +452,12 @@ export default async function ReconcileStatsPage({
           Reconcile with NHL stats
         </h1>
         <p className="text-sm text-ice-300">
-          Pulls fresh per-game NHL stats since {SEASON_START} and shows
-          them next to our recorded values. Compare is goals + assists
-          only — OT goals are preserved as you entered them. Read-only
-          until you click <strong>Apply</strong>.
+          Pulls fresh per-game NHL stats for playoff games since{" "}
+          {PLAYOFFS_START} (regular-season games are never included)
+          and shows them next to our recorded values. Compare is
+          goals + assists only — OT goals are preserved as you
+          entered them. Read-only until you click{" "}
+          <strong>Apply</strong>.
         </p>
 
         {success && (
@@ -503,7 +509,7 @@ export default async function ReconcileStatsPage({
               <CardContent className="px-4 py-6 text-center text-ice-400">
                 {view === "diffs"
                   ? "No differences — your data matches the NHL feed."
-                  : "No games found since the season start."}
+                  : "No playoff games found since the playoffs started."}
               </CardContent>
             </Card>
           ) : (
