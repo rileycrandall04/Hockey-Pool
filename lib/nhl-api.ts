@@ -18,18 +18,45 @@ const USER_AGENT =
   "stanley-cup-pool/1.0 (+https://hockey-pool-zeta.vercel.app)";
 
 async function nhlFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    // Cache briefly so cron retries don't hammer the API.
-    next: { revalidate: 60 },
-    headers: {
-      Accept: "application/json",
-      "User-Agent": USER_AGENT,
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`NHL API ${path} failed: ${res.status} ${res.statusText}`);
+  // Retry transient failures (network blips, 5xx, rate limits). The
+  // nightly cron runs once a day — a single flaky request shouldn't
+  // cost a whole night of stats.
+  const maxAttempts = 4;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(`${BASE}${path}`, {
+        // Cache briefly so cron retries don't hammer the API.
+        next: { revalidate: 60 },
+        headers: {
+          Accept: "application/json",
+          "User-Agent": USER_AGENT,
+        },
+      });
+      if (!res.ok) {
+        // 4xx (except 429) won't fix themselves — fail fast.
+        if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+          throw new Error(
+            `NHL API ${path} failed: ${res.status} ${res.statusText}`,
+          );
+        }
+        throw new Error(
+          `NHL API ${path} transient: ${res.status} ${res.statusText}`,
+        );
+      }
+      return (await res.json()) as T;
+    } catch (err) {
+      lastErr = err;
+      const isClient4xx =
+        err instanceof Error && err.message.includes("failed: 4");
+      if (isClient4xx || attempt === maxAttempts) break;
+      // 1s, 2s, 4s backoff.
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+    }
   }
-  return (await res.json()) as T;
+  throw lastErr instanceof Error
+    ? lastErr
+    : new Error(`NHL API ${path} failed after ${maxAttempts} attempts`);
 }
 
 // ----- types from the NHL API --------------------------------------------

@@ -72,7 +72,20 @@ export async function POST(request: Request) {
   // -------------------------------------------------------------------
   // 1 + 2. Stats and recaps from yesterday's games
   // -------------------------------------------------------------------
-  const gameIds = await fetchCompletedGamesOnDate(date);
+  let gameIds: number[] = [];
+  try {
+    gameIds = await fetchCompletedGamesOnDate(date);
+  } catch (err) {
+    // Don't let an NHL outage during the cron window nuke the whole
+    // run. Record it, skip the stats step, and let the rest of the
+    // cron (eliminations, reconcile self-heal, snapshots, bracket)
+    // still execute on existing data. Missed games can be backfilled
+    // from /admin/reconcile-stats once the API recovers.
+    console.error("Failed to fetch completed games", date, err);
+    summary.totals_errors.push(
+      `fetchCompletedGamesOnDate: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
   summary.games = gameIds.length;
 
   const deltas = new Map<
@@ -239,16 +252,23 @@ export async function POST(request: Request) {
     });
 
     const chunkSize = 500;
+    let upsertFailed = false;
     for (let i = 0; i < updates.length; i += chunkSize) {
       const chunk = updates.slice(i, i + chunkSize);
       const { error } = await svc
         .from("player_stats")
         .upsert(chunk, { onConflict: "player_id" });
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // Log and keep going — the reconcile self-heal below rebuilds
+        // player_stats from manual_game_stats anyway, and downstream
+        // steps (snapshots, bracket) shouldn't be skipped over one
+        // bad chunk.
+        console.error("player_stats upsert chunk failed", error.message);
+        summary.totals_errors.push(`player_stats upsert: ${error.message}`);
+        upsertFailed = true;
       }
     }
-    summary.stats_updated = updates.length;
+    summary.stats_updated = upsertFailed ? 0 : updates.length;
   }
 
   // -------------------------------------------------------------------
