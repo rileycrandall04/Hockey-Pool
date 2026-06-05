@@ -76,18 +76,43 @@ the commissioner can manually correct any match.
 - [x] **Phase 1** — schema + types
 - [x] **Phase 2** — scoring engine (`scoreCountry`, `scoreOwner`,
       `rankOwners`) + tests
-- [ ] **Phase 3** — auth, leagues, snake draft room (48 countries)
+- [x] **Phase 3** — auth, leagues, **live snake draft of 48 countries**,
+      standings, country list, team breakdown, commissioner tools
 - [ ] **Phase 4** — API-Football ingestion cron + manual override editor
-- [ ] **Phase 5** — pages: standings, my team, countries, fixtures,
-      bracket, Golden Boot leaderboard
-- [ ] **Phase 6** — push notifications, over/under, standings snapshots
+      (until then, match results / Golden Boot are unscored — standings
+      show the drafted rosters at 0 pts)
+- [ ] **Phase 5** — fixtures/scoreboard page, bracket, Golden Boot
+      leaderboard
+- [ ] **Phase 6** — push notifications, standings snapshots
 
-## Development
+## What works today
+
+Sign up → create/join a league → (commissioner) randomize order & start
+the draft → snake-draft all 48 countries live (manual click or
+auto-pick) → standings, per-country score breakdowns, and a secret
+over/under guess per team. Match scoring is wired through the engine but
+reads zero until Phase 4 feeds it results.
+
+## Run it locally
 
 ```bash
 cd world-cup
 npm install
-cp .env.example .env.local   # fill in Supabase + API-Football keys
-npm run dev
-npm test                     # scoring engine
+cp .env.example .env.local      # fill in the Supabase keys (API-Football
+                                # is only needed for Phase 4 ingestion)
+npm test                        # scoring engine (14 cases)
+npm run dev                     # http://localhost:3000
 ```
+
+### Supabase setup (one time)
+
+1. Create a project at <https://supabase.com>.
+2. In the SQL editor, run **`supabase/migrations/0001_initial_schema.sql`**
+   then **`0002_seed_countries.sql`** (loads the 48-team placeholder field).
+3. **Database → Replication:** add `draft_picks` and `leagues` to the
+   `supabase_realtime` publication so the draft board updates live for
+   everyone. (Without this, use the **↻ Refresh** button in the draft room.)
+4. Copy the project URL + anon key + service-role key into `.env.local`.
+
+Then sign up, create a league, open the **Draft** lobby, **Start draft**,
+and pick. To re-run a draft, use **Admin → Reset draft**.
