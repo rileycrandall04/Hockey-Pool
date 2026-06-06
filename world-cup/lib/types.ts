@@ -94,6 +94,8 @@ export interface Match {
   went_to_shootout: boolean;
   home_pens: number | null;
   away_pens: number | null;
+  /** Set when a commissioner manually edits the result; blocks API overwrite. */
+  locked: boolean;
   external_id: number | null;
 }
 

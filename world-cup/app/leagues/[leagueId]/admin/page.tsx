@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUser, loadLeagueAccess } from "@/lib/league-access";
+import Link from "next/link";
 import { NavBar } from "@/components/nav-bar";
 import { Button } from "@/components/ui/button";
+import { SyncButton } from "@/components/sync-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +83,29 @@ export default async function AdminPage({
             </p>
             <p>Draft status: {league.draft_status.replace("_", " ")}</p>
             <p>Teams: {teams.length} · Roster size: {league.roster_size}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Match results &amp; data</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-ice-400">
+              Pull fixtures, scores and the Golden Boot race from API-Football
+              (needs <code>API_FOOTBALL_KEY</code> set; app-owner only), or
+              enter/correct results by hand. Manual edits lock a match so the
+              sync won&rsquo;t overwrite it.
+            </p>
+            <SyncButton />
+            <div className="flex flex-wrap gap-3 pt-1 text-sm">
+              <Link href={`/leagues/${leagueId}/admin/matches`} className="text-ice-400 hover:underline">
+                ✏️ Edit match results
+              </Link>
+              <Link href={`/leagues/${leagueId}/golden-boot`} className="text-ice-400 hover:underline">
+                ⚽ Golden Boot race
+              </Link>
+            </div>
           </CardContent>
         </Card>
 

@@ -78,12 +78,30 @@ the commissioner can manually correct any match.
       `rankOwners`) + tests
 - [x] **Phase 3** — auth, leagues, **live snake draft of 48 countries**,
       standings, country list, team breakdown, commissioner tools
-- [ ] **Phase 4** — API-Football ingestion cron + manual override editor
-      (until then, match results / Golden Boot are unscored — standings
-      show the drafted rosters at 0 pts)
-- [ ] **Phase 5** — fixtures/scoreboard page, bracket, Golden Boot
-      leaderboard
+- [x] **Phase 4** — **API-Football ingestion** (nightly cron + on-demand
+      sync) and a **manual match editor** that locks results from being
+      overwritten
+- [x] **Phase 5 (partial)** — live **Golden Boot leaderboard**; standings
+      award the +5 to the current leader's owner
+- [ ] **Phase 5 (rest)** — fixtures/scoreboard page + knockout bracket
 - [ ] **Phase 6** — push notifications, standings snapshots
+
+## Match data (Phase 4)
+
+Two ways in, and they cooperate:
+
+1. **API-Football sync.** `lib/sync-matches.ts` pulls every World Cup
+   fixture and the top-scorers leaderboard in two requests. Run it
+   nightly via Vercel Cron (`/api/cron/update-matches`, see `vercel.json`)
+   or on demand from **Admin → Sync from API-Football** (app-owner only).
+   Country names are matched to our rows by a normalized-name + alias map,
+   backfilling each country's `external_id` on first match.
+2. **Manual editor.** **Admin → Edit match results** lets the commissioner
+   add or correct any match. A manual edit sets `locked = true`, so the
+   nightly sync never overwrites it.
+
+Standings recompute from `matches` on every page load — no stored totals —
+so either path moves the table immediately.
 
 ## What works today
 
@@ -107,12 +125,27 @@ npm run dev                     # http://localhost:3000
 ### Supabase setup (one time)
 
 1. Create a project at <https://supabase.com>.
-2. In the SQL editor, run **`supabase/migrations/0001_initial_schema.sql`**
-   then **`0002_seed_countries.sql`** (loads the 48-team placeholder field).
+2. In the SQL editor, run the migrations in order:
+   **`0001_initial_schema.sql`**, **`0002_seed_countries.sql`** (48-team
+   placeholder field), **`0003_ingestion.sql`** (match locks + top-scorers
+   cache).
 3. **Database → Replication:** add `draft_picks` and `leagues` to the
    `supabase_realtime` publication so the draft board updates live for
    everyone. (Without this, use the **↻ Refresh** button in the draft room.)
 4. Copy the project URL + anon key + service-role key into `.env.local`.
+
+### To pull live results (optional — manual entry works without it)
+
+5. Get a free key at <https://www.api-football.com/> and set
+   `API_FOOTBALL_KEY` in `.env.local` (and your Vercel project).
+6. Set `CRON_SECRET` to a long random string. Vercel Cron sends it as a
+   Bearer token to `/api/cron/update-matches` on the schedule in
+   `vercel.json` (08:00 UTC = 4am ET).
+7. Set `APP_OWNER_EMAIL` to your signup email so only you can trigger the
+   on-demand sync.
+
+Without an API key you can still test everything: use **Admin → Edit match
+results** to enter scores by hand and watch the standings move.
 
 Then sign up, create a league, open the **Draft** lobby, **Start draft**,
 and pick. To re-run a draft, use **Admin → Reset draft**.
