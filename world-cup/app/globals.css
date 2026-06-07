@@ -19,3 +19,20 @@ body {
 table {
   border-collapse: collapse;
 }
+
+/* Results ticker marquee. The track holds two copies of the items so a
+   translateX(-50%) loops seamlessly. Pauses on hover. */
+@keyframes ticker-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-ticker {
+  animation: ticker-marquee 80s linear infinite;
+  will-change: transform;
+}
+.ticker-wrap:hover .animate-ticker {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticker { animation: none; }
+}
