@@ -99,18 +99,18 @@ const CONFIGS: Array<{ name: string; cfg: Cfg }> = [
   { name: "Flat advancement = 3", cfg: { ...base, adv: ADV_FLAT3 } },
 ];
 
-const N = 2000;
-console.log(`\nOver ${N} tournaments — owners still alive going into the final (want lots of 2-4):\n`);
-console.log("Variant                       | avg live | =1 (decided) | 2-4 alive | 5+ alive");
-console.log("-".repeat(80));
+const N = 5000;
+console.log(`\nOver ${N} tournaments — exact # of owners who can still win going into the final:\n`);
+console.log("Variant                         |    1 (decided) |   2 alive |   3 alive |   4 alive |   5+");
+console.log("-".repeat(95));
 for (const { name, cfg } of CONFIGS) {
-  let sum = 0; const dist = [0, 0, 0, 0]; // [=1, 2-4, 5+, n/a]
+  const dist = [0, 0, 0, 0, 0, 0]; // index by contender count (0 unused), [5]=5+
   for (let s = 0; s < N; s++) {
     const sim = simulateTournament(1000 + s); const rosters = draft(1000 + s);
-    const c = liveContenders(rosters, sim, cfg); sum += c;
-    if (c <= 1) dist[0]++; else if (c <= 4) dist[1]++; else dist[2]++;
+    dist[Math.min(liveContenders(rosters, sim, cfg), 5)]++;
   }
-  console.log(`${name.padEnd(29)} | ${r(sum / N).padStart(8)} | ${(r((dist[0] / N) * 100) + "%").padStart(12)} | ${(r((dist[1] / N) * 100) + "%").padStart(9)} | ${(r((dist[2] / N) * 100) + "%").padStart(8)}`);
+  const pct = (k: number) => (r((dist[k] / N) * 100) + "%").padStart(9);
+  console.log(`${name.padEnd(31)} | ${pct(1).padStart(14)} | ${pct(2)} | ${pct(3)} | ${pct(4)} | ${pct(5)}`);
 }
 function r(n: number) { return String(Math.round(n * 10) / 10); }
-console.log("\n=1 = one owner already clinched (final is dead). 2-4 = genuine finals-day race. 5+ = wide open / undecided.\n");
+console.log("\n(1 = someone already clinched; the final is dead. 2-4 = genuine finals-day race.)\n");
