@@ -8,7 +8,7 @@ import { loadScorersByMatch } from "@/lib/match-scorers";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { ScorerList } from "@/components/scorer-list";
-import { fmtPoints } from "@/lib/utils";
+import { fmtPoints, fmtKickoff } from "@/lib/utils";
 import type { Country, Match, ScoredCountry, ScoringMatch } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +78,9 @@ export default async function GamePage({
             {m.went_to_shootout && played && (
               <div className="text-[11px] text-ice-400">{m.home_pens}–{m.away_pens} pens</div>
             )}
+            {!played && m.status !== "live" && m.kickoff_utc && (
+              <div className="text-[11px] text-ice-400">{fmtKickoff(m.kickoff_utc)} MT</div>
+            )}
           </div>
           <TeamHead leagueId={leagueId} country={away} alignRight />
         </div>
@@ -110,7 +113,7 @@ function TeamHead({ leagueId, country, alignRight }: { leagueId: string; country
       href={`/leagues/${leagueId}/country/${country.id}`}
       className={"flex flex-1 flex-col items-center gap-1 hover:underline " + (alignRight ? "" : "")}
     >
-      <Flag code={country.code} className="!w-9 !h-7" />
+      <Flag code={country.code} url={country.flag_url} className="!h-7" />
       <span className="text-center text-sm font-semibold text-ice-50">{country.name}</span>
     </Link>
   );
@@ -127,7 +130,7 @@ function Breakdown({ country, s }: { country?: Country; s: ScoredCountry }) {
   return (
     <div className="rounded-md border border-puck-border bg-puck-bg p-3">
       <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-ice-50">
-        <Flag code={country?.code} /> {country?.code ?? "?"}
+        <Flag code={country?.code} url={country?.flag_url} /> {country?.code ?? "?"}
       </div>
       <table className="w-full text-xs">
         <tbody>

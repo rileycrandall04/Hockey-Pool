@@ -113,9 +113,9 @@ export default async function GoalsAdminPage({
           <Link href={`/leagues/${leagueId}/games/${matchId}`} className="text-xs text-ice-400 hover:underline">view game →</Link>
         </div>
         <p className="flex items-center gap-2 text-sm text-ice-200">
-          <Flag code={home?.code} /> {home?.name ?? "?"}
+          <Flag code={home?.code} url={home?.flag_url} /> {home?.name ?? "?"}
           <span className="text-ice-500">v</span>
-          <Flag code={away?.code} /> {away?.name ?? "?"}
+          <Flag code={away?.code} url={away?.flag_url} /> {away?.name ?? "?"}
         </p>
 
         <Card>
@@ -168,7 +168,7 @@ export default async function GoalsAdminPage({
                     <tr key={g.id as string} className="border-t border-puck-border bg-puck-bg">
                       <td className="px-3 py-2 text-ice-100">
                         <span className="inline-flex items-center gap-1.5">
-                          <Flag code={c?.code} />
+                          <Flag code={c?.code} url={c?.flag_url} />
                           {g.minute != null ? `${g.minute}' ` : ""}{name ?? "Unknown"}
                           {g.type === "penalty" ? " (P)" : g.type === "own_goal" ? " (OG)" : ""}
                           {g.manual ? <span className="text-[10px] text-ice-500"> ✍️</span> : ""}

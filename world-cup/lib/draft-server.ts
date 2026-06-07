@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { League, Team } from "./types";
-import { teamOnTheClock, pickMeta } from "./draft";
+import { teamOnTheClock, pickMeta, randomizeDraftOrder } from "./draft";
 
 export interface DraftState {
   league: League;
@@ -130,6 +130,78 @@ export async function executePick(
     .eq("id", leagueId);
 
   return { ok: true };
+}
+
+export interface AutoDraftResult {
+  ok: boolean;
+  error?: string;
+  picks?: number;
+}
+
+/**
+ * Run an entire draft automatically: randomize the order, then snake-pick the
+ * best available country (lowest FIFA rank) for each team until every roster
+ * is full. Wipes any existing picks first. Marks the draft complete.
+ */
+export async function autoDraftEntire(
+  svc: SupabaseClient,
+  leagueId: string,
+): Promise<AutoDraftResult> {
+  const { data: league } = await svc
+    .from("leagues")
+    .select("*")
+    .eq("id", leagueId)
+    .single();
+  if (!league) return { ok: false, error: "League not found" };
+  if ((league as League).draft_status === "complete") {
+    return { ok: false, error: "Draft is already complete — reset it first" };
+  }
+
+  const { data: teams } = await svc.from("teams").select("*").eq("league_id", leagueId);
+  const teamList = (teams ?? []) as Team[];
+  if (teamList.length === 0) return { ok: false, error: "No teams in league" };
+
+  // Randomize and persist the snake order.
+  const ordered = randomizeDraftOrder(teamList).map((t, i) => ({ ...t, draft_position: i + 1 }));
+  for (const t of ordered) {
+    await svc.from("teams").update({ draft_position: t.draft_position }).eq("id", t.id);
+  }
+
+  // Best-available pool, ordered by FIFA rank (1 = best).
+  const { data: countries } = await svc
+    .from("countries")
+    .select("id, fifa_rank")
+    .order("fifa_rank", { ascending: true, nullsFirst: false });
+  const available = (countries ?? []).map((c) => c.id as number);
+  if (available.length === 0) return { ok: false, error: "No countries seeded" };
+
+  // Fresh draft — clear any prior picks.
+  await svc.from("draft_picks").delete().eq("league_id", leagueId);
+
+  const rosterSize = (league as League).roster_size;
+  const totalPicks = Math.min(teamList.length * rosterSize, available.length);
+  const rows: Array<Record<string, unknown>> = [];
+  for (let pickIndex = 0; pickIndex < totalPicks; pickIndex++) {
+    const team = teamOnTheClock(ordered, pickIndex);
+    const countryId = available.shift();
+    if (countryId == null) break;
+    const { round, pick_number } = pickMeta(pickIndex, teamList.length);
+    rows.push({ league_id: leagueId, team_id: team.id, country_id: countryId, round, pick_number });
+  }
+
+  const { error } = await svc.from("draft_picks").insert(rows);
+  if (error) return { ok: false, error: error.message };
+
+  await svc
+    .from("leagues")
+    .update({
+      draft_status: "complete",
+      draft_current_team: null,
+      draft_started_at: new Date().toISOString(),
+    })
+    .eq("id", leagueId);
+
+  return { ok: true, picks: rows.length };
 }
 
 /** Pick the best available country (lowest FIFA rank) for the team on the clock. */

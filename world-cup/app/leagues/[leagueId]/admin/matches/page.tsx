@@ -261,7 +261,7 @@ export default async function MatchesAdminPage({
                       </td>
                       <td className="px-3 py-2 text-ice-100">
                         <span className="inline-flex items-center gap-1">
-                          <Flag code={h?.code} /> {h?.code ?? "?"} v <Flag code={a?.code} /> {a?.code ?? "?"}
+                          <Flag code={h?.code} url={h?.flag_url} /> {h?.code ?? "?"} v <Flag code={a?.code} url={a?.flag_url} /> {a?.code ?? "?"}
                           <span className="ml-1 text-xs text-ice-500">{m.status}</span>
                         </span>
                       </td>

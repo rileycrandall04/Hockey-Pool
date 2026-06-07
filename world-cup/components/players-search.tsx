@@ -11,6 +11,7 @@ export interface PlayerItem {
   goals: number;
   country_code: string | null;
   country_name: string | null;
+  country_flag_url: string | null;
 }
 
 /** Alphabetical player directory with real-time client-side filtering. */
@@ -52,7 +53,7 @@ export function PlayersSearch({
                 className="flex items-center justify-between gap-2 bg-puck-bg px-3 py-2 hover:bg-puck-card"
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  <Flag code={p.country_code} />
+                  <Flag code={p.country_code} url={p.country_flag_url} />
                   <span className="truncate text-sm text-ice-50">{p.name}</span>
                   <span className="truncate text-xs text-ice-500">{p.country_name ?? ""}</span>
                 </span>

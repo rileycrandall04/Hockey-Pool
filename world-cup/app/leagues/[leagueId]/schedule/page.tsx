@@ -6,6 +6,7 @@ import { loadScorersByMatch } from "@/lib/match-scorers";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { ScorerList } from "@/components/scorer-list";
+import { POOL_TZ_OFFSET, poolToday, fmtKickoff } from "@/lib/utils";
 import type { Country, Match } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -28,10 +29,6 @@ function prettyDate(date: string): string {
     weekday: "long", month: "long", day: "numeric", timeZone: "UTC",
   });
 }
-function kickoffTime(iso: string | null): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
 
 export default async function SchedulePage({
   params,
@@ -48,25 +45,27 @@ export default async function SchedulePage({
   if (!access) redirect("/dashboard");
   const { league, isCommissioner, displayName } = access;
 
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateParam ?? "") ? dateParam! : ymd(new Date());
-  const dayStart = `${date}T00:00:00Z`;
-  const dayEnd = `${addDays(date, 1)}T00:00:00Z`;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateParam ?? "") ? dateParam! : poolToday();
+  // Day boundaries in Mountain Time so a 9pm MT kickoff lands on the right day.
+  const dayStart = `${date}T00:00:00${POOL_TZ_OFFSET}`;
+  const dayEnd = `${addDays(date, 1)}T00:00:00${POOL_TZ_OFFSET}`;
 
   const svc = createServiceClient();
   const [{ data: matchRows }, { data: countryRows }] = await Promise.all([
     svc.from("matches").select("*").gte("kickoff_utc", dayStart).lt("kickoff_utc", dayEnd).order("kickoff_utc"),
-    svc.from("countries").select("id, name, code"),
+    svc.from("countries").select("id, name, code, flag_url"),
   ]);
   const countryById = new Map((countryRows ?? []).map((c) => [c.id as number, c as Country]));
   const matches = (matchRows ?? []) as Match[];
   const scorers = await loadScorersByMatch(svc, matches.map((m) => m.id));
-  const today = ymd(new Date());
+  const today = poolToday();
 
   return (
     <>
       <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
-        <h1 className="mb-3 text-2xl font-bold text-ice-50">Schedule</h1>
+        <h1 className="mb-1 text-2xl font-bold text-ice-50">Schedule</h1>
+        <p className="mb-3 text-xs text-ice-500">All times Mountain (MT)</p>
 
         <div className="mb-4 flex items-center justify-between gap-2 rounded-md border border-puck-border bg-puck-card px-3 py-2">
           <Link href={`/leagues/${leagueId}/schedule?date=${addDays(date, -1)}`} className="rounded px-2 py-1 text-ice-200 hover:bg-puck-border" aria-label="Previous day">←</Link>
@@ -92,7 +91,7 @@ export default async function SchedulePage({
                   <Link href={`/leagues/${leagueId}/games/${m.id}`} className="group block">
                     <div className="mb-1 flex items-center justify-between text-xs text-ice-500">
                       <span className="uppercase tracking-wider group-hover:text-ice-300">{STAGE_LABEL[m.stage] ?? m.stage} →</span>
-                      <span>{m.status === "live" ? "LIVE" : played ? "FT" : kickoffTime(m.kickoff_utc)}</span>
+                      <span>{m.status === "live" ? "LIVE" : played ? "FT" : fmtKickoff(m.kickoff_utc)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <Row country={home} />
@@ -119,7 +118,7 @@ export default async function SchedulePage({
 function Row({ country, alignRight }: { country?: Country; alignRight?: boolean }) {
   return (
     <span className={"flex flex-1 items-center gap-2 text-sm text-ice-100 " + (alignRight ? "flex-row-reverse text-right" : "")}>
-      <Flag code={country?.code} />
+      <Flag code={country?.code} url={country?.flag_url} />
       <span className="truncate">{country?.name ?? "TBD"}</span>
     </span>
   );

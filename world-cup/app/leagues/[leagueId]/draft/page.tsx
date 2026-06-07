@@ -23,7 +23,7 @@ export default async function DraftPage({
   const svc = createServiceClient();
 
   const [{ data: countryRows }, { data: pickRows }] = await Promise.all([
-    svc.from("countries").select("id, name, code, group_letter, confederation, fifa_rank"),
+    svc.from("countries").select("id, name, code, group_letter, confederation, fifa_rank, flag_url"),
     svc.from("draft_picks").select("country_id, team_id, round, pick_number").eq("league_id", leagueId),
   ]);
 
