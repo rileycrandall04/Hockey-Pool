@@ -5,6 +5,7 @@ import { getUser, loadLeagueAccess } from "@/lib/league-access";
 import { computeStandings } from "@/lib/standings";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
+import { RecentResults } from "@/components/recent-results";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { fmtPoints } from "@/lib/utils";
@@ -137,6 +138,10 @@ export default async function LeagueStandingsPage({
             </div>
           </div>
         )}
+
+        <div className="mt-6">
+          <RecentResults leagueId={leagueId} />
+        </div>
       </main>
     </>
   );
