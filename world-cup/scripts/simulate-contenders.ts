@@ -54,10 +54,11 @@ function scoreCountry(cid: number, matches: M[], cfg: Cfg): number {
     const isHome = m.home_country_id === cid; const opp = isHome ? m.away_country_id : m.home_country_id;
     const gf = (isHome ? m.home_goals : m.away_goals) ?? 0; const ga = (isHome ? m.away_goals : m.home_goals) ?? 0;
     let base = gf * cfg.goal - ga * 0.5; if (ga === 0) base += cfg.cs;
-    if (m.went_to_shootout) { base += cfg.draw; const myP = (isHome ? m.home_pens : m.away_pens) ?? 0, opP = (isHome ? m.away_pens : m.home_pens) ?? 0; base += myP > opP ? 4 : 2; if (m.stage === "final" && myP > opP) base += cfg.champion; }
-    else if (gf > ga) { base += cfg.win; if (m.stage === "group" && fifaRank(cid) > fifaRank(opp)) base += cfg.upset; if (m.stage === "final") base += cfg.champion; }
+    let champ = 0; // flat champion bonus — NOT multiplied (matches production)
+    if (m.went_to_shootout) { const myP = (isHome ? m.home_pens : m.away_pens) ?? 0, opP = (isHome ? m.away_pens : m.home_pens) ?? 0; base += myP > opP ? 5 : 3; if (m.stage === "final" && myP > opP) champ = cfg.champion; }
+    else if (gf > ga) { base += cfg.win; if (m.stage === "group" && fifaRank(cid) > fifaRank(opp)) base += cfg.upset; if (m.stage === "final") champ = cfg.champion; }
     else if (gf === ga) base += cfg.draw;
-    pts += base * (cfg.mult[m.stage] ?? 1);
+    pts += base * (cfg.mult[m.stage] ?? 1) + champ;
   }
   for (const s of stages) pts += cfg.adv[s] ?? 0;
   return pts;
@@ -86,16 +87,16 @@ function liveContenders(rosters: number[][], sim: ReturnType<typeof simulateTour
   return winnersSet.size;
 }
 
-const ADV = { r32: 1, r16: 2, qf: 3, sf: 4, final: 5 };
-const M1 = { group: 1, r32: 1, r16: 1, qf: 1, sf: 1, third: 1, final: 1 };
-const base = { goal: 1, cs: 1, win: 3, draw: 1, upset: 5, adv: ADV };
+// Adopted championship config: champion 18 flat + SF/Final match points x1.5.
+const MULT = { group: 1, r32: 1, r16: 1, qf: 1, sf: 1.5, third: 1, final: 1.5 };
+const ADV_GRADIENT = { r32: 1, r16: 2, qf: 3, sf: 4, final: 5 };
+const ADV_FLAT2 = { r32: 2, r16: 2, qf: 2, sf: 2, final: 2 };
+const ADV_FLAT3 = { r32: 3, r16: 3, qf: 3, sf: 3, final: 3 };
+const base = { goal: 1, cs: 1, win: 3, draw: 1, upset: 5, champion: 18, mult: MULT };
 const CONFIGS: Array<{ name: string; cfg: Cfg }> = [
-  { name: "Baseline (champ 8)", cfg: { ...base, champion: 8, mult: M1 } },
-  { name: "champ 12", cfg: { ...base, champion: 12, mult: M1 } },
-  { name: "champ 16", cfg: { ...base, champion: 16, mult: M1 } },
-  { name: "champ 20", cfg: { ...base, champion: 20, mult: M1 } },
-  { name: "champ 10 + final x1.5", cfg: { ...base, champion: 10, mult: { ...M1, final: 1.5 } } },
-  { name: "champ 12 + SF/Final x1.5", cfg: { ...base, champion: 12, mult: { ...M1, sf: 1.5, final: 1.5 } } },
+  { name: "Adopted (advancement 1/2/3/4/5)", cfg: { ...base, adv: ADV_GRADIENT } },
+  { name: "Flat advancement = 2", cfg: { ...base, adv: ADV_FLAT2 } },
+  { name: "Flat advancement = 3", cfg: { ...base, adv: ADV_FLAT3 } },
 ];
 
 const N = 2000;

@@ -4,7 +4,7 @@ import { NavBar } from "@/components/nav-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   WIN_POINTS, DRAW_POINTS, LOSS_POINTS, GOAL_FOR_POINTS, GOAL_AGAINST_POINTS,
-  CLEAN_SHEET_POINTS, UPSET_POINTS, SHOOTOUT_WIN_BONUS, SHOOTOUT_LOSS_BONUS,
+  CLEAN_SHEET_POINTS, UPSET_POINTS, SHOOTOUT_WIN_POINTS, SHOOTOUT_LOSS_POINTS,
   GOLDEN_BOOT_POINTS, ADVANCEMENT_POINTS, CHAMPION_POINTS, ROUND_MULTIPLIER,
 } from "@/lib/scoring";
 import { fmtPoints } from "@/lib/utils";
@@ -69,12 +69,12 @@ export default async function RulesPage({
         <Card>
           <CardHeader><CardTitle>Knockout shootouts</CardTitle></CardHeader>
           <CardContent className="text-sm text-ice-200">
-            <p className="mb-1">A shootout counts as a draw after 120&rsquo; (both get {sign(DRAW_POINTS)}), then:</p>
+            <p className="mb-1">A knockout decided on penalties pays a flat result:</p>
             <RuleTable rows={[
-              ["Win the shootout", `${sign(SHOOTOUT_WIN_BONUS)} (→ ${fmtPoints(DRAW_POINTS + SHOOTOUT_WIN_BONUS)} total)`],
-              ["Lose the shootout", `${sign(SHOOTOUT_LOSS_BONUS)} (→ ${fmtPoints(DRAW_POINTS + SHOOTOUT_LOSS_BONUS)} total)`],
+              ["Win the shootout", sign(SHOOTOUT_WIN_POINTS)],
+              ["Lose the shootout", sign(SHOOTOUT_LOSS_POINTS)],
             ]} />
-            <p className="mt-2 text-xs text-ice-400">Penalty-kick goals in a shootout don&rsquo;t count as goals.</p>
+            <p className="mt-2 text-xs text-ice-400">Penalty-kick goals in a shootout don&rsquo;t count as goals. (In a semifinal or final, these are multiplied like other match points.)</p>
           </CardContent>
         </Card>
 

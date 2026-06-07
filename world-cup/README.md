@@ -23,22 +23,18 @@ nightly from API-Football with commissioner manual override.
 \* FIFA ranking frozen at kickoff. Win only — a draw is not an upset.
 
 **Advancement** (one-time, the moment the bracket places you in the round) —
-flat, never multiplied.
-
-| Round of 32 | R16 | QF | SF | Final | Champion bonus |
-| --- | --- | --- | --- | --- | --- |
-| +1 | +2 | +3 | +4 | +5 | +18 |
+flat **+2 per knockout round**, never multiplied. Plus a flat **+18 champion
+bonus** for winning the final.
 
 **Semifinal & final multiplier** — match points (result, goals, clean sheet,
-shootout bonus) earned in a **semifinal or final count ×1.5**, so the title
+shootout result) earned in a **semifinal or final count ×1.5**, so the title
 game swings the standings. The flat champion bonus and advancement are not
 multiplied.
 
 **Knockout matches** are scored like group matches (win 3 / goals ±, clean
-sheet) except a **shootout** counts as a draw after 120′ (both +1), then the
-**shootout winner gets +4** and the **loser +2**. Shootout PKs never count as
-goals. The third-place playoff is scored as a match but grants no
-advancement bonus.
+sheet) except a **shootout** pays a flat **5 to the winner / 3 to the loser**
+(PKs never count as goals). The third-place playoff is scored as a match but
+grants no advancement bonus.
 
 **Golden Boot** — +5 to the owner of the tournament's top scorer (live
 leaderboard from goal events; tiebreak goals → assists → fewer minutes).

@@ -24,12 +24,9 @@ export const CLEAN_SHEET_POINTS = 1;
 /** Group-stage giant-killing: beat a higher-ranked side. */
 export const UPSET_POINTS = 5;
 
-/**
- * Shootout add-ons. A shootout is a draw after 120', so both sides bank
- * DRAW_POINTS first, then the winner/loser get these on top.
- */
-export const SHOOTOUT_WIN_BONUS = 4; // -> 5 total with the draw point
-export const SHOOTOUT_LOSS_BONUS = 2; // -> 3 total with the draw point
+/** Flat result for a knockout decided on penalties (no separate draw point). */
+export const SHOOTOUT_WIN_POINTS = 5;
+export const SHOOTOUT_LOSS_POINTS = 3;
 
 /** Golden Boot: awarded to the owner of the tournament's top scorer. */
 export const GOLDEN_BOOT_POINTS = 5;
@@ -41,12 +38,12 @@ export const GOLDEN_BOOT_POINTS = 5;
  */
 export const ADVANCEMENT_POINTS: Record<Stage, number> = {
   group: 0,
-  r32: 1,
+  r32: 2,
   r16: 2,
-  qf: 3,
-  sf: 4,
+  qf: 2,
+  sf: 2,
   third: 0,
-  final: 5,
+  final: 2,
 };
 
 /** Additional one-time bonus for winning the final (a flat bonus). */
@@ -140,11 +137,10 @@ export function scoreCountry(
     if (ga === 0) cleanSheetPoints += CLEAN_SHEET_POINTS * mult;
 
     if (m.went_to_shootout) {
-      // A shootout is a draw after 120', then the bonus on top.
-      matchPoints += DRAW_POINTS * mult;
+      // Decided on penalties: a flat result (no separate draw point).
       const myPens = (isHome ? m.home_pens : m.away_pens) ?? 0;
       const oppPens = (isHome ? m.away_pens : m.home_pens) ?? 0;
-      matchPoints += (myPens > oppPens ? SHOOTOUT_WIN_BONUS : SHOOTOUT_LOSS_BONUS) * mult;
+      matchPoints += (myPens > oppPens ? SHOOTOUT_WIN_POINTS : SHOOTOUT_LOSS_POINTS) * mult;
       if (m.stage === "final" && myPens > oppPens) {
         championPoints += CHAMPION_POINTS; // flat — not multiplied
       }
