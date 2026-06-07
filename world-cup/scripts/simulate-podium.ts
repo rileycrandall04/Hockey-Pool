@@ -39,7 +39,10 @@ function simulateTournament(seed: number) {
   const r16 = round(r32.w, "r16"); matches.push(...r16.played);
   const qf = round(r16.w, "qf"); matches.push(...qf.played);
   const sf = round(qf.w, "sf"); matches.push(...sf.played);
-  return { matches, finalists: [sf.w[0], sf.w[1]] as [number, number], thirdPair: [koLoser(sf.played[0]), koLoser(sf.played[1])] as [number, number] };
+  const thirdM = ko(koLoser(sf.played[0]), koLoser(sf.played[1]), "third", rng);
+  const finalM = ko(sf.w[0], sf.w[1], "final", rng);
+  matches.push(thirdM, finalM);
+  return { matches, finalists: [sf.w[0], sf.w[1]] as [number, number], thirdPair: [koLoser(sf.played[0]), koLoser(sf.played[1])] as [number, number], champion: koWinner(finalM) };
 }
 function draft(seed: number): number[][] { const rng = mulberry32(seed * 7 + 1); const order = Array.from({ length: 12 }, (_, i) => i); for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; } const rosters: number[][] = Array.from({ length: 12 }, () => []); const pool = TEAMS.map((t) => t.id).sort((a, b) => fifaRank(a) - fifaRank(b)); let pick = 0; for (let r = 0; r < 4; r++) { const seq = r % 2 === 0 ? order : [...order].reverse(); for (const o of seq) rosters[o].push(pool[pick++]); } return rosters; }
 
@@ -92,24 +95,27 @@ function liveContenders(rosters: number[][], sim: ReturnType<typeof simulateTour
   return winners.size;
 }
 
-const N = 3000;
+const N = 4000;
 const r1 = (n: number) => Math.round(n * 10) / 10;
-const results: Array<{ cfg: Cfg; dist: number[] }> = [];
-for (const champ of [18, 25])
-  for (const runnerUp of [0, 5, 8, 12])
-    for (const third of [0, 6, 10, 14, 18])
-      for (const sfFinalMult of [1, 1.5]) {
-        if (third > runnerUp || runnerUp > champ) continue; // keep 1st >= 2nd >= 3rd
-        const cfg = { champ, runnerUp, third, sfFinalMult };
-        const dist = [0, 0, 0, 0, 0, 0];
-        for (let s = 0; s < N; s++) dist[Math.min(liveContenders(draft(1000 + s), simulateTournament(1000 + s), cfg), 5)]++;
-        results.push({ cfg, dist });
-      }
-results.sort((a, b) => b.dist[3] - a.dist[3]);
-console.log(`\nPodium bonuses — top configs by P(exactly 3 contenders), over ${N} tournaments:\n`);
-console.log("champ | 2nd | 3rd | SF/Fin x |   =1   |   =2   |   =3   |   =4   |  5+");
-console.log("-".repeat(78));
+const ownerTotals = (rosters: number[][], matches: M[], cfg: Cfg) => rosters.map((r) => r.reduce((s, id) => s + scoreCountry(id, matches, cfg), 0));
+
+console.log(`\nFocused podium configs (champion / runner-up / 3rd), over ${N} tournaments:\n`);
+console.log("config         | SF/Fin x |   =1   |   =2   |   =3   |   =4  | champ-owner-wins | leader/last");
+console.log("-".repeat(98));
 const pct = (k: number, d: number[]) => (r1((d[k] / N) * 100) + "%").padStart(6);
-for (const { cfg, dist } of results.slice(0, 14))
-  console.log(`${String(cfg.champ).padStart(5)} | ${String(cfg.runnerUp).padStart(3)} | ${String(cfg.third).padStart(3)} | ${String(cfg.sfFinalMult).padStart(8)} | ${pct(1, dist)} | ${pct(2, dist)} | ${pct(3, dist)} | ${pct(4, dist)} | ${pct(5, dist)}`);
-console.log("");
+for (const [champ, runnerUp, third] of [[12, 10, 8], [18, 10, 8], [18, 12, 8], [25, 14, 8]] as number[][])
+  for (const sfFinalMult of [1.5, 1]) {
+    const cfg = { champ, runnerUp, third, sfFinalMult };
+    const dist = [0, 0, 0, 0, 0, 0]; let win = 0, last = 0, champWins = 0;
+    for (let s = 0; s < N; s++) {
+      const sim = simulateTournament(1000 + s); const rosters = draft(1000 + s);
+      dist[Math.min(liveContenders(rosters, sim, cfg), 5)]++;
+      const finals = ownerTotals(rosters, sim.matches, cfg);
+      win += Math.max(...finals); last += Math.min(...finals);
+      const champOwner = rosters.findIndex((r) => r.includes(sim.champion));
+      if (finals.indexOf(Math.max(...finals)) === champOwner) champWins++;
+    }
+    const label = `${champ}/${runnerUp}/${third}`;
+    console.log(`${label.padEnd(14)} | ${String(sfFinalMult).padStart(8)} | ${pct(1, dist)} | ${pct(2, dist)} | ${pct(3, dist)} | ${pct(4, dist)} | ${(r1((champWins / N) * 100) + "%").padStart(16)} | ${(r1(win / last) + "x").padStart(11)}`);
+  }
+console.log("\nchamp-owner-wins = how often the title team's owner wins the pool. leader/last = proportional spread.\n");
