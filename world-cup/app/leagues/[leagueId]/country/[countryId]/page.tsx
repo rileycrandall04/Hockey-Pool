@@ -1,0 +1,117 @@
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { createServiceClient } from "@/lib/supabase/server";
+import { getUser, loadLeagueAccess } from "@/lib/league-access";
+import { scoreCountry } from "@/lib/scoring";
+import { loadScorersByMatch } from "@/lib/match-scorers";
+import { NavBar } from "@/components/nav-bar";
+import { Flag } from "@/components/flag";
+import { ScorerList } from "@/components/scorer-list";
+import { fmtPoints } from "@/lib/utils";
+import type { Country, Match, ScoringMatch } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+const STAGE_LABEL: Record<string, string> = {
+  group: "Group", r32: "Round of 32", r16: "Round of 16", qf: "Quarterfinal",
+  sf: "Semifinal", third: "Third place", final: "Final",
+};
+
+export default async function CountryPage({
+  params,
+}: {
+  params: Promise<{ leagueId: string; countryId: string }>;
+}) {
+  const { leagueId, countryId } = await params;
+  const cid = Number(countryId);
+  const user = await getUser();
+  if (!user) redirect("/login");
+  const access = await loadLeagueAccess(leagueId, user.id, user.email ?? null);
+  if (!access) redirect("/dashboard");
+  const { league, isCommissioner, displayName } = access;
+
+  const svc = createServiceClient();
+  const [{ data: countryRows }, { data: matchRows }] = await Promise.all([
+    svc.from("countries").select("*"),
+    svc.from("matches").select("*").or(`home_country_id.eq.${cid},away_country_id.eq.${cid}`).order("kickoff_utc", { nullsFirst: true }),
+  ]);
+  const countries = (countryRows ?? []) as Country[];
+  const countryById = new Map(countries.map((c) => [c.id, c]));
+  const me = countryById.get(cid);
+  if (!me) redirect(`/leagues/${leagueId}/countries`);
+
+  const matches = (matchRows ?? []) as Match[];
+  const fifaRank = (id: number) => countryById.get(id)?.fifa_rank ?? null;
+  const breakdown = scoreCountry(cid, matches as ScoringMatch[], fifaRank);
+  const scorers = await loadScorersByMatch(svc, matches.map((m) => m.id));
+
+  return (
+    <>
+      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
+      <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+        <div className="mb-4 flex items-center gap-3">
+          <Flag code={me.code} className="!w-8 !h-6" />
+          <div>
+            <h1 className="text-2xl font-bold text-ice-50">{me.name}</h1>
+            <p className="text-xs text-ice-400">
+              {me.group_letter ? `Group ${me.group_letter}` : ""}
+              {me.fifa_rank ? ` · FIFA #${me.fifa_rank}` : ""} · {fmtPoints(breakdown.total)} pool pts
+            </p>
+          </div>
+        </div>
+
+        {/* Our-rules point breakdown */}
+        <div className="mb-5 flex flex-wrap gap-x-3 gap-y-1 rounded-md border border-puck-border bg-puck-card px-3 py-2 text-xs text-ice-400">
+          <Stat label="Results" v={breakdown.match_points} />
+          <Stat label="Goals for" v={breakdown.goals_for_points} />
+          <Stat label="Goals against" v={breakdown.goals_against_points} />
+          <Stat label="Clean sheets" v={breakdown.clean_sheet_points} />
+          <Stat label="Upsets" v={breakdown.upset_points} />
+          <Stat label="Advancement" v={breakdown.advancement_points} />
+          <Stat label="Champion" v={breakdown.champion_points} />
+        </div>
+
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ice-400">Matches</h2>
+        <div className="space-y-2">
+          {matches.length === 0 && <p className="text-sm text-ice-400">No matches scheduled yet.</p>}
+          {matches.map((m) => {
+            const isHome = m.home_country_id === cid;
+            const opp = countryById.get(isHome ? m.away_country_id : m.home_country_id);
+            const myGoals = isHome ? m.home_goals : m.away_goals;
+            const oppGoals = isHome ? m.away_goals : m.home_goals;
+            const played = m.status === "final" && myGoals != null && oppGoals != null;
+            const resultColor = !played ? "text-ice-400" : myGoals! > oppGoals! ? "text-green-300" : myGoals! < oppGoals! ? "text-red-300" : "text-ice-200";
+            return (
+              <div key={m.id} className="rounded-md border border-puck-border bg-puck-bg p-3">
+                <Link href={`/leagues/${leagueId}/games/${m.id}`} className="group block">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-wider text-ice-500 group-hover:text-ice-300">
+                      {STAGE_LABEL[m.stage] ?? m.stage} →
+                    </span>
+                    <span className={"text-sm font-semibold " + resultColor}>
+                      {played ? `${myGoals} – ${oppGoals}` : m.status === "live" ? "LIVE" : "—"}
+                      {m.went_to_shootout && played ? ` (${isHome ? m.home_pens : m.away_pens}–${isHome ? m.away_pens : m.home_pens} pens)` : ""}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-sm text-ice-100">
+                    <span className="text-ice-400">vs</span>
+                    <Flag code={opp?.code} />
+                    {opp?.name ?? "TBD"}
+                  </div>
+                </Link>
+                <ScorerList leagueId={leagueId} lines={scorers.get(m.id) ?? []} countryById={countryById} />
+              </div>
+            );
+          })}
+        </div>
+      </main>
+    </>
+  );
+}
+
+function Stat({ label, v }: { label: string; v: number }) {
+  if (!v) return null;
+  return (
+    <span>{label}: <span className="text-ice-200">{fmtPoints(v)}</span></span>
+  );
+}

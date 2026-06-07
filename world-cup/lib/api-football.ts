@@ -66,6 +66,23 @@ export interface RawTopScorer {
   }>;
 }
 
+export interface RawEvent {
+  time: { elapsed: number | null; extra: number | null };
+  team: { id: number; name: string };
+  player: { id: number | null; name: string | null };
+  assist: { id: number | null; name: string | null };
+  type: string; // "Goal", "Card", "subst", "Var"
+  detail: string; // "Normal Goal", "Penalty", "Own Goal", "Missed Penalty"
+  comments: string | null;
+}
+
+/** Match events (goals, cards, subs) for a single fixture. */
+export async function fetchFixtureEvents(fixtureId: number): Promise<RawEvent[]> {
+  return (await apiGet("fixtures/events", {
+    fixture: String(fixtureId),
+  })) as RawEvent[];
+}
+
 /** All World Cup fixtures, optionally narrowed to a [from, to] date window. */
 export async function fetchWorldCupFixtures(window?: {
   from?: string;
