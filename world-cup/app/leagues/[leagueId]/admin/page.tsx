@@ -154,6 +154,9 @@ export default async function AdminPage({
               <Link href={`/leagues/${leagueId}/admin/matches`} className="text-ice-400 hover:underline">
                 ✏️ Edit match results
               </Link>
+              <Link href={`/leagues/${leagueId}/admin/countries`} className="text-ice-400 hover:underline">
+                🌍 Edit groups &amp; FIFA ranks
+              </Link>
               <Link href={`/leagues/${leagueId}/schedule`} className="text-ice-400 hover:underline">
                 🥅 Enter goals (via a game)
               </Link>

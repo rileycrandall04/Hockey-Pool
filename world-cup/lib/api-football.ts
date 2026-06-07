@@ -102,6 +102,39 @@ export async function fetchTopScorers(): Promise<RawTopScorer[]> {
   })) as RawTopScorer[];
 }
 
+export interface RawTeam {
+  team: { id: number; name: string; code: string | null; logo: string | null; national: boolean };
+}
+
+/** The teams participating in the World Cup competition. */
+export async function fetchWorldCupTeams(): Promise<RawTeam[]> {
+  return (await apiGet("teams", { league: LEAGUE, season: SEASON })) as RawTeam[];
+}
+
+export interface RawStandingRow {
+  team: { id: number; name: string };
+  group: string; // e.g. "Group A"
+}
+
+/**
+ * The competition standings, flattened to one row per team. For group
+ * tournaments API-Football nests standings as response[0].league.standings
+ * (an array of group tables). Each row carries its group label, which is
+ * what we use to assign group letters. May be empty before kickoff.
+ */
+export async function fetchWorldCupStandings(): Promise<RawStandingRow[]> {
+  const resp = await apiGet("standings", { league: LEAGUE, season: SEASON });
+  const first = resp[0] as { league?: { standings?: RawStandingRow[][] } } | undefined;
+  const groups = first?.league?.standings ?? [];
+  return groups.flat();
+}
+
+/** Extract the group letter ("Group A" -> "A") from a standings label. */
+export function groupLetter(label: string): string | null {
+  const m = label.match(/group\s+([a-l])/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
 // ---- Mappers ---------------------------------------------------------------
 
 /** Map an API-Football status short code to our match status. */
