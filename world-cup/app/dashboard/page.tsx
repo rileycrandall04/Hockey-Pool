@@ -117,6 +117,15 @@ export default async function DashboardPage({
                       {isCommish && " · commissioner"}
                     </span>
                   </Link>
+                  {isCommish && (
+                    <Link
+                      href={`/leagues/${l.id}/admin#delete-league`}
+                      className="mr-2 shrink-0 rounded-md border border-puck-border px-2 py-1 text-xs text-ice-400 hover:bg-puck-border hover:text-ice-100"
+                      title="Commissioner tools (rename, reset, delete)"
+                    >
+                      Manage
+                    </Link>
+                  )}
                 </li>
               );
             })}
