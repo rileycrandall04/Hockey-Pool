@@ -6,6 +6,7 @@ import {
   WIN_POINTS, DRAW_POINTS, LOSS_POINTS, GOAL_FOR_POINTS, GOAL_AGAINST_POINTS,
   CLEAN_SHEET_POINTS, UPSET_POINTS, SHOOTOUT_WIN_POINTS, SHOOTOUT_LOSS_POINTS,
   GOLDEN_BOOT_POINTS, ADVANCEMENT_POINTS, CHAMPION_POINTS, ROUND_MULTIPLIER,
+  RUNNER_UP_POINTS, THIRD_PLACE_POINTS,
 } from "@/lib/scoring";
 import { fmtPoints } from "@/lib/utils";
 
@@ -88,9 +89,20 @@ export default async function RulesPage({
               ["Reach the Quarterfinal", sign(ADVANCEMENT_POINTS.qf)],
               ["Reach the Semifinal", sign(ADVANCEMENT_POINTS.sf)],
               ["Reach the Final", sign(ADVANCEMENT_POINTS.final)],
-              ["Win the World Cup (champion bonus)", sign(CHAMPION_POINTS)],
             ]} />
-            <p className="mt-2 text-xs text-ice-400">Advancement and the champion bonus are flat — they are not multiplied.</p>
+            <p className="mt-2 text-xs text-ice-400">Advancement bonuses are flat — they are not multiplied.</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>🏆 Podium finish bonuses</CardTitle></CardHeader>
+          <CardContent>
+            <p className="mb-2 text-xs text-ice-400">One-time flat bonuses for how your country finishes (not multiplied).</p>
+            <RuleTable rows={[
+              ["Champion (win the final)", sign(CHAMPION_POINTS)],
+              ["Runner-up (lose the final)", sign(RUNNER_UP_POINTS)],
+              ["Third place (win the 3rd-place game)", sign(THIRD_PLACE_POINTS)],
+            ]} />
           </CardContent>
         </Card>
 

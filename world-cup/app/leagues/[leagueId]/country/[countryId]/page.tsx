@@ -69,6 +69,8 @@ export default async function CountryPage({
           <Stat label="Upsets" v={breakdown.upset_points} />
           <Stat label="Advancement" v={breakdown.advancement_points} />
           <Stat label="Champion" v={breakdown.champion_points} />
+          <Stat label="Runner-up" v={breakdown.runner_up_points} />
+          <Stat label="3rd place" v={breakdown.third_place_points} />
         </div>
 
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ice-400">Matches</h2>

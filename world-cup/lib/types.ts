@@ -139,6 +139,8 @@ export interface ScoredCountry {
   upset_points: number;
   advancement_points: number;
   champion_points: number;
+  runner_up_points: number;
+  third_place_points: number;
   total: number;
   // Tiebreaker data.
   goals_for: number;

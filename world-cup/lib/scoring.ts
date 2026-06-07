@@ -46,8 +46,15 @@ export const ADVANCEMENT_POINTS: Record<Stage, number> = {
   final: 2,
 };
 
-/** Additional one-time bonus for winning the final (a flat bonus). */
-export const CHAMPION_POINTS = 18;
+/**
+ * Flat podium finish bonuses, awarded once the bracket resolves. Champion
+ * (wins the final) gets the most; runner-up (loses the final) and third
+ * place (wins the third-place playoff) get consolation bonuses. These are
+ * flat — not multiplied by the late-round multiplier.
+ */
+export const CHAMPION_POINTS = 25;
+export const RUNNER_UP_POINTS = 10;
+export const THIRD_PLACE_POINTS = 8;
 
 /**
  * Late-round multiplier. Match points (result, goals, clean sheet, shootout
@@ -114,6 +121,8 @@ export function scoreCountry(
   let upsetPoints = 0;
   let goalsFor = 0;
   let championPoints = 0;
+  let runnerUpPoints = 0;
+  let thirdPlacePoints = 0;
 
   const stagesReached = new Set<Stage>();
   let furthest: Stage = "group";
@@ -140,10 +149,10 @@ export function scoreCountry(
       // Decided on penalties: a flat result (no separate draw point).
       const myPens = (isHome ? m.home_pens : m.away_pens) ?? 0;
       const oppPens = (isHome ? m.away_pens : m.home_pens) ?? 0;
-      matchPoints += (myPens > oppPens ? SHOOTOUT_WIN_POINTS : SHOOTOUT_LOSS_POINTS) * mult;
-      if (m.stage === "final" && myPens > oppPens) {
-        championPoints += CHAMPION_POINTS; // flat — not multiplied
-      }
+      const won = myPens > oppPens;
+      matchPoints += (won ? SHOOTOUT_WIN_POINTS : SHOOTOUT_LOSS_POINTS) * mult;
+      if (m.stage === "final") (won ? (championPoints += CHAMPION_POINTS) : (runnerUpPoints += RUNNER_UP_POINTS));
+      if (m.stage === "third" && won) thirdPlacePoints += THIRD_PLACE_POINTS;
     } else if (gf > ga) {
       matchPoints += WIN_POINTS * mult;
       // Upset bonus: group stage only, beating a better-ranked side.
@@ -155,10 +164,12 @@ export function scoreCountry(
         }
       }
       if (m.stage === "final") championPoints += CHAMPION_POINTS; // flat
+      if (m.stage === "third") thirdPlacePoints += THIRD_PLACE_POINTS; // flat
     } else if (gf === ga) {
       matchPoints += DRAW_POINTS * mult;
     } else {
       matchPoints += LOSS_POINTS * mult;
+      if (m.stage === "final") runnerUpPoints += RUNNER_UP_POINTS; // flat
     }
   }
 
@@ -172,7 +183,9 @@ export function scoreCountry(
     cleanSheetPoints +
     upsetPoints +
     advancementPoints +
-    championPoints;
+    championPoints +
+    runnerUpPoints +
+    thirdPlacePoints;
 
   return {
     country_id: countryId,
@@ -183,6 +196,8 @@ export function scoreCountry(
     upset_points: upsetPoints,
     advancement_points: advancementPoints,
     champion_points: championPoints,
+    runner_up_points: runnerUpPoints,
+    third_place_points: thirdPlacePoints,
     total,
     goals_for: goalsFor,
     furthest_stage: furthest,

@@ -23,8 +23,10 @@ nightly from API-Football with commissioner manual override.
 \* FIFA ranking frozen at kickoff. Win only — a draw is not an upset.
 
 **Advancement** (one-time, the moment the bracket places you in the round) —
-flat **+2 per knockout round**, never multiplied. Plus a flat **+18 champion
-bonus** for winning the final.
+flat **+2 per knockout round**, never multiplied.
+
+**Podium finish bonuses** (flat, one-time): **champion +25**, **runner-up +10**,
+**third place +8** (win the third-place game).
 
 **Semifinal & final multiplier** — match points (result, goals, clean sheet,
 shootout result) earned in a **semifinal or final count ×1.5**, so the title
