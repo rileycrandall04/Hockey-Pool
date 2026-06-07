@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getUser, loadLeagueAccess } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
+import { GoldenBootIcon } from "@/components/golden-boot-icon";
 import { GOLDEN_BOOT_POINTS } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export default async function GoldenBootPage({
     <>
       <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner />
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
-        <h1 className="mb-1 text-2xl font-bold text-ice-50">⚽ Golden Boot race</h1>
+        <h1 className="mb-1 inline-flex items-center gap-2 text-2xl font-bold text-ice-50"><GoldenBootIcon /> Golden Boot race</h1>
         <p className="mb-4 text-xs text-ice-400">
           The leader&rsquo;s owner gets <strong className="text-ice-200">+{GOLDEN_BOOT_POINTS}</strong> in
           the standings. Updates with each data sync.
@@ -85,7 +86,7 @@ export default async function GoldenBootPage({
                       <td className="px-2 py-2 text-ice-400 sm:px-3">{i + 1}</td>
                       <td className="px-2 py-2 text-ice-50 sm:px-3">
                         <span className="inline-flex items-center gap-1.5">
-                          {leader && "👑 "}
+                          {leader && <GoldenBootIcon />}
                           <Flag code={country?.code} url={country?.flag_url} />
                           {s.player_name}
                           <span className="text-xs text-ice-500">{country?.code ?? ""}</span>
