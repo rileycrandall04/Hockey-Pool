@@ -69,6 +69,8 @@ export interface Country {
   eliminated: boolean;
   /** API-Football team id, for ingestion mapping. */
   external_id: number | null;
+  /** Hand-edited in the admin editor; the API sync leaves these alone. */
+  manual_override?: boolean;
 }
 
 /** A player, lazily upserted from goal events for the Golden Boot race. */

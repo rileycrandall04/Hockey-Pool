@@ -88,8 +88,12 @@ the commissioner can manually correct any match.
       ingestion** in the nightly sync
 - [ ] **Phase 6** — knockout bracket view, push notifications, standings
       snapshots
-- [ ] **Polish backlog** — official 2026 groups + FIFA ranks (replace the
-      placeholder seed); make wide tables fit/scroll on mobile
+- [x] **Real data** — sync pulls the team list + group letters from
+      API-Football (`/teams`, `/standings`), applies FIFA ranks from a
+      reference (the API has none), and a Rules page documents scoring. An
+      admin country editor overrides any group/rank by hand (sync-protected).
+- [ ] **Polish backlog** — make wide tables fit/scroll on mobile; verify
+      the FIFA-rank reference against the official pre-tournament ranking
 
 ## Match data (Phase 4)
 

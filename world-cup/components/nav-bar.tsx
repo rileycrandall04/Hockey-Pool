@@ -88,6 +88,11 @@ export function NavBar({
       label: "Golden Boot",
       active: isActive(`/leagues/${leagueId}/golden-boot`),
     });
+    items.push({
+      href: `/leagues/${leagueId}/rules`,
+      label: "Rules",
+      active: isActive(`/leagues/${leagueId}/rules`),
+    });
     if (draftHref && draftStatus !== "complete") {
       items.push({ href: draftHref, label: draftLabel, active: isActive(draftHref) });
     }

@@ -3,17 +3,24 @@ import {
   fetchWorldCupFixtures,
   fetchTopScorers,
   fetchFixtureEvents,
+  fetchWorldCupTeams,
+  fetchWorldCupStandings,
+  groupLetter,
   mapStatus,
   mapStage,
   extractMatchday,
   type RawFixture,
   type RawEvent,
 } from "./api-football";
+import { fifaRankForName } from "./fifa-rankings";
 
 /** Max fixtures to pull events for in one run (protects the API quota). */
 const MAX_EVENT_FETCHES = 40;
 
 export interface SyncSummary {
+  teams_upserted: number;
+  groups_set: number;
+  ranks_set: number;
   fixtures_seen: number;
   matches_upserted: number;
   skipped_locked: number;
@@ -142,6 +149,116 @@ function parseGoalEvent(
   };
 }
 
+/** Derive a 3-letter code from a country name when the API doesn't give one. */
+function deriveCode(name: string): string {
+  const letters = name.replace(/[^a-zA-Z]/g, "").toUpperCase();
+  return (letters.slice(0, 3) || "XXX").padEnd(3, "X");
+}
+
+interface FullCountryRow {
+  id: number;
+  name: string;
+  code: string;
+  external_id: number | null;
+  manual_override: boolean;
+  group_letter: string | null;
+  fifa_rank: number | null;
+  flag_url: string | null;
+}
+
+/**
+ * Sync the real team list + group letters (from API-Football's /teams and
+ * /standings) and apply FIFA ranks (from our reference, since the API has
+ * none). Countries flagged manual_override keep their hand-set name/group/
+ * rank; we still backfill their external_id and flag. Each step is guarded.
+ */
+async function syncTeamsGroupsRanks(
+  svc: SupabaseClient,
+  summary: SyncSummary,
+): Promise<void> {
+  // Group letter per API team id (may be empty before kickoff).
+  const groupByApiId = new Map<number, string>();
+  try {
+    const standings = await fetchWorldCupStandings();
+    for (const r of standings) {
+      const g = groupLetter(r.group);
+      if (g) groupByApiId.set(r.team.id, g);
+    }
+  } catch (err) {
+    summary.errors.push("standings: " + (err instanceof Error ? err.message : "failed"));
+  }
+
+  // The real team list -> upsert into countries.
+  try {
+    const { data: countryRows } = await svc
+      .from("countries")
+      .select("id, name, code, external_id, manual_override, group_letter, fifa_rank, flag_url");
+    const rows = (countryRows ?? []) as FullCountryRow[];
+    const resolver = new CountryResolver(
+      rows.map((r) => ({ id: r.id, name: r.name, code: r.code, external_id: r.external_id })),
+    );
+    const rowById = new Map(rows.map((r) => [r.id, r]));
+    const usedCodes = new Set(rows.map((r) => r.code.toUpperCase()));
+
+    const teams = await fetchWorldCupTeams();
+    for (const t of teams) {
+      const existing = resolver.resolve({ id: t.team.id, name: t.team.name });
+      const grp = groupByApiId.get(t.team.id) ?? null;
+      const rank = fifaRankForName(t.team.name);
+
+      if (existing) {
+        const row = rowById.get(existing.id)!;
+        const update: Record<string, unknown> = {};
+        if (row.external_id == null) update.external_id = t.team.id;
+        if (t.team.logo && row.flag_url !== t.team.logo) update.flag_url = t.team.logo;
+        if (!row.manual_override) {
+          if (grp && grp !== row.group_letter) { update.group_letter = grp; summary.groups_set++; }
+          if (rank != null && rank !== row.fifa_rank) { update.fifa_rank = rank; summary.ranks_set++; }
+        }
+        if (Object.keys(update).length > 0) {
+          await svc.from("countries").update(update).eq("id", existing.id);
+        }
+        summary.teams_upserted++;
+      } else {
+        // A real team not in our seed — insert it.
+        let code = (t.team.code || deriveCode(t.team.name)).toUpperCase();
+        while (usedCodes.has(code)) code = code.slice(0, 2) + String((code.charCodeAt(2) + 1) % 90 + 33);
+        usedCodes.add(code);
+        const { error } = await svc.from("countries").insert({
+          name: t.team.name,
+          code,
+          external_id: t.team.id,
+          flag_url: t.team.logo ?? null,
+          group_letter: grp,
+          fifa_rank: rank,
+        });
+        if (error) summary.errors.push(`insert ${t.team.name}: ${error.message}`);
+        else { summary.teams_upserted++; if (grp) summary.groups_set++; if (rank != null) summary.ranks_set++; }
+      }
+    }
+  } catch (err) {
+    summary.errors.push("teams: " + (err instanceof Error ? err.message : "failed"));
+  }
+
+  // Apply FIFA ranks to any remaining (non-override) countries by name, so
+  // ranks are corrected even if /teams didn't return everyone.
+  try {
+    const { data: allC } = await svc
+      .from("countries")
+      .select("id, name, fifa_rank, manual_override");
+    for (const c of allC ?? []) {
+      if (c.manual_override) continue;
+      const rank = fifaRankForName(c.name as string);
+      if (rank != null && rank !== c.fifa_rank) {
+        await svc.from("countries").update({ fifa_rank: rank }).eq("id", c.id);
+        summary.ranks_set++;
+      }
+    }
+  } catch (err) {
+    summary.errors.push("ranks: " + (err instanceof Error ? err.message : "failed"));
+  }
+}
+
 /**
  * Pull World Cup fixtures + the top-scorers leaderboard from API-Football
  * and upsert them. Locked matches (commissioner-corrected) are never
@@ -152,6 +269,9 @@ export async function syncMatches(
   window?: { from?: string; to?: string },
 ): Promise<SyncSummary> {
   const summary: SyncSummary = {
+    teams_upserted: 0,
+    groups_set: 0,
+    ranks_set: 0,
     fixtures_seen: 0,
     matches_upserted: 0,
     skipped_locked: 0,
@@ -161,6 +281,11 @@ export async function syncMatches(
     goals_ingested: 0,
     errors: [],
   };
+
+  // Pull the real team list, group assignments, and apply FIFA ranks first,
+  // so fixtures match against accurate countries. Best-effort and per-step
+  // guarded — a failure here never blocks the rest of the sync.
+  await syncTeamsGroupsRanks(svc, summary);
 
   const { data: countryRows } = await svc
     .from("countries")
