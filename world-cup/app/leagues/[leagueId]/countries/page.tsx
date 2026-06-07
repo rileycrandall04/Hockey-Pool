@@ -56,13 +56,14 @@ export default async function CountriesPage({
           </p>
         ) : (
           <div className="overflow-hidden rounded-xl border border-puck-border">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-puck-card text-left text-xs uppercase tracking-wider text-ice-400">
                 <tr>
-                  <th className="px-3 py-2">Grp</th>
-                  <th className="px-3 py-2">Country</th>
-                  <th className="px-3 py-2 text-right">FIFA</th>
-                  <th className="px-3 py-2">Owner</th>
+                  <th className="px-2 py-2 sm:px-3">Grp</th>
+                  <th className="px-2 py-2 sm:px-3">Country</th>
+                  <th className="px-2 py-2 text-right sm:px-3">FIFA</th>
+                  <th className="px-2 py-2 sm:px-3">Owner</th>
                 </tr>
               </thead>
               <tbody>
@@ -70,18 +71,18 @@ export default async function CountriesPage({
                   const owner = ownerOfCountry.get(c.id);
                   return (
                     <tr key={c.id} className="border-t border-puck-border bg-puck-bg">
-                      <td className="px-3 py-2 text-ice-400">{c.group_letter ?? "—"}</td>
-                      <td className="px-3 py-2 font-medium text-ice-50">
+                      <td className="px-2 py-2 text-ice-400 sm:px-3">{c.group_letter ?? "—"}</td>
+                      <td className="px-2 py-2 font-medium text-ice-50 sm:px-3">
                         <span className="inline-flex items-center gap-2">
                           <Flag code={c.code} />
                           {c.name}{" "}
                           <span className="text-xs text-ice-500">{c.code}</span>
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right text-ice-300">
+                      <td className="px-2 py-2 text-right text-ice-300 sm:px-3">
                         {c.fifa_rank ?? "—"}
                       </td>
-                      <td className="px-3 py-2 text-ice-300">
+                      <td className="px-2 py-2 text-ice-300 sm:px-3">
                         {owner ? (
                           <span className="text-ice-100">{owner}</span>
                         ) : (
@@ -93,6 +94,7 @@ export default async function CountriesPage({
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 

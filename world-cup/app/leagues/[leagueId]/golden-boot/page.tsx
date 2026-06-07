@@ -61,14 +61,15 @@ export default async function GoldenBootPage({
           </p>
         ) : (
           <div className="overflow-hidden rounded-xl border border-puck-border">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-puck-card text-left text-xs uppercase tracking-wider text-ice-400">
                 <tr>
-                  <th className="px-3 py-2">#</th>
-                  <th className="px-3 py-2">Player</th>
-                  <th className="px-3 py-2 text-right">G</th>
-                  <th className="px-3 py-2 text-right">A</th>
-                  <th className="px-3 py-2">Owner</th>
+                  <th className="px-2 py-2 sm:px-3">#</th>
+                  <th className="px-2 py-2 sm:px-3">Player</th>
+                  <th className="px-2 py-2 text-right sm:px-3">G</th>
+                  <th className="hidden px-2 py-2 text-right sm:table-cell sm:px-3">A</th>
+                  <th className="px-2 py-2 sm:px-3">Owner</th>
                 </tr>
               </thead>
               <tbody>
@@ -81,8 +82,8 @@ export default async function GoldenBootPage({
                       key={s.player_external_id}
                       className={"border-t border-puck-border " + (leader ? "bg-ice-500/10" : "bg-puck-bg")}
                     >
-                      <td className="px-3 py-2 text-ice-400">{i + 1}</td>
-                      <td className="px-3 py-2 text-ice-50">
+                      <td className="px-2 py-2 text-ice-400 sm:px-3">{i + 1}</td>
+                      <td className="px-2 py-2 text-ice-50 sm:px-3">
                         <span className="inline-flex items-center gap-1.5">
                           {leader && "👑 "}
                           <Flag code={country?.code} />
@@ -90,9 +91,9 @@ export default async function GoldenBootPage({
                           <span className="text-xs text-ice-500">{country?.code ?? ""}</span>
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right font-semibold text-ice-100">{s.goals}</td>
-                      <td className="px-3 py-2 text-right text-ice-300">{s.assists}</td>
-                      <td className="px-3 py-2 text-ice-300">
+                      <td className="px-2 py-2 text-right font-semibold text-ice-100 sm:px-3">{s.goals}</td>
+                      <td className="hidden px-2 py-2 text-right text-ice-300 sm:table-cell sm:px-3">{s.assists}</td>
+                      <td className="px-2 py-2 text-ice-300 sm:px-3">
                         {owner ? <span className="text-ice-100">{owner}</span> : <span className="text-ice-500">—</span>}
                       </td>
                     </tr>
@@ -100,6 +101,7 @@ export default async function GoldenBootPage({
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </main>
