@@ -73,11 +73,14 @@ export default async function CountriesPage({
                     <tr key={c.id} className="border-t border-puck-border bg-puck-bg">
                       <td className="px-2 py-2 text-ice-400 sm:px-3">{c.group_letter ?? "—"}</td>
                       <td className="px-2 py-2 font-medium text-ice-50 sm:px-3">
-                        <span className="inline-flex items-center gap-2">
+                        <Link
+                          href={`/leagues/${leagueId}/country/${c.id}`}
+                          className="inline-flex items-center gap-2 hover:underline"
+                        >
                           <Flag code={c.code} url={c.flag_url} />
                           {c.name}{" "}
                           <span className="text-xs text-ice-500">{c.code}</span>
-                        </span>
+                        </Link>
                       </td>
                       <td className="px-2 py-2 text-right text-ice-300 sm:px-3">
                         {c.fifa_rank ?? "—"}
