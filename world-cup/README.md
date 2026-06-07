@@ -86,8 +86,11 @@ the commissioner can manually correct any match.
       search) + **player** pages, **Golden Boot** leaderboard, **manual
       goal entry** with assignable app-admins, and **per-match goal-scorer
       ingestion** in the nightly sync
-- [ ] **Phase 6** — knockout bracket view, push notifications, standings
-      snapshots
+- [x] **Bracket** — knockout bracket view (round columns, owner tags, winners)
+- [x] **Reconciliation** — locked matches that disagree with the API raise a
+      conflict on the admin page (Use API / Keep manual) instead of silently
+      hiding the difference
+- [ ] **Phase 6** — push notifications, standings snapshots
 - [x] **Real data** — sync pulls the team list + group letters from
       API-Football (`/teams`, `/standings`), applies FIFA ranks from a
       reference (the API has none), and a Rules page documents scoring. An

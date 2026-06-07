@@ -3,14 +3,59 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUser, loadLeagueAccess } from "@/lib/league-access";
 import { isAppOwner } from "@/lib/auth";
+import { isAppAdmin } from "@/lib/admin";
 import Link from "next/link";
 import { NavBar } from "@/components/nav-bar";
+import { Flag } from "@/components/flag";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SyncButton } from "@/components/sync-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Country } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+/** Apply the API's result to a conflicting match (the API was right). */
+async function useApiAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  const matchId = String(formData.get("match_id") ?? "");
+  const user = await getUser();
+  if (!user) redirect("/login");
+  const svc = createServiceClient();
+  if (!(await isAppAdmin(svc, user.id, user.email))) redirect(`/leagues/${leagueId}/admin?error=Admins+only`);
+
+  const { data: c } = await svc.from("match_conflicts").select("*").eq("match_id", matchId).maybeSingle();
+  if (c) {
+    await svc.from("matches").update({
+      home_goals: c.api_home_goals,
+      away_goals: c.api_away_goals,
+      went_to_shootout: c.api_went_to_shootout,
+      home_pens: c.api_home_pens,
+      away_pens: c.api_away_pens,
+      status: "final",
+      locked: false, // let the sync keep it fresh from here
+      goals_synced: false, // re-pull scorers
+    }).eq("id", matchId);
+    await svc.from("match_conflicts").delete().eq("match_id", matchId);
+  }
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  redirect(`/leagues/${leagueId}/admin`);
+}
+
+/** Dismiss a conflict, keeping the manual (locked) result. */
+async function keepManualAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  const matchId = String(formData.get("match_id") ?? "");
+  const user = await getUser();
+  if (!user) redirect("/login");
+  const svc = createServiceClient();
+  if (!(await isAppAdmin(svc, user.id, user.email))) redirect(`/leagues/${leagueId}/admin?error=Admins+only`);
+  await svc.from("match_conflicts").delete().eq("match_id", matchId);
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  redirect(`/leagues/${leagueId}/admin`);
+}
 
 async function addAdminAction(formData: FormData) {
   "use server";
@@ -107,6 +152,18 @@ export default async function AdminPage({
     }
   }
 
+  // Open sync vs manual conflicts (global; surfaced to any league admin).
+  const { data: conflictRows } = await svc
+    .from("match_conflicts")
+    .select("*, matches(home_country_id, away_country_id)")
+    .order("updated_at", { ascending: false });
+  const conflicts = conflictRows ?? [];
+  let conflictCountries = new Map<number, Country>();
+  if (conflicts.length > 0) {
+    const { data: cs } = await svc.from("countries").select("id, name, code");
+    conflictCountries = new Map((cs ?? []).map((c) => [c.id as number, c as Country]));
+  }
+
   return (
     <>
       <NavBar
@@ -166,6 +223,52 @@ export default async function AdminPage({
             </div>
           </CardContent>
         </Card>
+
+        {conflicts.length > 0 && (
+          <Card className="border-yellow-500/50">
+            <CardHeader>
+              <CardTitle>⚠️ Sync vs manual conflicts ({conflicts.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-ice-400">
+                These matches were hand-edited, but the API now reports a
+                different result. Your manual value is still in effect — pick
+                which source is right.
+              </p>
+              {conflicts.map((c) => {
+                const rel = c.matches as { home_country_id: number; away_country_id: number } | { home_country_id: number; away_country_id: number }[] | null;
+                const match = Array.isArray(rel) ? rel[0] : rel;
+                const h = match ? conflictCountries.get(match.home_country_id) : undefined;
+                const a = match ? conflictCountries.get(match.away_country_id) : undefined;
+                const fmt = (hg: number | null, ag: number | null, s: boolean | null, hp: number | null, ap: number | null) =>
+                  `${hg ?? "?"}–${ag ?? "?"}${s ? ` (${hp}–${ap} pens)` : ""}`;
+                return (
+                  <div key={c.match_id} className="rounded-md border border-puck-border bg-puck-bg p-3 text-sm">
+                    <div className="mb-2 flex items-center gap-1.5 text-ice-100">
+                      <Flag code={h?.code} /> {h?.code ?? "?"} <span className="text-ice-500">v</span> <Flag code={a?.code} /> {a?.code ?? "?"}
+                    </div>
+                    <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                      <span>Manual: <span className="font-semibold text-ice-100">{fmt(c.manual_home_goals, c.manual_away_goals, c.manual_went_to_shootout, c.manual_home_pens, c.manual_away_pens)}</span></span>
+                      <span>API: <span className="font-semibold text-ice-100">{fmt(c.api_home_goals, c.api_away_goals, c.api_went_to_shootout, c.api_home_pens, c.api_away_pens)}</span></span>
+                    </div>
+                    <div className="flex gap-2">
+                      <form action={useApiAction}>
+                        <input type="hidden" name="league_id" value={leagueId} />
+                        <input type="hidden" name="match_id" value={c.match_id as string} />
+                        <Button type="submit" size="sm">Use API</Button>
+                      </form>
+                      <form action={keepManualAction}>
+                        <input type="hidden" name="league_id" value={leagueId} />
+                        <input type="hidden" name="match_id" value={c.match_id as string} />
+                        <Button type="submit" size="sm" variant="secondary">Keep manual</Button>
+                      </form>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         {isOwner && (
           <Card>
