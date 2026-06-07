@@ -27,6 +27,7 @@ export function SyncButton() {
           `✅ ${json.teams_upserted ?? 0} teams, ${json.groups_set ?? 0} groups, ${json.ranks_set ?? 0} ranks · ` +
             `${json.matches_upserted} matches, ${json.goals_ingested ?? 0} goals, ${json.top_scorers} scorers` +
             (json.skipped_locked ? `, ${json.skipped_locked} locked skipped` : "") +
+            (json.conflicts_open ? ` · ⚠️ ${json.conflicts_open} conflicts` : "") +
             (json.unmatched_teams?.length ? ` · unmatched: ${json.unmatched_teams.join(", ")}` : "") +
             (json.errors?.length ? ` · errors: ${json.errors.join("; ")}` : ""),
         );

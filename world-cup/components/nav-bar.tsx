@@ -74,6 +74,11 @@ export function NavBar({
       active: isActive(`/leagues/${leagueId}/groups`),
     });
     items.push({
+      href: `/leagues/${leagueId}/bracket`,
+      label: "Bracket",
+      active: isActive(`/leagues/${leagueId}/bracket`),
+    });
+    items.push({
       href: `/leagues/${leagueId}/countries`,
       label: "Countries",
       active: isActive(`/leagues/${leagueId}/countries`),

@@ -28,6 +28,7 @@ export interface SyncSummary {
   top_scorers: number;
   events_fetched: number;
   goals_ingested: number;
+  conflicts_open: number;
   errors: string[];
 }
 
@@ -107,6 +108,68 @@ function buildMatchRow(
     external_id: fx.fixture.id,
     updated_at: new Date().toISOString(),
   };
+}
+
+interface StoredMatch {
+  id: string;
+  external_id: number;
+  locked: boolean;
+  home_goals: number | null;
+  away_goals: number | null;
+  went_to_shootout: boolean;
+  home_pens: number | null;
+  away_pens: number | null;
+}
+
+/**
+ * For a locked (manually-edited) match, compare the stored result against
+ * what the API now reports. If they disagree and the API has a final result,
+ * record a conflict for review; if they agree, clear any stale conflict.
+ * Never overwrites the manual values. Returns true if a conflict is open.
+ */
+async function reconcileLockedMatch(
+  svc: SupabaseClient,
+  stored: StoredMatch,
+  apiRow: Record<string, unknown>,
+): Promise<boolean> {
+  const status = apiRow.status as string;
+  const ah = apiRow.home_goals as number | null;
+  const aa = apiRow.away_goals as number | null;
+  if (status !== "final" || ah == null || aa == null) return false;
+
+  const aShoot = Boolean(apiRow.went_to_shootout);
+  const ahp = (apiRow.home_pens as number | null) ?? null;
+  const aap = (apiRow.away_pens as number | null) ?? null;
+
+  const differs =
+    stored.home_goals !== ah ||
+    stored.away_goals !== aa ||
+    Boolean(stored.went_to_shootout) !== aShoot ||
+    (aShoot && (stored.home_pens !== ahp || stored.away_pens !== aap));
+
+  if (!differs) {
+    await svc.from("match_conflicts").delete().eq("match_id", stored.id);
+    return false;
+  }
+
+  await svc.from("match_conflicts").upsert(
+    {
+      match_id: stored.id,
+      manual_home_goals: stored.home_goals,
+      manual_away_goals: stored.away_goals,
+      manual_went_to_shootout: stored.went_to_shootout,
+      manual_home_pens: stored.home_pens,
+      manual_away_pens: stored.away_pens,
+      api_home_goals: ah,
+      api_away_goals: aa,
+      api_went_to_shootout: aShoot,
+      api_home_pens: ahp,
+      api_away_pens: aap,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "match_id" },
+  );
+  return true;
 }
 
 interface ParsedGoal {
@@ -279,6 +342,7 @@ export async function syncMatches(
     top_scorers: 0,
     events_fetched: 0,
     goals_ingested: 0,
+    conflicts_open: 0,
     errors: [],
   };
 
@@ -292,14 +356,14 @@ export async function syncMatches(
     .select("id, name, code, external_id");
   const resolver = new CountryResolver((countryRows ?? []) as CountryRow[]);
 
-  // Which existing matches are locked? (Don't clobber manual corrections.)
+  // Existing matches keyed by external_id, so we can spot locked ones and
+  // compare their stored (manual) values against what the API now reports.
   const { data: existing } = await svc
     .from("matches")
-    .select("external_id, locked")
+    .select("id, external_id, locked, home_goals, away_goals, went_to_shootout, home_pens, away_pens")
     .not("external_id", "is", null);
-  const lockedExternalIds = new Set(
-    (existing ?? []).filter((m) => m.locked).map((m) => m.external_id as number),
-  );
+  const storedByExtId = new Map<number, StoredMatch>();
+  for (const m of existing ?? []) storedByExtId.set(m.external_id as number, m as StoredMatch);
 
   // -------- Fixtures ----------------------------------------------------
   try {
@@ -326,13 +390,17 @@ export async function syncMatches(
         away.external_id = fx.teams.away.id;
       }
 
-      if (lockedExternalIds.has(fx.fixture.id)) {
-        summary.skipped_locked++;
-        continue;
-      }
-
       const row = buildMatchRow(fx, home.id, away.id);
       if (!row) continue;
+
+      const stored = storedByExtId.get(fx.fixture.id);
+      if (stored?.locked) {
+        // Don't overwrite a manual edit — but if the API now disagrees,
+        // record the conflict so a commissioner can reconcile it.
+        summary.skipped_locked++;
+        if (await reconcileLockedMatch(svc, stored, row)) summary.conflicts_open++;
+        continue;
+      }
 
       const { error } = await svc
         .from("matches")
