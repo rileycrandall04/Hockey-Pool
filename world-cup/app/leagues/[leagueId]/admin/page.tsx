@@ -347,7 +347,7 @@ export default async function AdminPage({
           </CardContent>
         </Card>
 
-        <Card className="border-red-500/40">
+        <Card id="delete-league" className="scroll-mt-20 border-red-500/40">
           <CardHeader>
             <CardTitle>Delete league</CardTitle>
           </CardHeader>
