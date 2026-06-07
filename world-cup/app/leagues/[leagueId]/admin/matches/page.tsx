@@ -42,11 +42,13 @@ async function saveMatchAction(formData: FormData) {
   }
 
   const wentToShootout = formData.get("shootout") === "on";
+  const kickoffRaw = String(formData.get("kickoff") ?? "").trim();
   const row = {
     stage: String(formData.get("stage") ?? "group"),
     matchday: intOrNull(formData.get("matchday")),
     home_country_id: homeId,
     away_country_id: awayId,
+    kickoff_utc: kickoffRaw === "" ? null : new Date(kickoffRaw).toISOString(),
     status: String(formData.get("status") ?? "scheduled"),
     home_goals: intOrNull(formData.get("home_goals")),
     away_goals: intOrNull(formData.get("away_goals")),
@@ -176,6 +178,11 @@ export default async function MatchesAdminPage({
                 </div>
               </div>
 
+              <div className="space-y-1">
+                <Label htmlFor="kickoff">Kickoff (so it shows on the schedule)</Label>
+                <Input id="kickoff" name="kickoff" type="datetime-local" defaultValue={editing?.kickoff_utc ? editing.kickoff_utc.slice(0, 16) : ""} />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="home_goals">Home goals (reg + ET)</Label>
@@ -254,7 +261,10 @@ export default async function MatchesAdminPage({
                       </td>
                       <td className="px-3 py-2 text-center text-ice-200">{score}</td>
                       <td className="px-3 py-2 text-right">
-                        <Link href={`/leagues/${leagueId}/admin/matches?edit=${m.id}`} className="text-ice-400 hover:underline">
+                        <Link href={`/leagues/${leagueId}/admin/goals/${m.id}`} className="text-ice-400 hover:underline">
+                          goals
+                        </Link>
+                        <Link href={`/leagues/${leagueId}/admin/matches?edit=${m.id}`} className="ml-2 text-ice-400 hover:underline">
                           edit
                         </Link>
                         <form action={deleteMatchAction} className="ml-2 inline">

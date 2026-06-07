@@ -81,10 +81,15 @@ the commissioner can manually correct any match.
 - [x] **Phase 4** — **API-Football ingestion** (nightly cron + on-demand
       sync) and a **manual match editor** that locks results from being
       overwritten
-- [x] **Phase 5 (partial)** — live **Golden Boot leaderboard**; standings
-      award the +5 to the current leader's owner
-- [ ] **Phase 5 (rest)** — fixtures/scoreboard page + knockout bracket
-- [ ] **Phase 6** — push notifications, standings snapshots
+- [x] **Phase 5** — **group tables**, **schedule** (date picker) + **game**
+      pages, **country** match-history pages, **players** directory (live
+      search) + **player** pages, **Golden Boot** leaderboard, **manual
+      goal entry** with assignable app-admins, and **per-match goal-scorer
+      ingestion** in the nightly sync
+- [ ] **Phase 6** — knockout bracket view, push notifications, standings
+      snapshots
+- [ ] **Polish backlog** — official 2026 groups + FIFA ranks (replace the
+      placeholder seed); make wide tables fit/scroll on mobile
 
 ## Match data (Phase 4)
 

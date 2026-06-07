@@ -24,7 +24,7 @@ export function SyncButton() {
         setResult(`❌ ${json.error ?? res.status}`);
       } else {
         setResult(
-          `✅ ${json.matches_upserted} matches, ${json.top_scorers} scorers` +
+          `✅ ${json.matches_upserted} matches, ${json.goals_ingested ?? 0} goals, ${json.top_scorers} scorers` +
             (json.skipped_locked ? `, ${json.skipped_locked} locked skipped` : "") +
             (json.unmatched_teams?.length ? ` · unmatched: ${json.unmatched_teams.join(", ")}` : "") +
             (json.errors?.length ? ` · errors: ${json.errors.join("; ")}` : ""),

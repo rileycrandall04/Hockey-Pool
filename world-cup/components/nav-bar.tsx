@@ -64,9 +64,24 @@ export function NavBar({
   ];
   if (leagueId) {
     items.push({
+      href: `/leagues/${leagueId}/schedule`,
+      label: "Schedule",
+      active: isActive(`/leagues/${leagueId}/schedule`),
+    });
+    items.push({
+      href: `/leagues/${leagueId}/groups`,
+      label: "Group tables",
+      active: isActive(`/leagues/${leagueId}/groups`),
+    });
+    items.push({
       href: `/leagues/${leagueId}/countries`,
       label: "Countries",
       active: isActive(`/leagues/${leagueId}/countries`),
+    });
+    items.push({
+      href: `/leagues/${leagueId}/players`,
+      label: "Players",
+      active: isActive(`/leagues/${leagueId}/players`),
     });
     items.push({
       href: `/leagues/${leagueId}/golden-boot`,

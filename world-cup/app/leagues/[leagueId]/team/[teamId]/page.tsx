@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
@@ -101,14 +102,17 @@ export default async function TeamPage({
                   className="rounded-md border border-puck-border bg-puck-card p-3"
                 >
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="inline-flex items-center gap-2 font-semibold text-ice-50">
+                    <Link
+                      href={`/leagues/${leagueId}/country/${country.id}`}
+                      className="inline-flex items-center gap-2 font-semibold text-ice-50 hover:underline"
+                    >
                       <Flag code={country.code} />
                       {country.name}{" "}
                       <span className="text-xs text-ice-500">
                         {country.group_letter ? `Grp ${country.group_letter}` : ""}
                         {country.fifa_rank ? ` · #${country.fifa_rank}` : ""}
                       </span>
-                    </span>
+                    </Link>
                     <span className="font-semibold text-ice-50">{fmtPoints(s.total)}</span>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-ice-400">
