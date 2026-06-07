@@ -78,14 +78,14 @@ describe("scoreCountry - knockout & shootouts", () => {
       away_pens: 3,
     });
     const s = scoreCountry(1, [match], rank);
-    // 1 (draw) + 4 (SO win) = 5 match points; PKs not counted as goals
+    // flat 5 for a shootout win; PKs not counted as goals
     expect(s.match_points).toBe(5);
     expect(s.goals_for).toBe(1);
     // + GF 1 - 0.5 (GA) + advancement r16 (2) = 5 + 0.5 + 2 = 7.5
     expect(s.total).toBeCloseTo(7.5, 5);
   });
 
-  it("scores a shootout loss as a draw + loss bonus", () => {
+  it("scores a shootout loss as a flat 3", () => {
     const match = m({
       stage: "r16",
       home_country_id: 1,
@@ -97,7 +97,7 @@ describe("scoreCountry - knockout & shootouts", () => {
       away_pens: 3,
     });
     const s = scoreCountry(3, [match], rank);
-    // 1 (draw) + 2 (SO loss) = 3 match points
+    // flat 3 for a shootout loss
     expect(s.match_points).toBe(3);
     // + GF 1 - 0.5 + advancement r16 (2) = 3 + 0.5 + 2 = 5.5
     expect(s.total).toBeCloseTo(5.5, 5);
@@ -115,8 +115,8 @@ describe("scoreCountry - advancement & champion", () => {
 
   it("sums one-time advancement bonuses across the bracket", () => {
     const s = scoreCountry(1, champPath, rank);
-    // r32 1 + r16 2 + qf 3 + sf 4 + final 5 = 15
-    expect(s.advancement_points).toBe(15);
+    // flat 2 per knockout round x 5 rounds = 10
+    expect(s.advancement_points).toBe(10);
   });
 
   it("adds the flat champion bonus for winning the final", () => {
@@ -127,9 +127,9 @@ describe("scoreCountry - advancement & champion", () => {
 
   it("grants advancement for a scheduled (not-yet-played) match but no result points", () => {
     const s = scoreCountry(1, [m({ stage: "qf", status: "scheduled", home_country_id: 1, away_country_id: 4 })], rank);
-    expect(s.advancement_points).toBe(3); // reached the QF
+    expect(s.advancement_points).toBe(2); // reached the QF (flat 2)
     expect(s.match_points).toBe(0); // not played yet
-    expect(s.total).toBe(3);
+    expect(s.total).toBe(2);
   });
 
   it("treats a third-place game as reaching the semifinal with no extra advancement", () => {
@@ -146,9 +146,9 @@ describe("scoreCountry - late-round 1.5x multiplier", () => {
     expect(s.goals_for_points).toBeCloseTo(2 * 1.5, 5);
     expect(s.clean_sheet_points).toBeCloseTo(1 * 1.5, 5);
     expect(s.goals_for).toBe(2); // raw goal count is NOT multiplied (tiebreaker)
-    expect(s.advancement_points).toBe(4); // reaching SF, flat
-    // 4.5 + 3 + 1.5 + 4 = 13
-    expect(s.total).toBeCloseTo(13, 5);
+    expect(s.advancement_points).toBe(2); // reaching SF, flat 2
+    // 4.5 + 3 + 1.5 + 2 = 11
+    expect(s.total).toBeCloseTo(11, 5);
   });
 
   it("multiplies final match points but keeps the champion bonus flat at 18", () => {
@@ -157,9 +157,9 @@ describe("scoreCountry - late-round 1.5x multiplier", () => {
     expect(s.goals_for_points).toBeCloseTo(2 * 1.5, 5);
     expect(s.goals_against_points).toBeCloseTo(-0.5 * 1.5, 5);
     expect(s.champion_points).toBe(18); // flat, NOT multiplied
-    expect(s.advancement_points).toBe(5); // reaching the final, flat
-    // 4.5 + 3 - 0.75 + 0 + 18 + 5 = 29.75
-    expect(s.total).toBeCloseTo(29.75, 5);
+    expect(s.advancement_points).toBe(2); // reaching the final, flat 2
+    // 4.5 + 3 - 0.75 + 0 + 18 + 2 = 26.75
+    expect(s.total).toBeCloseTo(26.75, 5);
   });
 
   it("does not multiply group or earlier knockout matches", () => {
