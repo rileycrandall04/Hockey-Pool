@@ -6,6 +6,7 @@ import { computeStandings } from "@/lib/standings";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { RecentResults } from "@/components/recent-results";
+import { GoldenBootRace } from "@/components/golden-boot-race";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { fmtPoints } from "@/lib/utils";
@@ -118,6 +119,9 @@ export default async function LeagueStandingsPage({
                         >
                           {row.team.name}
                         </Link>
+                        {row.scored.golden_boot_points > 0 && (
+                          <span title="Holds the Golden Boot bonus"> 🥾</span>
+                        )}
                         <div className="text-xs text-ice-400">{row.ownerName}</div>
                         <div className="mt-1 flex flex-wrap gap-1 sm:hidden">{chips()}</div>
                       </td>
@@ -139,6 +143,7 @@ export default async function LeagueStandingsPage({
           </div>
         )}
 
+        <GoldenBootRace leagueId={leagueId} />
         <div className="mt-6">
           <RecentResults leagueId={leagueId} />
         </div>
