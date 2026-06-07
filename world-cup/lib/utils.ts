@@ -29,3 +29,13 @@ export function fmtKickoff(iso: string | null): string {
     timeZone: POOL_TZ,
   });
 }
+
+/** Short Mountain-Time date (e.g. "Jun 14"). */
+export function fmtShortDate(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: POOL_TZ,
+  });
+}

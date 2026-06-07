@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { fmtKickoff } from "@/lib/utils";
+import { fmtKickoff, fmtShortDate } from "@/lib/utils";
 import { TickerClient, type TickerItem } from "@/components/ticker-client";
 import type { Country, Match } from "@/lib/types";
 
@@ -33,6 +33,7 @@ export async function Ticker({ leagueId }: { leagueId: string }) {
         : fmtKickoff(m.kickoff_utc) || "v";
     return {
       matchId: m.id,
+      date: fmtShortDate(m.kickoff_utc),
       homeCode: h?.code ?? "?",
       homeFlag: h?.flag_url ?? null,
       awayCode: a?.code ?? "?",
