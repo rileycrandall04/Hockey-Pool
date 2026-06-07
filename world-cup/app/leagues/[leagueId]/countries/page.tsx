@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUser, loadLeagueAccess } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
+import { Flag } from "@/components/flag";
 import type { Country } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -71,8 +72,11 @@ export default async function CountriesPage({
                     <tr key={c.id} className="border-t border-puck-border bg-puck-bg">
                       <td className="px-3 py-2 text-ice-400">{c.group_letter ?? "—"}</td>
                       <td className="px-3 py-2 font-medium text-ice-50">
-                        {c.name}{" "}
-                        <span className="text-xs text-ice-500">{c.code}</span>
+                        <span className="inline-flex items-center gap-2">
+                          <Flag code={c.code} />
+                          {c.name}{" "}
+                          <span className="text-xs text-ice-500">{c.code}</span>
+                        </span>
                       </td>
                       <td className="px-3 py-2 text-right text-ice-300">
                         {c.fifa_rank ?? "—"}

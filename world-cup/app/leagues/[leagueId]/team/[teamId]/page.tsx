@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getUser, loadLeagueAccess } from "@/lib/league-access";
 import { scoreCountry } from "@/lib/scoring";
 import { NavBar } from "@/components/nav-bar";
+import { Flag } from "@/components/flag";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -100,7 +101,8 @@ export default async function TeamPage({
                   className="rounded-md border border-puck-border bg-puck-card p-3"
                 >
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="font-semibold text-ice-50">
+                    <span className="inline-flex items-center gap-2 font-semibold text-ice-50">
+                      <Flag code={country.code} />
                       {country.name}{" "}
                       <span className="text-xs text-ice-500">
                         {country.group_letter ? `Grp ${country.group_letter}` : ""}

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUser, loadLeagueAccess } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
+import { Flag } from "@/components/flag";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -246,8 +247,10 @@ export default async function MatchesAdminPage({
                         {m.locked && <span title="Locked from API sync"> 🔒</span>}
                       </td>
                       <td className="px-3 py-2 text-ice-100">
-                        {h?.code ?? "?"} v {a?.code ?? "?"}
-                        <span className="ml-1 text-xs text-ice-500">{m.status}</span>
+                        <span className="inline-flex items-center gap-1">
+                          <Flag code={h?.code} /> {h?.code ?? "?"} v <Flag code={a?.code} /> {a?.code ?? "?"}
+                          <span className="ml-1 text-xs text-ice-500">{m.status}</span>
+                        </span>
                       </td>
                       <td className="px-3 py-2 text-center text-ice-200">{score}</td>
                       <td className="px-3 py-2 text-right">

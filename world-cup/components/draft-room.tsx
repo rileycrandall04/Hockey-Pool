@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { teamOnTheClock } from "@/lib/draft";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
+import { Flag } from "@/components/flag";
 
 export interface DraftTeam {
   id: string;
@@ -229,7 +230,10 @@ export function DraftRoom(props: DraftRoomProps) {
                     onClick={() => post("/api/draft/pick", { leagueId, countryId: c.id })}
                     className="flex w-full flex-col rounded-md border border-puck-border bg-puck-card px-3 py-2 text-left transition-colors hover:border-ice-400 hover:bg-ice-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <span className="text-sm font-semibold text-ice-50">{c.name}</span>
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-ice-50">
+                      <Flag code={c.code} />
+                      {c.name}
+                    </span>
                     <span className="text-xs text-ice-400">
                       {c.group_letter ? `Grp ${c.group_letter}` : c.confederation ?? ""}
                       {c.fifa_rank ? ` · #${c.fifa_rank}` : ""}
@@ -267,7 +271,8 @@ export function DraftRoom(props: DraftRoomProps) {
                 <div className="flex flex-wrap gap-1">
                   {roster.map((c) =>
                     c ? (
-                      <span key={c.id} className="rounded bg-puck-bg px-1.5 py-0.5 text-xs text-ice-200">
+                      <span key={c.id} className="inline-flex items-center gap-1 rounded bg-puck-bg px-1.5 py-0.5 text-xs text-ice-200">
+                        <Flag code={c.code} />
                         {c.code}
                       </span>
                     ) : null,
