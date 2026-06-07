@@ -49,8 +49,24 @@ export const ADVANCEMENT_POINTS: Record<Stage, number> = {
   final: 5,
 };
 
-/** Additional one-time bonus for winning the final. */
-export const CHAMPION_POINTS = 8;
+/** Additional one-time bonus for winning the final (a flat bonus). */
+export const CHAMPION_POINTS = 18;
+
+/**
+ * Late-round multiplier. Match points (result, goals, clean sheet, shootout
+ * bonus) earned in a semifinal or final are worth 1.5x, so the back end of the
+ * bracket — and the title game especially — swings the standings. Advancement
+ * bonuses and the flat champion bonus are NOT multiplied.
+ */
+export const ROUND_MULTIPLIER: Record<Stage, number> = {
+  group: 1,
+  r32: 1,
+  r16: 1,
+  qf: 1,
+  sf: 1.5,
+  third: 1,
+  final: 1.5,
+};
 
 /** Chronological order used for the "furthest team" tiebreaker. */
 export const STAGE_ORDER: Stage[] = [
@@ -115,23 +131,25 @@ export function scoreCountry(
     const oppId = isHome ? m.away_country_id : m.home_country_id;
     const gf = (isHome ? m.home_goals : m.away_goals) ?? 0;
     const ga = (isHome ? m.away_goals : m.home_goals) ?? 0;
+    // SF/Final match points count 1.5x. Goal COUNT (tiebreaker) stays raw.
+    const mult = ROUND_MULTIPLIER[m.stage];
 
     goalsFor += gf;
-    goalsForPoints += gf * GOAL_FOR_POINTS;
-    goalsAgainstPoints += ga * GOAL_AGAINST_POINTS;
-    if (ga === 0) cleanSheetPoints += CLEAN_SHEET_POINTS;
+    goalsForPoints += gf * GOAL_FOR_POINTS * mult;
+    goalsAgainstPoints += ga * GOAL_AGAINST_POINTS * mult;
+    if (ga === 0) cleanSheetPoints += CLEAN_SHEET_POINTS * mult;
 
     if (m.went_to_shootout) {
       // A shootout is a draw after 120', then the bonus on top.
-      matchPoints += DRAW_POINTS;
+      matchPoints += DRAW_POINTS * mult;
       const myPens = (isHome ? m.home_pens : m.away_pens) ?? 0;
       const oppPens = (isHome ? m.away_pens : m.home_pens) ?? 0;
-      matchPoints += myPens > oppPens ? SHOOTOUT_WIN_BONUS : SHOOTOUT_LOSS_BONUS;
+      matchPoints += (myPens > oppPens ? SHOOTOUT_WIN_BONUS : SHOOTOUT_LOSS_BONUS) * mult;
       if (m.stage === "final" && myPens > oppPens) {
-        championPoints += CHAMPION_POINTS;
+        championPoints += CHAMPION_POINTS; // flat — not multiplied
       }
     } else if (gf > ga) {
-      matchPoints += WIN_POINTS;
+      matchPoints += WIN_POINTS * mult;
       // Upset bonus: group stage only, beating a better-ranked side.
       if (m.stage === "group") {
         const myRank = fifaRank(countryId);
@@ -140,11 +158,11 @@ export function scoreCountry(
           upsetPoints += UPSET_POINTS;
         }
       }
-      if (m.stage === "final") championPoints += CHAMPION_POINTS;
+      if (m.stage === "final") championPoints += CHAMPION_POINTS; // flat
     } else if (gf === ga) {
-      matchPoints += DRAW_POINTS;
+      matchPoints += DRAW_POINTS * mult;
     } else {
-      matchPoints += LOSS_POINTS;
+      matchPoints += LOSS_POINTS * mult;
     }
   }
 
