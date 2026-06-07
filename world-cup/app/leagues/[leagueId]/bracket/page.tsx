@@ -31,7 +31,7 @@ export default async function BracketPage({
   const svc = createServiceClient();
   const [{ data: matchRows }, { data: countryRows }, { data: pickRows }] = await Promise.all([
     svc.from("matches").select("*").neq("stage", "group").order("kickoff_utc", { nullsFirst: true }),
-    svc.from("countries").select("id, name, code"),
+    svc.from("countries").select("id, name, code, flag_url"),
     svc.from("draft_picks").select("country_id, team_id").eq("league_id", leagueId),
   ]);
 
@@ -118,7 +118,7 @@ function MatchCard({
 function TeamLine({ country, goals, win, owner }: { country?: Country; goals?: number | null; win?: boolean; owner?: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <Flag code={country?.code} />
+      <Flag code={country?.code} url={country?.flag_url} />
       <span className={"flex-1 truncate text-sm " + (win ? "font-bold text-ice-50" : "text-ice-200")}>
         {country?.name ?? "TBD"}
         {owner ? <span className="ml-1 text-[10px] font-normal text-ice-500">· {owner}</span> : null}

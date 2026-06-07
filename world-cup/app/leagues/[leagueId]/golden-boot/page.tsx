@@ -33,7 +33,7 @@ export default async function GoldenBootPage({
   const svc = createServiceClient();
   const [{ data: scorerRows }, { data: countryRows }, { data: pickRows }] = await Promise.all([
     svc.from("top_scorers").select("*").order("rank", { ascending: true }).limit(25),
-    svc.from("countries").select("id, name, code"),
+    svc.from("countries").select("id, name, code, flag_url"),
     svc.from("draft_picks").select("country_id, team_id").eq("league_id", leagueId),
   ]);
 
@@ -86,7 +86,7 @@ export default async function GoldenBootPage({
                       <td className="px-2 py-2 text-ice-50 sm:px-3">
                         <span className="inline-flex items-center gap-1.5">
                           {leader && "👑 "}
-                          <Flag code={country?.code} />
+                          <Flag code={country?.code} url={country?.flag_url} />
                           {s.player_name}
                           <span className="text-xs text-ice-500">{country?.code ?? ""}</span>
                         </span>

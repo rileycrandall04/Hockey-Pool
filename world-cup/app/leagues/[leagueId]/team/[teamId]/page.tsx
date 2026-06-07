@@ -106,7 +106,7 @@ export default async function TeamPage({
                       href={`/leagues/${leagueId}/country/${country.id}`}
                       className="inline-flex items-center gap-2 font-semibold text-ice-50 hover:underline"
                     >
-                      <Flag code={country.code} />
+                      <Flag code={country.code} url={country.flag_url} />
                       {country.name}{" "}
                       <span className="text-xs text-ice-500">
                         {country.group_letter ? `Grp ${country.group_letter}` : ""}

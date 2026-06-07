@@ -65,7 +65,7 @@ export default async function GroupsPage({
                           href={`/leagues/${leagueId}/country/${r.country.id}`}
                           className="inline-flex items-center gap-1.5 text-ice-100 hover:underline"
                         >
-                          <Flag code={r.country.code} />
+                          <Flag code={r.country.code} url={r.country.flag_url} />
                           <span className="truncate">{r.country.name}</span>
                         </Link>
                       </td>

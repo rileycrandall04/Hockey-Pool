@@ -1,18 +1,33 @@
 import { iso2ForCode } from "@/lib/flags";
 
 /**
- * A small country flag image (flagcdn.com). Renders nothing if we don't
- * have an ISO-2 mapping for the code, so call sites can drop it in next to
- * any country name safely. Plain <img> so it works in both server and
- * client components; alt="" because the country name is always adjacent.
+ * A small country flag. Prefers the API-provided `url` (every synced country
+ * has one) and falls back to a flagcdn image derived from the country code.
+ * Renders nothing if neither is available, so it's safe to drop in next to
+ * any country name. Plain <img> so it works in server and client components;
+ * alt="" because the country name is always adjacent.
  */
 export function Flag({
   code,
+  url,
   className = "",
 }: {
-  code: string | null | undefined;
+  code?: string | null;
+  url?: string | null;
   className?: string;
 }) {
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt=""
+        loading="lazy"
+        width={20}
+        height={15}
+        className={`inline-block h-[15px] w-auto shrink-0 object-contain ${className}`}
+      />
+    );
+  }
   const iso2 = iso2ForCode(code);
   if (!iso2) return null;
   return (

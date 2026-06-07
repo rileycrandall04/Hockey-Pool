@@ -36,11 +36,11 @@ export default async function PlayerPage({
 
   const [{ data: goalRows }, { data: countryRows }, { data: ts }] = await Promise.all([
     svc.from("match_goals").select("match_id, minute, type, is_shootout, matches(*)").eq("scorer_player_id", pid),
-    svc.from("countries").select("id, name, code"),
+    svc.from("countries").select("id, name, code, flag_url"),
     svc.from("top_scorers").select("goals, assists, minutes, rank").eq("player_id", pid).maybeSingle(),
   ]);
 
-  const countryById = new Map((countryRows ?? []).map((c) => [c.id as number, c as Pick<Country, "id" | "name" | "code">]));
+  const countryById = new Map((countryRows ?? []).map((c) => [c.id as number, c as Pick<Country, "id" | "name" | "code" | "flag_url">]));
   const myCountry = player.country_id != null ? countryById.get(player.country_id) : null;
   const goals = (goalRows ?? []) as unknown as GoalWithMatch[];
   const scoringGoals = goals.filter((g) => isScoringGoal(g));
@@ -57,7 +57,7 @@ export default async function PlayerPage({
       <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
       <main className="mx-auto max-w-xl px-4 py-6 sm:px-6">
         <div className="mb-4 flex items-center gap-3">
-          <Flag code={myCountry?.code} className="!w-8 !h-6" />
+          <Flag code={myCountry?.code} url={myCountry?.flag_url} className="!h-6" />
           <div>
             <h1 className="text-2xl font-bold text-ice-50">{player.name}</h1>
             {myCountry && (
@@ -91,9 +91,9 @@ export default async function PlayerPage({
                   className="flex items-center justify-between rounded-md border border-puck-border bg-puck-bg p-3 hover:border-ice-400"
                 >
                   <span className="flex items-center gap-1.5 text-sm text-ice-100">
-                    <Flag code={home?.code} /> {home?.code ?? "?"}
+                    <Flag code={home?.code} url={home?.flag_url} /> {home?.code ?? "?"}
                     <span className="text-ice-500">v</span>
-                    <Flag code={away?.code} /> {away?.code ?? "?"}
+                    <Flag code={away?.code} url={away?.flag_url} /> {away?.code ?? "?"}
                   </span>
                   <span className="text-xs text-ice-300">
                     {gs.length > 1 ? `${gs.length} goals · ` : ""}

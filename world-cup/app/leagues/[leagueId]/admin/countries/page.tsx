@@ -86,7 +86,7 @@ export default async function CountriesAdminPage({
             >
               <input type="hidden" name="league_id" value={leagueId} />
               <input type="hidden" name="country_id" value={c.id} />
-              <Flag code={c.code} />
+              <Flag code={c.code} url={c.flag_url} />
               <Input name="name" defaultValue={c.name} className="min-w-0 flex-1" />
               <Input name="group_letter" defaultValue={c.group_letter ?? ""} placeholder="Grp" className="w-12 text-center" maxLength={1} />
               <Input name="fifa_rank" type="number" defaultValue={c.fifa_rank ?? ""} placeholder="#" className="w-16 text-center" />

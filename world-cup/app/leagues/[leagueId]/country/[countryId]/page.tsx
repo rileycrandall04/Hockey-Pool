@@ -50,7 +50,7 @@ export default async function CountryPage({
       <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
         <div className="mb-4 flex items-center gap-3">
-          <Flag code={me.code} className="!w-8 !h-6" />
+          <Flag code={me.code} url={me.flag_url} className="!h-6" />
           <div>
             <h1 className="text-2xl font-bold text-ice-50">{me.name}</h1>
             <p className="text-xs text-ice-400">
@@ -95,7 +95,7 @@ export default async function CountryPage({
                   </div>
                   <div className="mt-1 flex items-center gap-2 text-sm text-ice-100">
                     <span className="text-ice-400">vs</span>
-                    <Flag code={opp?.code} />
+                    <Flag code={opp?.code} url={opp?.flag_url} />
                     {opp?.name ?? "TBD"}
                   </div>
                 </Link>

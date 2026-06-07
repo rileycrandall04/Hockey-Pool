@@ -35,7 +35,7 @@ export function ScorerList({
         );
         return (
           <li key={i} className="inline-flex items-center gap-1">
-            <Flag code={country?.code} />
+            <Flag code={country?.code} url={country?.flag_url} />
             {l.player_id != null ? (
               <Link
                 href={`/leagues/${leagueId}/players/${l.player_id}`}

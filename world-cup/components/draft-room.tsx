@@ -22,6 +22,7 @@ export interface DraftCountry {
   group_letter: string | null;
   confederation: string | null;
   fifa_rank: number | null;
+  flag_url: string | null;
 }
 
 export interface DraftPick {
@@ -154,13 +155,32 @@ export function DraftRoom(props: DraftRoomProps) {
         {error && <ErrorBox>{error}</ErrorBox>}
         <TeamOrderList teams={orderedTeams} showOrder={hasOrder} />
         {isCommissioner && (
-          <div className="flex flex-wrap gap-2">
-            <Button disabled={busy} variant="secondary" onClick={() => post("/api/draft/randomize", { leagueId })}>
-              Randomize order
-            </Button>
-            <Button disabled={busy} onClick={() => post("/api/draft/start", { leagueId })}>
-              Start draft
-            </Button>
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={busy} variant="secondary" onClick={() => post("/api/draft/randomize", { leagueId })}>
+                Randomize order
+              </Button>
+              <Button disabled={busy} onClick={() => post("/api/draft/start", { leagueId })}>
+                Start manual draft
+              </Button>
+            </div>
+            <div className="rounded-md border border-puck-border bg-puck-card p-3">
+              <p className="mb-2 text-xs text-ice-400">
+                Or skip the live draft entirely: randomize the order and
+                auto-pick best-available (by FIFA rank) for everyone. Do this
+                once all owners have joined.
+              </p>
+              <Button
+                disabled={busy}
+                onClick={() => {
+                  if (confirm("Auto-draft the entire league now? This randomizes the order and fills every roster.")) {
+                    post("/api/draft/auto-all", { leagueId });
+                  }
+                }}
+              >
+                ⚡ Auto-draft entire league
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -231,7 +251,7 @@ export function DraftRoom(props: DraftRoomProps) {
                     className="flex w-full flex-col rounded-md border border-puck-border bg-puck-card px-3 py-2 text-left transition-colors hover:border-ice-400 hover:bg-ice-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <span className="flex items-center gap-1.5 text-sm font-semibold text-ice-50">
-                      <Flag code={c.code} />
+                      <Flag code={c.code} url={c.flag_url} />
                       {c.name}
                     </span>
                     <span className="text-xs text-ice-400">
@@ -272,7 +292,7 @@ export function DraftRoom(props: DraftRoomProps) {
                   {roster.map((c) =>
                     c ? (
                       <span key={c.id} className="inline-flex items-center gap-1 rounded bg-puck-bg px-1.5 py-0.5 text-xs text-ice-200">
-                        <Flag code={c.code} />
+                        <Flag code={c.code} url={c.flag_url} />
                         {c.code}
                       </span>
                     ) : null,

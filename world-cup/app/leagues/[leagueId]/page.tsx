@@ -95,7 +95,7 @@ export default async function LeagueStandingsPage({
                             className="inline-flex items-center gap-1 rounded bg-puck-card px-1.5 py-0.5 text-xs text-ice-200"
                             title={country.name}
                           >
-                            <Flag code={country.code} />
+                            <Flag code={country.code} url={country.flag_url} />
                             {country.code}
                           </span>
                         ) : null,

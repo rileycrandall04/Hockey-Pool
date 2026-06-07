@@ -117,6 +117,32 @@ async function resetDraftAction(formData: FormData) {
   redirect(`/leagues/${leagueId}/draft`);
 }
 
+/** Commissioner-only: permanently delete the league (cascades teams + picks). */
+async function deleteLeagueAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  const confirm = String(formData.get("confirm") ?? "").trim().toUpperCase();
+  const user = await getUser();
+  if (!user) redirect("/login");
+
+  const svc = createServiceClient();
+  const { data: league } = await svc
+    .from("leagues")
+    .select("commissioner_id, name")
+    .eq("id", leagueId)
+    .single();
+  if (!league || league.commissioner_id !== user.id) {
+    redirect(`/leagues/${leagueId}/admin?error=Commissioner+only`);
+  }
+  if (confirm !== "DELETE") {
+    redirect(`/leagues/${leagueId}/admin?error=${encodeURIComponent('Type DELETE to confirm')}`);
+  }
+
+  // Cascades teams, draft_picks, score_adjustments, golden_boot per schema.
+  await svc.from("leagues").delete().eq("id", leagueId);
+  redirect(`/dashboard?league_deleted=${encodeURIComponent(`Deleted "${league.name}"`)}`);
+}
+
 export default async function AdminPage({
   params,
   searchParams,
@@ -160,7 +186,7 @@ export default async function AdminPage({
   const conflicts = conflictRows ?? [];
   let conflictCountries = new Map<number, Country>();
   if (conflicts.length > 0) {
-    const { data: cs } = await svc.from("countries").select("id, name, code");
+    const { data: cs } = await svc.from("countries").select("id, name, code, flag_url");
     conflictCountries = new Map((cs ?? []).map((c) => [c.id as number, c as Country]));
   }
 
@@ -245,7 +271,7 @@ export default async function AdminPage({
                 return (
                   <div key={c.match_id} className="rounded-md border border-puck-border bg-puck-bg p-3 text-sm">
                     <div className="mb-2 flex items-center gap-1.5 text-ice-100">
-                      <Flag code={h?.code} /> {h?.code ?? "?"} <span className="text-ice-500">v</span> <Flag code={a?.code} /> {a?.code ?? "?"}
+                      <Flag code={h?.code} url={h?.flag_url} /> {h?.code ?? "?"} <span className="text-ice-500">v</span> <Flag code={a?.code} url={a?.flag_url} /> {a?.code ?? "?"}
                     </div>
                     <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                       <span>Manual: <span className="font-semibold text-ice-100">{fmt(c.manual_home_goals, c.manual_away_goals, c.manual_went_to_shootout, c.manual_home_pens, c.manual_away_pens)}</span></span>
@@ -316,6 +342,26 @@ export default async function AdminPage({
               <input type="hidden" name="league_id" value={leagueId} />
               <Button type="submit" variant="danger">
                 Reset draft
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="border-red-500/40">
+          <CardHeader>
+            <CardTitle>Delete league</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-xs text-ice-400">
+              Permanently deletes this league and every team, roster, and pick
+              in it. This can&rsquo;t be undone. Type <strong>DELETE</strong> to
+              confirm.
+            </p>
+            <form action={deleteLeagueAction} className="flex items-center gap-2">
+              <input type="hidden" name="league_id" value={leagueId} />
+              <Input name="confirm" placeholder="DELETE" className="max-w-[140px]" autoComplete="off" />
+              <Button type="submit" variant="danger">
+                Delete league
               </Button>
             </form>
           </CardContent>

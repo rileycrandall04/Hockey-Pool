@@ -24,10 +24,10 @@ export default async function PlayersPage({
   const [{ data: playerRows }, { data: goalRows }, { data: countryRows }] = await Promise.all([
     svc.from("players").select("*"),
     svc.from("match_goals").select("scorer_player_id, type, is_shootout"),
-    svc.from("countries").select("id, name, code"),
+    svc.from("countries").select("id, name, code, flag_url"),
   ]);
 
-  const countryById = new Map((countryRows ?? []).map((c) => [c.id as number, c as Pick<Country, "id" | "name" | "code">]));
+  const countryById = new Map((countryRows ?? []).map((c) => [c.id as number, c as Pick<Country, "id" | "name" | "code" | "flag_url">]));
   const aggregated = aggregatePlayerGoals(
     (playerRows ?? []) as Player[],
     (goalRows ?? []) as MatchGoal[],
@@ -40,6 +40,7 @@ export default async function PlayersPage({
       goals: p.goals,
       country_code: c?.code ?? null,
       country_name: c?.name ?? null,
+      country_flag_url: c?.flag_url ?? null,
     };
   });
 
