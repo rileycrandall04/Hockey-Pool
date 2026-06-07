@@ -103,7 +103,7 @@ console.log(`\nFocused podium configs (champion / runner-up / 3rd), over ${N} to
 console.log("config         | SF/Fin x |   =1   |   =2   |   =3   |   =4  | champ-owner-wins | leader/last");
 console.log("-".repeat(98));
 const pct = (k: number, d: number[]) => (r1((d[k] / N) * 100) + "%").padStart(6);
-for (const [champ, runnerUp, third] of [[12, 10, 8], [18, 10, 8], [18, 12, 8], [25, 14, 8]] as number[][])
+for (const [champ, runnerUp, third] of [[25, 10, 8], [12, 10, 8], [18, 10, 8], [25, 14, 8]] as number[][])
   for (const sfFinalMult of [1.5, 1]) {
     const cfg = { champ, runnerUp, third, sfFinalMult };
     const dist = [0, 0, 0, 0, 0, 0]; let win = 0, last = 0, champWins = 0;

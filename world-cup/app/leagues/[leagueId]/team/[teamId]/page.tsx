@@ -123,6 +123,8 @@ export default async function TeamPage({
                     <Stat label="Upset" v={s.upset_points} />
                     <Stat label="Advance" v={s.advancement_points} />
                     <Stat label="Champion" v={s.champion_points} />
+                    <Stat label="Runner-up" v={s.runner_up_points} />
+                    <Stat label="3rd place" v={s.third_place_points} />
                   </div>
                 </div>
               ) : null,

@@ -121,7 +121,7 @@ describe("scoreCountry - advancement & champion", () => {
 
   it("adds the flat champion bonus for winning the final", () => {
     const s = scoreCountry(1, champPath, rank);
-    expect(s.champion_points).toBe(18); // flat, not multiplied
+    expect(s.champion_points).toBe(25); // flat, not multiplied
     expect(s.furthest_stage).toBe("final");
   });
 
@@ -151,15 +151,31 @@ describe("scoreCountry - late-round 1.5x multiplier", () => {
     expect(s.total).toBeCloseTo(11, 5);
   });
 
-  it("multiplies final match points but keeps the champion bonus flat at 18", () => {
+  it("multiplies final match points but keeps the champion bonus flat at 25", () => {
     const s = scoreCountry(1, [m({ stage: "final", home_country_id: 1, away_country_id: 2, home_goals: 2, away_goals: 1 })], rank);
     expect(s.match_points).toBeCloseTo(3 * 1.5, 5); // win 1.5x
     expect(s.goals_for_points).toBeCloseTo(2 * 1.5, 5);
     expect(s.goals_against_points).toBeCloseTo(-0.5 * 1.5, 5);
-    expect(s.champion_points).toBe(18); // flat, NOT multiplied
+    expect(s.champion_points).toBe(25); // flat, NOT multiplied
     expect(s.advancement_points).toBe(2); // reaching the final, flat 2
-    // 4.5 + 3 - 0.75 + 0 + 18 + 2 = 26.75
-    expect(s.total).toBeCloseTo(26.75, 5);
+    // 4.5 + 3 - 0.75 + 0 + 25 + 2 = 33.75
+    expect(s.total).toBeCloseTo(33.75, 5);
+  });
+
+  it("awards a flat runner-up bonus for losing the final", () => {
+    const s = scoreCountry(1, [m({ stage: "final", home_country_id: 1, away_country_id: 2, home_goals: 1, away_goals: 2 })], rank);
+    expect(s.runner_up_points).toBe(10);
+    expect(s.champion_points).toBe(0);
+    // match loss 0 + GF 1*1.5 + GA -0.5*2*1.5 + runner-up 10 + advancement 2
+    // = 0 + 1.5 - 1.5 + 10 + 2 = 12
+    expect(s.total).toBeCloseTo(12, 5);
+  });
+
+  it("awards a flat third-place bonus for winning the third-place game", () => {
+    const s = scoreCountry(1, [m({ stage: "third", home_country_id: 1, away_country_id: 2, home_goals: 2, away_goals: 0 })], rank);
+    expect(s.third_place_points).toBe(8);
+    // win 3 + GF 2 + clean sheet 1 (third not multiplied) + third bonus 8 = 14
+    expect(s.total).toBeCloseTo(14, 5);
   });
 
   it("does not multiply group or earlier knockout matches", () => {
