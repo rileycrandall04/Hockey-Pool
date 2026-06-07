@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getUser, loadLeagueAccess } from "@/lib/league-access";
 import { computeStandings } from "@/lib/standings";
 import { NavBar } from "@/components/nav-bar";
+import { Flag } from "@/components/flag";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { fmtPoints } from "@/lib/utils";
@@ -106,9 +107,10 @@ export default async function LeagueStandingsPage({
                             country ? (
                               <span
                                 key={country.id}
-                                className="rounded bg-puck-card px-1.5 py-0.5 text-xs text-ice-200"
+                                className="inline-flex items-center gap-1 rounded bg-puck-card px-1.5 py-0.5 text-xs text-ice-200"
                                 title={country.name}
                               >
+                                <Flag code={country.code} />
                                 {country.code}
                               </span>
                             ) : null,

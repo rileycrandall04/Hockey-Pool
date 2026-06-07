@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUser, loadLeagueAccess } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
+import { Flag } from "@/components/flag";
 import { GOLDEN_BOOT_POINTS } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
@@ -82,9 +83,12 @@ export default async function GoldenBootPage({
                     >
                       <td className="px-3 py-2 text-ice-400">{i + 1}</td>
                       <td className="px-3 py-2 text-ice-50">
-                        {leader && "👑 "}
-                        {s.player_name}
-                        <span className="ml-1 text-xs text-ice-500">{country?.code ?? ""}</span>
+                        <span className="inline-flex items-center gap-1.5">
+                          {leader && "👑 "}
+                          <Flag code={country?.code} />
+                          {s.player_name}
+                          <span className="text-xs text-ice-500">{country?.code ?? ""}</span>
+                        </span>
                       </td>
                       <td className="px-3 py-2 text-right font-semibold text-ice-100">{s.goals}</td>
                       <td className="px-3 py-2 text-right text-ice-300">{s.assists}</td>
