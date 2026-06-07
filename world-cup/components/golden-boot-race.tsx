@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { GOLDEN_BOOT_POINTS } from "@/lib/scoring";
 import { Flag } from "@/components/flag";
+import { GoldenBootIcon } from "@/components/golden-boot-icon";
 import type { Country } from "@/lib/types";
 
 interface ScorerRow {
@@ -34,8 +35,8 @@ export async function GoldenBootRace({ leagueId }: { leagueId: string }) {
   return (
     <section className="mt-6">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ice-400">
-          🥾 Golden Boot race <span className="font-normal normal-case text-ice-500">· +{GOLDEN_BOOT_POINTS} to the leader&rsquo;s owner</span>
+        <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wider text-ice-400">
+          <GoldenBootIcon /> Golden Boot race <span className="font-normal normal-case text-ice-500">· +{GOLDEN_BOOT_POINTS} to the leader&rsquo;s owner</span>
         </h2>
         <Link href={`/leagues/${leagueId}/golden-boot`} className="text-xs text-ice-400 hover:underline">Full race →</Link>
       </div>
@@ -49,7 +50,7 @@ export async function GoldenBootRace({ leagueId }: { leagueId: string }) {
                 <tr key={i} className={"border-t border-puck-border first:border-t-0 " + (i === 0 ? "bg-ice-500/10" : "bg-puck-bg")}>
                   <td className="px-3 py-1.5 text-ice-50">
                     <span className="inline-flex items-center gap-1.5">
-                      {i === 0 && "🥾 "}
+                      {i === 0 && <GoldenBootIcon />}
                       <Flag code={c?.code} url={c?.flag_url} />
                       {s.player_name}
                       <span className="text-xs text-ice-500">{c?.code ?? ""}</span>
