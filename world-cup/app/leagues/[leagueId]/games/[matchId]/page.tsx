@@ -57,7 +57,10 @@ export default async function GamePage({
       <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
         {canEditGoals && (
-          <div className="mb-2 text-right">
+          <div className="mb-2 flex justify-end gap-3">
+            <Link href={`/leagues/${leagueId}/admin/matches?edit=${m.id}`} className="text-xs text-ice-400 hover:underline">
+              ✏️ Edit score
+            </Link>
             <Link href={`/leagues/${leagueId}/admin/goals/${m.id}`} className="text-xs text-ice-400 hover:underline">
               ✍️ Edit goals
             </Link>

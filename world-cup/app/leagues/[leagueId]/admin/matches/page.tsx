@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getUser, loadLeagueAccess } from "@/lib/league-access";
+import { isAppAdmin } from "@/lib/admin";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { Button } from "@/components/ui/button";
@@ -14,12 +15,16 @@ export const dynamic = "force-dynamic";
 
 const STAGES: Stage[] = ["group", "r32", "r16", "qf", "sf", "third", "final"];
 
-async function requireCommish(leagueId: string) {
+/** Match score entry is open to the league commissioner OR any app-admin. */
+async function requireMatchEditor(leagueId: string) {
   const user = await getUser();
   if (!user) redirect("/login");
   const access = await loadLeagueAccess(leagueId, user.id, user.email ?? null);
   if (!access) redirect("/dashboard");
-  if (!access.isCommissioner) redirect(`/leagues/${leagueId}`);
+  const svc = createServiceClient();
+  if (!access.isCommissioner && !(await isAppAdmin(svc, user.id, user.email))) {
+    redirect(`/leagues/${leagueId}`);
+  }
   return access;
 }
 
@@ -32,7 +37,7 @@ function intOrNull(v: FormDataEntryValue | null): number | null {
 async function saveMatchAction(formData: FormData) {
   "use server";
   const leagueId = String(formData.get("league_id") ?? "");
-  await requireCommish(leagueId);
+  await requireMatchEditor(leagueId);
 
   const matchId = String(formData.get("match_id") ?? "").trim();
   const homeId = intOrNull(formData.get("home_country_id"));
@@ -73,7 +78,7 @@ async function saveMatchAction(formData: FormData) {
 async function deleteMatchAction(formData: FormData) {
   "use server";
   const leagueId = String(formData.get("league_id") ?? "");
-  await requireCommish(leagueId);
+  await requireMatchEditor(leagueId);
   const matchId = String(formData.get("match_id") ?? "");
   const svc = createServiceClient();
   await svc.from("matches").delete().eq("id", matchId);
@@ -90,7 +95,7 @@ export default async function MatchesAdminPage({
 }) {
   const { leagueId } = await params;
   const { edit, error, saved } = await searchParams;
-  const access = await requireCommish(leagueId);
+  const access = await requireMatchEditor(leagueId);
   const { league, displayName } = access;
 
   const svc = createServiceClient();
@@ -105,7 +110,7 @@ export default async function MatchesAdminPage({
 
   return (
     <>
-      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner />
+      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={access.isCommissioner} />
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-6 sm:px-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-ice-50">Match results</h1>
