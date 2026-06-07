@@ -35,8 +35,9 @@ export default async function RulesPage({
         <div>
           <h1 className="text-2xl font-bold text-ice-50">Scoring rules</h1>
           <p className="text-sm text-ice-300">
-            You draft 4 countries. Your score is the sum of all the points
-            your countries earn across the whole World Cup.
+            Owners snake-draft the field evenly (4 countries each in a full
+            12-owner league; more if there are fewer owners). Your score is the
+            sum of all the points your countries earn across the whole World Cup.
           </p>
         </div>
 
