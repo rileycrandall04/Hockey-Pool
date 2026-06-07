@@ -22,11 +22,17 @@ nightly from API-Football with commissioner manual override.
 
 \* FIFA ranking frozen at kickoff. Win only — a draw is not an upset.
 
-**Advancement** (one-time, the moment the bracket places you in the round)
+**Advancement** (one-time, the moment the bracket places you in the round) —
+flat, never multiplied.
 
-| Round of 32 | R16 | QF | SF | Final | Champion |
+| Round of 32 | R16 | QF | SF | Final | Champion bonus |
 | --- | --- | --- | --- | --- | --- |
-| +1 | +2 | +3 | +4 | +5 | +8 |
+| +1 | +2 | +3 | +4 | +5 | +18 |
+
+**Semifinal & final multiplier** — match points (result, goals, clean sheet,
+shootout bonus) earned in a **semifinal or final count ×1.5**, so the title
+game swings the standings. The flat champion bonus and advancement are not
+multiplied.
 
 **Knockout matches** are scored like group matches (win 3 / goals ±, clean
 sheet) except a **shootout** counts as a draw after 120′ (both +1), then the

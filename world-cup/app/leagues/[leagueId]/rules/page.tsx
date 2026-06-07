@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   WIN_POINTS, DRAW_POINTS, LOSS_POINTS, GOAL_FOR_POINTS, GOAL_AGAINST_POINTS,
   CLEAN_SHEET_POINTS, UPSET_POINTS, SHOOTOUT_WIN_BONUS, SHOOTOUT_LOSS_BONUS,
-  GOLDEN_BOOT_POINTS, ADVANCEMENT_POINTS, CHAMPION_POINTS,
+  GOLDEN_BOOT_POINTS, ADVANCEMENT_POINTS, CHAMPION_POINTS, ROUND_MULTIPLIER,
 } from "@/lib/scoring";
 import { fmtPoints } from "@/lib/utils";
 
@@ -88,8 +88,25 @@ export default async function RulesPage({
               ["Reach the Quarterfinal", sign(ADVANCEMENT_POINTS.qf)],
               ["Reach the Semifinal", sign(ADVANCEMENT_POINTS.sf)],
               ["Reach the Final", sign(ADVANCEMENT_POINTS.final)],
-              ["Win the World Cup", sign(CHAMPION_POINTS)],
+              ["Win the World Cup (champion bonus)", sign(CHAMPION_POINTS)],
             ]} />
+            <p className="mt-2 text-xs text-ice-400">Advancement and the champion bonus are flat — they are not multiplied.</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>🔥 Semifinal &amp; final multiplier</CardTitle></CardHeader>
+          <CardContent className="text-sm text-ice-200">
+            <p className="mb-2">
+              Every <span className="font-semibold">match</span> point your country earns in a
+              <span className="font-semibold"> semifinal or final</span> — the result, goals,
+              clean sheet, and shootout bonus — counts <span className="font-semibold text-ice-50">×{ROUND_MULTIPLIER.final}</span>.
+              The back of the bracket carries the most weight, so the pool comes down to the title game.
+            </p>
+            <p className="text-xs text-ice-400">
+              Example: a 2–0 semifinal win is (3 + 2 + 1) × {ROUND_MULTIPLIER.sf} = {fmtPoints((WIN_POINTS + 2 * GOAL_FOR_POINTS + CLEAN_SHEET_POINTS) * ROUND_MULTIPLIER.sf)} points.
+              The champion bonus ({sign(CHAMPION_POINTS)}) and all advancement bonuses are flat — not multiplied.
+            </p>
           </CardContent>
         </Card>
 

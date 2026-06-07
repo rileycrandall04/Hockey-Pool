@@ -119,9 +119,9 @@ describe("scoreCountry - advancement & champion", () => {
     expect(s.advancement_points).toBe(15);
   });
 
-  it("adds the champion bonus for winning the final", () => {
+  it("adds the flat champion bonus for winning the final", () => {
     const s = scoreCountry(1, champPath, rank);
-    expect(s.champion_points).toBe(8);
+    expect(s.champion_points).toBe(18); // flat, not multiplied
     expect(s.furthest_stage).toBe("final");
   });
 
@@ -136,6 +136,36 @@ describe("scoreCountry - advancement & champion", () => {
     const s = scoreCountry(1, [m({ stage: "third", home_country_id: 1, away_country_id: 2, home_goals: 2, away_goals: 0 })], rank);
     expect(s.advancement_points).toBe(0); // third grants no bonus
     expect(s.furthest_stage).toBe("third");
+  });
+});
+
+describe("scoreCountry - late-round 1.5x multiplier", () => {
+  it("scores semifinal match points (result/goals/clean sheet) at 1.5x", () => {
+    const s = scoreCountry(1, [m({ stage: "sf", home_country_id: 1, away_country_id: 2, home_goals: 2, away_goals: 0 })], rank);
+    expect(s.match_points).toBeCloseTo(3 * 1.5, 5); // win
+    expect(s.goals_for_points).toBeCloseTo(2 * 1.5, 5);
+    expect(s.clean_sheet_points).toBeCloseTo(1 * 1.5, 5);
+    expect(s.goals_for).toBe(2); // raw goal count is NOT multiplied (tiebreaker)
+    expect(s.advancement_points).toBe(4); // reaching SF, flat
+    // 4.5 + 3 + 1.5 + 4 = 13
+    expect(s.total).toBeCloseTo(13, 5);
+  });
+
+  it("multiplies final match points but keeps the champion bonus flat at 18", () => {
+    const s = scoreCountry(1, [m({ stage: "final", home_country_id: 1, away_country_id: 2, home_goals: 2, away_goals: 1 })], rank);
+    expect(s.match_points).toBeCloseTo(3 * 1.5, 5); // win 1.5x
+    expect(s.goals_for_points).toBeCloseTo(2 * 1.5, 5);
+    expect(s.goals_against_points).toBeCloseTo(-0.5 * 1.5, 5);
+    expect(s.champion_points).toBe(18); // flat, NOT multiplied
+    expect(s.advancement_points).toBe(5); // reaching the final, flat
+    // 4.5 + 3 - 0.75 + 0 + 18 + 5 = 29.75
+    expect(s.total).toBeCloseTo(29.75, 5);
+  });
+
+  it("does not multiply group or earlier knockout matches", () => {
+    const s = scoreCountry(1, [m({ stage: "qf", home_country_id: 1, away_country_id: 2, home_goals: 2, away_goals: 0 })], rank);
+    expect(s.match_points).toBe(3); // QF win at 1x
+    expect(s.goals_for_points).toBe(2);
   });
 });
 
