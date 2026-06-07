@@ -30,7 +30,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "It is not your turn" }, { status: 403 });
   }
 
-  const countryId = await bestAvailableCountryId(svc, leagueId);
+  const poolSize = state.teams.length * state.league.roster_size;
+  const countryId = await bestAvailableCountryId(svc, leagueId, poolSize);
   if (countryId == null) {
     return NextResponse.json({ error: "No countries available" }, { status: 409 });
   }

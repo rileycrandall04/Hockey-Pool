@@ -32,3 +32,23 @@ export function randomizeDraftOrder<T>(items: T[]): T[] {
   }
   return arr;
 }
+
+/**
+ * How many teams each owner drafts, given the number of owners. It's the
+ * largest EVEN number of teams per owner that fits in the field — even keeps
+ * the snake draft fair (each owner gets the same early/late pick balance), and
+ * every owner gets the same count. With fewer owners, everyone drafts more.
+ * The leftover (lowest-ranked) teams go undrafted.
+ *
+ *   12 owners -> 4 each (48 used)      9 owners -> 4 each (36 used, 12 unused)
+ *    8 owners -> 6 each (48 used)      6 owners -> 8 each (48 used)
+ *
+ * Returns 0 if there are so many owners that not even 2 teams each fit.
+ */
+export function evenRosterSize(numTeams: number, totalCountries = 48): number {
+  if (numTeams <= 0) return 0;
+  let k = Math.floor(totalCountries / numTeams);
+  if (k % 2 === 1) k -= 1; // make it even
+  return k;
+}
+

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { randomizeDraftOrder, teamOnTheClock } from "@/lib/draft";
+import { randomizeDraftOrder, teamOnTheClock, evenRosterSize } from "@/lib/draft";
 import type { Team } from "@/lib/types";
 
 /**
@@ -51,6 +51,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No teams in league" }, { status: 409 });
   }
 
+  // Even, equal teams-per-owner for this many owners; the leftover lowest-
+  // ranked teams go undrafted.
+  const rosterSize = evenRosterSize(teamList.length);
+  if (rosterSize < 2) {
+    return NextResponse.json({ error: "Too many owners for an even draft" }, { status: 409 });
+  }
+  if ((countryCount ?? 0) < teamList.length * rosterSize) {
+    return NextResponse.json({ error: "Not enough countries seeded for this many owners" }, { status: 409 });
+  }
+
   // Assign a random order if positions aren't set.
   const needsOrder = teamList.some((t) => t.draft_position == null);
   if (needsOrder) {
@@ -71,6 +81,7 @@ export async function POST(request: Request) {
       draft_round: 1,
       draft_current_team: first.id,
       draft_started_at: new Date().toISOString(),
+      roster_size: rosterSize,
     })
     .eq("id", leagueId);
 

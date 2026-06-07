@@ -22,8 +22,15 @@ export default async function DraftPage({
   const { league, teams, ownerNames, isCommissioner, displayName, myTeam } = access;
   const svc = createServiceClient();
 
+  // Only the draft pool (top teams by FIFA rank) is draftable; the lowest-
+  // ranked leftovers go undrafted. Pool size = owners x roster size.
+  const poolSize = teams.length * league.roster_size;
   const [{ data: countryRows }, { data: pickRows }] = await Promise.all([
-    svc.from("countries").select("id, name, code, group_letter, confederation, fifa_rank, flag_url"),
+    svc
+      .from("countries")
+      .select("id, name, code, group_letter, confederation, fifa_rank, flag_url")
+      .order("fifa_rank", { ascending: true, nullsFirst: false })
+      .limit(poolSize),
     svc.from("draft_picks").select("country_id, team_id, round, pick_number").eq("league_id", leagueId),
   ]);
 

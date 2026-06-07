@@ -1,6 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { League, Team } from "./types";
-import { teamOnTheClock, pickMeta, randomizeDraftOrder } from "./draft";
+import { teamOnTheClock, pickMeta, randomizeDraftOrder, evenRosterSize } from "./draft";
+
+/**
+ * The draftable pool: the top `poolSize` countries by FIFA rank. The remaining
+ * (lowest-ranked) teams go undrafted and are ignored by the app. Returns a set
+ * of country ids.
+ */
+export async function draftPoolIds(
+  svc: SupabaseClient,
+  poolSize: number,
+): Promise<Set<number>> {
+  const { data } = await svc
+    .from("countries")
+    .select("id")
+    .order("fifa_rank", { ascending: true, nullsFirst: false })
+    .limit(poolSize);
+  return new Set((data ?? []).map((c) => c.id as number));
+}
 
 export interface DraftState {
   league: League;
@@ -90,6 +107,13 @@ export async function executePick(
     .maybeSingle();
   if (!country) return { ok: false, error: "Unknown country" };
 
+  // ...and be inside this league's draft pool (the top teams by FIFA rank).
+  const poolSize = state.teams.length * state.league.roster_size;
+  const pool = await draftPoolIds(svc, poolSize);
+  if (!pool.has(countryId)) {
+    return { ok: false, error: "That team isn't in this league's draft pool" };
+  }
+
   const { data: taken } = await svc
     .from("draft_picks")
     .select("id")
@@ -161,25 +185,29 @@ export async function autoDraftEntire(
   const teamList = (teams ?? []) as Team[];
   if (teamList.length === 0) return { ok: false, error: "No teams in league" };
 
+  // Even, equal roster size for this many owners; persist it.
+  const rosterSize = evenRosterSize(teamList.length);
+  if (rosterSize < 2) return { ok: false, error: "Too many owners for an even draft" };
+  await svc.from("leagues").update({ roster_size: rosterSize }).eq("id", leagueId);
+
   // Randomize and persist the snake order.
   const ordered = randomizeDraftOrder(teamList).map((t, i) => ({ ...t, draft_position: i + 1 }));
   for (const t of ordered) {
     await svc.from("teams").update({ draft_position: t.draft_position }).eq("id", t.id);
   }
 
-  // Best-available pool, ordered by FIFA rank (1 = best).
+  // Draft pool: the top (owners * rosterSize) countries by FIFA rank.
+  const totalPicks = teamList.length * rosterSize;
   const { data: countries } = await svc
     .from("countries")
     .select("id, fifa_rank")
-    .order("fifa_rank", { ascending: true, nullsFirst: false });
+    .order("fifa_rank", { ascending: true, nullsFirst: false })
+    .limit(totalPicks);
   const available = (countries ?? []).map((c) => c.id as number);
-  if (available.length === 0) return { ok: false, error: "No countries seeded" };
+  if (available.length < totalPicks) return { ok: false, error: "Not enough countries seeded" };
 
   // Fresh draft — clear any prior picks.
   await svc.from("draft_picks").delete().eq("league_id", leagueId);
-
-  const rosterSize = (league as League).roster_size;
-  const totalPicks = Math.min(teamList.length * rosterSize, available.length);
   const rows: Array<Record<string, unknown>> = [];
   for (let pickIndex = 0; pickIndex < totalPicks; pickIndex++) {
     const team = teamOnTheClock(ordered, pickIndex);
@@ -204,10 +232,14 @@ export async function autoDraftEntire(
   return { ok: true, picks: rows.length };
 }
 
-/** Pick the best available country (lowest FIFA rank) for the team on the clock. */
+/**
+ * Pick the best available country (lowest FIFA rank) for the team on the clock,
+ * restricted to the league's draft pool (the top `poolSize` teams by rank).
+ */
 export async function bestAvailableCountryId(
   svc: SupabaseClient,
   leagueId: string,
+  poolSize: number,
 ): Promise<number | null> {
   const { data: picks } = await svc
     .from("draft_picks")
@@ -218,7 +250,8 @@ export async function bestAvailableCountryId(
   const { data: countries } = await svc
     .from("countries")
     .select("id, fifa_rank")
-    .order("fifa_rank", { ascending: true, nullsFirst: false });
+    .order("fifa_rank", { ascending: true, nullsFirst: false })
+    .limit(poolSize);
 
   for (const c of countries ?? []) {
     if (!taken.has(c.id as number)) return c.id as number;
