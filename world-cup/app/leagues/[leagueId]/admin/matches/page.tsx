@@ -223,13 +223,14 @@ export default async function MatchesAdminPage({
         </Card>
 
         <div className="overflow-hidden rounded-xl border border-puck-border">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-puck-card text-left text-xs uppercase tracking-wider text-ice-400">
               <tr>
-                <th className="px-3 py-2">Stage</th>
-                <th className="px-3 py-2">Match</th>
-                <th className="px-3 py-2 text-center">Score</th>
-                <th className="px-3 py-2"></th>
+                <th className="px-2 py-2 sm:px-3">Stage</th>
+                <th className="px-2 py-2 sm:px-3">Match</th>
+                <th className="px-2 py-2 text-center sm:px-3">Score</th>
+                <th className="px-2 py-2 sm:px-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -279,6 +280,7 @@ export default async function MatchesAdminPage({
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </main>
     </>

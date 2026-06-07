@@ -70,19 +70,37 @@ export default async function LeagueStandingsPage({
           </Card>
         ) : (
           <div className="overflow-hidden rounded-xl border border-puck-border">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-puck-card text-left text-xs uppercase tracking-wider text-ice-400">
                 <tr>
-                  <th className="px-3 py-2">#</th>
-                  <th className="px-3 py-2">Team</th>
-                  <th className="px-3 py-2">Countries</th>
-                  <th className="px-3 py-2 text-right">GF</th>
-                  <th className="px-3 py-2 text-right">Pts</th>
+                  <th className="px-2 py-2 sm:px-3">#</th>
+                  <th className="px-2 py-2 sm:px-3">Team</th>
+                  <th className="hidden px-3 py-2 sm:table-cell">Countries</th>
+                  <th className="hidden px-3 py-2 text-right sm:table-cell">GF</th>
+                  <th className="px-2 py-2 text-right sm:px-3">Pts</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row, i) => {
                   const isMe = myTeam?.id === row.team.id;
+                  const chips = () =>
+                    row.countries.length === 0 ? (
+                      <span className="text-xs text-ice-500">—</span>
+                    ) : (
+                      row.countries.map(({ country }) =>
+                        country ? (
+                          <span
+                            key={country.id}
+                            className="inline-flex items-center gap-1 rounded bg-puck-card px-1.5 py-0.5 text-xs text-ice-200"
+                            title={country.name}
+                          >
+                            <Flag code={country.code} />
+                            {country.code}
+                          </span>
+                        ) : null,
+                      )
+                    );
                   return (
                     <tr
                       key={row.team.id}
@@ -91,8 +109,8 @@ export default async function LeagueStandingsPage({
                         (isMe ? "bg-ice-500/10" : "bg-puck-bg")
                       }
                     >
-                      <td className="px-3 py-2 text-ice-400">{i + 1}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-2 py-2 text-ice-400 sm:px-3">{i + 1}</td>
+                      <td className="px-2 py-2 sm:px-3">
                         <Link
                           href={`/leagues/${leagueId}/team/${row.team.id}`}
                           className="font-semibold text-ice-50 hover:underline"
@@ -100,30 +118,15 @@ export default async function LeagueStandingsPage({
                           {row.team.name}
                         </Link>
                         <div className="text-xs text-ice-400">{row.ownerName}</div>
+                        <div className="mt-1 flex flex-wrap gap-1 sm:hidden">{chips()}</div>
                       </td>
-                      <td className="px-3 py-2">
-                        <div className="flex flex-wrap gap-1">
-                          {row.countries.map(({ country }) =>
-                            country ? (
-                              <span
-                                key={country.id}
-                                className="inline-flex items-center gap-1 rounded bg-puck-card px-1.5 py-0.5 text-xs text-ice-200"
-                                title={country.name}
-                              >
-                                <Flag code={country.code} />
-                                {country.code}
-                              </span>
-                            ) : null,
-                          )}
-                          {row.countries.length === 0 && (
-                            <span className="text-xs text-ice-500">—</span>
-                          )}
-                        </div>
+                      <td className="hidden px-3 py-2 sm:table-cell">
+                        <div className="flex flex-wrap gap-1">{chips()}</div>
                       </td>
-                      <td className="px-3 py-2 text-right text-ice-300">
+                      <td className="hidden px-3 py-2 text-right text-ice-300 sm:table-cell">
                         {row.scored.tiebreak.goals_for}
                       </td>
-                      <td className="px-3 py-2 text-right font-semibold text-ice-50">
+                      <td className="px-2 py-2 text-right font-semibold text-ice-50 sm:px-3">
                         {fmtPoints(row.scored.total)}
                       </td>
                     </tr>
@@ -131,6 +134,7 @@ export default async function LeagueStandingsPage({
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </main>
