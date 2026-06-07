@@ -29,7 +29,7 @@ export const SHOOTOUT_WIN_POINTS = 5;
 export const SHOOTOUT_LOSS_POINTS = 3;
 
 /** Golden Boot: awarded to the owner of the tournament's top scorer. */
-export const GOLDEN_BOOT_POINTS = 5;
+export const GOLDEN_BOOT_POINTS = 10;
 
 /**
  * One-time advancement bonus, granted the moment a country appears in a

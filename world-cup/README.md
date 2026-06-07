@@ -38,7 +38,7 @@ sheet) except a **shootout** pays a flat **5 to the winner / 3 to the loser**
 (PKs never count as goals). The third-place playoff is scored as a match but
 grants no advancement bonus.
 
-**Golden Boot** — +5 to the owner of the tournament's top scorer (live
+**Golden Boot** — +10 to the owner of the tournament's top scorer (live
 leaderboard from goal events; tiebreak goals → assists → fewer minutes).
 
 **Tiebreakers** (in order): total points → total goals scored by owned

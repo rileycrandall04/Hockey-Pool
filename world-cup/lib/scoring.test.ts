@@ -197,9 +197,9 @@ describe("scoreOwner & rankOwners", () => {
       matches,
       rank,
     );
-    // country 1: 6, country 4: 10 (upset), + golden boot 5 = 21
+    // country 1: 6, country 4: 10 (upset), + golden boot bonus
     expect(owner.total).toBe(6 + 10 + GOLDEN_BOOT_POINTS);
-    expect(owner.golden_boot_points).toBe(5);
+    expect(owner.golden_boot_points).toBe(GOLDEN_BOOT_POINTS);
   });
 
   it("applies commissioner adjustments", () => {
