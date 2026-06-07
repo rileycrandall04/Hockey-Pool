@@ -187,7 +187,7 @@ export async function autoDraftEntire(
 
   // Even, equal roster size for this many owners; persist it.
   const rosterSize = evenRosterSize(teamList.length);
-  if (rosterSize < 2) return { ok: false, error: "Too many owners for an even draft" };
+  if (rosterSize < 2) return { ok: false, error: "This draft supports up to 24 owners \u2014 the 48-team field can't be split evenly among more" };
   await svc.from("leagues").update({ roster_size: rosterSize }).eq("id", leagueId);
 
   // Randomize and persist the snake order.

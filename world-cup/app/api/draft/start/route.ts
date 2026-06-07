@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   // ranked teams go undrafted.
   const rosterSize = evenRosterSize(teamList.length);
   if (rosterSize < 2) {
-    return NextResponse.json({ error: "Too many owners for an even draft" }, { status: 409 });
+    return NextResponse.json({ error: "This draft supports up to 24 owners \u2014 the 48-team field can't be split evenly among more" }, { status: 409 });
   }
   if ((countryCount ?? 0) < teamList.length * rosterSize) {
     return NextResponse.json({ error: "Not enough countries seeded for this many owners" }, { status: 409 });
