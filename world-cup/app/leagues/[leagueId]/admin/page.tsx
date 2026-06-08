@@ -117,6 +117,68 @@ async function resetDraftAction(formData: FormData) {
   redirect(`/leagues/${leagueId}/draft`);
 }
 
+/**
+ * Commissioner-only: create an account on someone's behalf (email + password)
+ * and add them to the league. If the email already has an account, just adds
+ * that person. Only allowed before the draft starts.
+ */
+async function addMemberAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const teamName = String(formData.get("team_name") ?? "").trim();
+  const back = (msg: string): never => redirect(`/leagues/${leagueId}/admin?error=${encodeURIComponent(msg)}#add-member`);
+
+  const user = await getUser();
+  if (!user) redirect("/login");
+  const svc = createServiceClient();
+  const { data: league } = await svc
+    .from("leagues")
+    .select("commissioner_id, draft_status")
+    .eq("id", leagueId)
+    .single();
+  if (!league || league.commissioner_id !== user.id) back("Commissioner only");
+  if (league!.draft_status !== "pending") back("Members can only be added before the draft starts");
+  if (!email || !password || !teamName) back("Email, password and team name are all required");
+  if (password.length < 6) back("Password must be at least 6 characters");
+
+  // Reuse an existing account for this email, otherwise create one.
+  let userId: string | null = null;
+  const { data: existing } = await svc.from("profiles").select("id").ilike("email", email).maybeSingle();
+  if (existing) {
+    userId = existing.id as string;
+  } else {
+    const { data: created, error } = await svc.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { display_name: email.split("@")[0] },
+    });
+    const newUser = created?.user;
+    if (error || !newUser) back(error?.message ?? "Could not create the account");
+    userId = newUser!.id;
+    await svc.from("profiles").upsert(
+      { id: userId, display_name: email.split("@")[0], email },
+      { onConflict: "id" },
+    );
+  }
+
+  const { data: alreadyIn } = await svc
+    .from("teams")
+    .select("id")
+    .eq("league_id", leagueId)
+    .eq("owner_id", userId!)
+    .maybeSingle();
+  if (alreadyIn) back("That person is already in this league");
+
+  const { error: teamErr } = await svc.from("teams").insert({ league_id: leagueId, owner_id: userId, name: teamName });
+  if (teamErr) back(teamErr.message);
+
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  redirect(`/leagues/${leagueId}/admin?added=${encodeURIComponent(teamName)}#add-member`);
+}
+
 /** Commissioner-only: permanently delete the league (cascades teams + picks). */
 async function deleteLeagueAction(formData: FormData) {
   "use server";
@@ -148,10 +210,10 @@ export default async function AdminPage({
   searchParams,
 }: {
   params: Promise<{ leagueId: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; added?: string }>;
 }) {
   const { leagueId } = await params;
-  const { error } = await searchParams;
+  const { error, added } = await searchParams;
   const user = await getUser();
   if (!user) redirect("/login");
 
@@ -206,6 +268,11 @@ export default async function AdminPage({
             {error}
           </div>
         )}
+        {added && (
+          <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+            ✅ Added {added} to the league.
+          </div>
+        )}
 
         <Card>
           <CardHeader>
@@ -220,6 +287,31 @@ export default async function AdminPage({
             <p>Teams: {teams.length} · Roster size: {league.roster_size}</p>
           </CardContent>
         </Card>
+
+        {league.draft_status === "pending" && (
+          <Card id="add-member" className="scroll-mt-20">
+            <CardHeader>
+              <CardTitle>Add a member</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-3 text-xs text-ice-400">
+                Create an account for someone and add them to the league — set
+                their email and a password to share with them. If the email
+                already has an account, they&rsquo;re just added. Only works
+                before the draft starts.
+              </p>
+              <form action={addMemberAction} className="space-y-3">
+                <input type="hidden" name="league_id" value={leagueId} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input name="email" type="email" placeholder="player@example.com" required autoComplete="off" />
+                  <Input name="team_name" placeholder="Their team name" required />
+                </div>
+                <Input name="password" type="text" placeholder="Password (share with them)" required minLength={6} autoComplete="off" />
+                <Button type="submit">Add member</Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
