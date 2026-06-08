@@ -569,3 +569,20 @@ alter table public.match_conflicts enable row level security;
 drop policy if exists "match conflicts are readable" on public.match_conflicts;
 create policy "match conflicts are readable" on public.match_conflicts
   for select to authenticated using (true);
+
+
+-- ####################################################################
+-- # 0007_pool_odds.sql
+-- ####################################################################
+
+-- Preseason win odds.
+--
+-- Stores each team's simulated probability of winning the pool (a JSON map of
+-- team_id -> win %), computed on demand by the commissioner from the drafted
+-- rosters + FIFA ranks. Refreshable.
+--
+-- Re-runnable.
+
+alter table public.leagues
+  add column if not exists odds jsonb,
+  add column if not exists odds_computed_at timestamptz;

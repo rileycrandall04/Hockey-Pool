@@ -42,6 +42,9 @@ export interface League {
   draft_round: number;
   draft_started_at: string | null;
   created_at: string;
+  /** Preseason win odds: team_id -> win %, computed by the commissioner. */
+  odds?: Record<string, number> | null;
+  odds_computed_at?: string | null;
 }
 
 export interface Team {
