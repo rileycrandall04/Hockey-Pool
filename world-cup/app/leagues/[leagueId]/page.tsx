@@ -8,6 +8,7 @@ import { Flag } from "@/components/flag";
 import { RecentResults } from "@/components/recent-results";
 import { GoldenBootRace } from "@/components/golden-boot-race";
 import { GoldenBootIcon } from "@/components/golden-boot-icon";
+import { OddsButton } from "@/components/odds-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { fmtPoints } from "@/lib/utils";
@@ -31,6 +32,7 @@ export default async function LeagueStandingsPage({
   const rows = await computeStandings(svc, leagueId, teams, ownerNames);
 
   const drafted = league.draft_status === "complete";
+  const odds = (league.odds ?? null) as Record<string, number> | null;
 
   return (
     <>
@@ -61,6 +63,18 @@ export default async function LeagueStandingsPage({
           <div className="mb-4 rounded-md border border-puck-border bg-puck-card px-4 py-3 text-sm text-ice-300">
             The draft isn&rsquo;t finished yet, so totals are all zero. Standings
             come alive once matches are scored.
+          </div>
+        )}
+
+        {drafted && (isCommissioner || odds) && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-puck-border bg-puck-card px-3 py-2">
+            <div className="text-xs text-ice-400">
+              🎲 Preseason win odds {odds ? "(simulated from rosters + FIFA ranks)" : "— not computed yet"}
+              {league.odds_computed_at && (
+                <span className="text-ice-500"> · updated {new Date(league.odds_computed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+              )}
+            </div>
+            {isCommissioner && <OddsButton leagueId={leagueId} recompute={Boolean(odds)} />}
           </div>
         )}
 
@@ -123,7 +137,12 @@ export default async function LeagueStandingsPage({
                         {row.scored.golden_boot_points > 0 && (
                           <span title="Holds the Golden Boot bonus"> <GoldenBootIcon /></span>
                         )}
-                        <div className="text-xs text-ice-400">{row.ownerName}</div>
+                        <div className="text-xs text-ice-400">
+                          {row.ownerName}
+                          {odds && odds[row.team.id] != null && (
+                            <span className="text-ice-500"> · {odds[row.team.id]}% to win</span>
+                          )}
+                        </div>
                         <div className="mt-1 flex flex-wrap gap-1 sm:hidden">{chips()}</div>
                       </td>
                       <td className="hidden px-3 py-2 sm:table-cell">
