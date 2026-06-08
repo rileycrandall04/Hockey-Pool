@@ -8,7 +8,7 @@ import Link from "next/link";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
 import { SyncButton } from "@/components/sync-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Country } from "@/lib/types";
@@ -179,6 +179,37 @@ async function addMemberAction(formData: FormData) {
   redirect(`/leagues/${leagueId}/admin?added=${encodeURIComponent(teamName)}#add-member`);
 }
 
+/**
+ * Commissioner-only: trade two drafted countries between their owners
+ * (one-for-one, so every roster keeps the same size).
+ */
+async function swapTeamsAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  const ca = Number(formData.get("country_a"));
+  const cb = Number(formData.get("country_b"));
+  const back = (msg: string): never => redirect(`/leagues/${leagueId}/admin?error=${encodeURIComponent(msg)}#trade`);
+
+  const user = await getUser();
+  if (!user) redirect("/login");
+  const svc = createServiceClient();
+  const { data: league } = await svc.from("leagues").select("commissioner_id").eq("id", leagueId).single();
+  if (!league || league.commissioner_id !== user.id) back("Commissioner only");
+  if (!ca || !cb || ca === cb) back("Pick two different countries");
+
+  const { data: pickA } = await svc.from("draft_picks").select("id, team_id").eq("league_id", leagueId).eq("country_id", ca).maybeSingle();
+  const { data: pickB } = await svc.from("draft_picks").select("id, team_id").eq("league_id", leagueId).eq("country_id", cb).maybeSingle();
+  if (!pickA || !pickB) back("Both countries must be drafted");
+  if (pickA!.team_id === pickB!.team_id) back("Those countries already have the same owner");
+
+  // Swap owners.
+  await svc.from("draft_picks").update({ team_id: pickB!.team_id }).eq("id", pickA!.id);
+  await svc.from("draft_picks").update({ team_id: pickA!.team_id }).eq("id", pickB!.id);
+
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  redirect(`/leagues/${leagueId}/admin?swapped=1#trade`);
+}
+
 /** Commissioner-only: permanently delete the league (cascades teams + picks). */
 async function deleteLeagueAction(formData: FormData) {
   "use server";
@@ -210,10 +241,10 @@ export default async function AdminPage({
   searchParams,
 }: {
   params: Promise<{ leagueId: string }>;
-  searchParams: Promise<{ error?: string; added?: string }>;
+  searchParams: Promise<{ error?: string; added?: string; swapped?: string }>;
 }) {
   const { leagueId } = await params;
-  const { error, added } = await searchParams;
+  const { error, added, swapped } = await searchParams;
   const user = await getUser();
   if (!user) redirect("/login");
 
@@ -252,6 +283,24 @@ export default async function AdminPage({
     conflictCountries = new Map((cs ?? []).map((c) => [c.id as number, c as Country]));
   }
 
+  // Drafted countries (for the trade tool), labelled with their current owner.
+  const { data: tradePicks } = await svc
+    .from("draft_picks")
+    .select("country_id, team_id")
+    .eq("league_id", leagueId);
+  let tradeOptions: Array<{ countryId: number; label: string }> = [];
+  if ((tradePicks ?? []).length > 0) {
+    const { data: allC } = await svc.from("countries").select("id, name");
+    const cName = new Map((allC ?? []).map((c) => [c.id as number, c.name as string]));
+    const tName = new Map(teams.map((t) => [t.id, t.name]));
+    tradeOptions = (tradePicks ?? [])
+      .map((p) => ({
+        countryId: p.country_id as number,
+        label: `${cName.get(p.country_id as number) ?? "?"} — ${tName.get(p.team_id as string) ?? "?"}`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
+
   return (
     <>
       <NavBar
@@ -271,6 +320,11 @@ export default async function AdminPage({
         {added && (
           <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-200">
             ✅ Added {added} to the league.
+          </div>
+        )}
+        {swapped && (
+          <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+            ✅ Trade completed.
           </div>
         )}
 
@@ -417,6 +471,44 @@ export default async function AdminPage({
                   ))}
                 </ul>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {tradeOptions.length >= 2 && (
+          <Card id="trade" className="scroll-mt-20">
+            <CardHeader>
+              <CardTitle>Trade teams</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-3 text-xs text-ice-400">
+                Swap two drafted countries between their owners (one-for-one, so
+                rosters stay the same size). Each option shows its current owner.
+              </p>
+              <form action={swapTeamsAction} className="space-y-3">
+                <input type="hidden" name="league_id" value={leagueId} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs text-ice-400">Country A</label>
+                    <Select name="country_a" defaultValue="">
+                      <option value="" disabled>Pick a country…</option>
+                      {tradeOptions.map((o) => (
+                        <option key={o.countryId} value={o.countryId}>{o.label}</option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-ice-400">Country B</label>
+                    <Select name="country_b" defaultValue="">
+                      <option value="" disabled>Pick a country…</option>
+                      {tradeOptions.map((o) => (
+                        <option key={o.countryId} value={o.countryId}>{o.label}</option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+                <Button type="submit">Swap owners</Button>
+              </form>
             </CardContent>
           </Card>
         )}
