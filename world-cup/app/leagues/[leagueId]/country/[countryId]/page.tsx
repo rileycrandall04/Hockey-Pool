@@ -7,7 +7,7 @@ import { loadScorersByMatch } from "@/lib/match-scorers";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { ScorerList } from "@/components/scorer-list";
-import { fmtPoints } from "@/lib/utils";
+import { fmtPoints, fmtShortDate } from "@/lib/utils";
 import type { Country, Match, ScoringMatch } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -88,7 +88,8 @@ export default async function CountryPage({
                 <Link href={`/leagues/${leagueId}/games/${m.id}`} className="group block">
                   <div className="flex items-center justify-between">
                     <span className="text-xs uppercase tracking-wider text-ice-500 group-hover:text-ice-300">
-                      {STAGE_LABEL[m.stage] ?? m.stage} →
+                      {STAGE_LABEL[m.stage] ?? m.stage}
+                      {m.kickoff_utc ? ` · ${fmtShortDate(m.kickoff_utc)}` : ""} →
                     </span>
                     <span className={"text-sm font-semibold " + resultColor}>
                       {played ? `${myGoals} – ${oppGoals}` : m.status === "live" ? "LIVE" : "—"}
