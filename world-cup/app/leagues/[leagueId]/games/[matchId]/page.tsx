@@ -8,7 +8,7 @@ import { loadScorersByMatch } from "@/lib/match-scorers";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { ScorerList } from "@/components/scorer-list";
-import { fmtPoints, fmtKickoff } from "@/lib/utils";
+import { fmtPoints, fmtKickoff, fmtShortDate } from "@/lib/utils";
 import type { Country, Match, ScoredCountry, ScoringMatch } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +67,7 @@ export default async function GamePage({
           </div>
         )}
         <div className="mb-2 text-center text-xs uppercase tracking-wider text-ice-500">
-          {STAGE_LABEL[m.stage] ?? m.stage}
+          {STAGE_LABEL[m.stage] ?? m.stage}{m.kickoff_utc ? ` · ${fmtShortDate(m.kickoff_utc)}` : ""}
         </div>
         <div className="mb-4 flex items-center justify-center gap-4">
           <TeamHead leagueId={leagueId} country={home} />
