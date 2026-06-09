@@ -69,6 +69,7 @@ export default async function TeamPage({
     s: scoreCountry(id, matches, fifaRank),
   }));
   const total = scored.reduce((sum, x) => sum + x.s.total, 0);
+  const liveTotal = scored.reduce((sum, x) => sum + x.s.provisional_points, 0);
 
   return (
     <>
@@ -84,6 +85,11 @@ export default async function TeamPage({
           <p className="text-xs text-ice-400">
             {ownerNames.get(team.owner_id) ?? "Player"} · {fmtPoints(total)} pts
             from {myCountryIds.length} countries
+            {liveTotal !== 0 && (
+              <span className="ml-1 font-medium text-amber-400">
+                · 🔴 {liveTotal > 0 ? "+" : ""}{fmtPoints(liveTotal)} live
+              </span>
+            )}
           </p>
         </div>
 
@@ -113,7 +119,12 @@ export default async function TeamPage({
                         {country.fifa_rank ? ` · #${country.fifa_rank}` : ""}
                       </span>
                     </Link>
-                    <span className="font-semibold text-ice-50">{fmtPoints(s.total)}</span>
+                    <span className="font-semibold text-ice-50">
+                      {fmtPoints(s.total)}
+                      {s.provisional_points !== 0 && (
+                        <span className="ml-1 text-[10px] font-medium text-amber-400">🔴</span>
+                      )}
+                    </span>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-ice-400">
                     <Stat label="Results" v={s.match_points} />
