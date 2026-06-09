@@ -341,6 +341,46 @@ export interface SyncOptions {
 }
 
 /**
+ * Cheap (DB-only, no API calls) check for whether any match is currently
+ * "active" and therefore worth polling the live feed for. True when a match
+ * is already marked live, or its kickoff time falls inside the window
+ * [now - postHours, now + preMinutes] and it hasn't gone final yet — i.e. a
+ * game is about to start, is in progress, or could still be running.
+ *
+ * Lets the cron self-gate: start polling around kickoff, stop once every
+ * game of the day has finished, without burning API calls in dead hours.
+ */
+export async function hasActiveMatchWindow(
+  svc: SupabaseClient,
+  opts?: { preMinutes?: number; postHours?: number },
+): Promise<boolean> {
+  const preMinutes = opts?.preMinutes ?? 10;
+  const postHours = opts?.postHours ?? 3.5; // 90' + ET + pens + buffer
+  const now = Date.now();
+
+  // Any match already in progress?
+  const { data: live } = await svc
+    .from("matches")
+    .select("id")
+    .eq("status", "live")
+    .limit(1);
+  if (live && live.length > 0) return true;
+
+  // Any not-yet-final match whose kickoff is near now (just upcoming, or
+  // recent enough that it could still be playing)?
+  const lower = new Date(now - postHours * 3_600_000).toISOString();
+  const upper = new Date(now + preMinutes * 60_000).toISOString();
+  const { data: near } = await svc
+    .from("matches")
+    .select("id")
+    .neq("status", "final")
+    .gte("kickoff_utc", lower)
+    .lte("kickoff_utc", upper)
+    .limit(1);
+  return Boolean(near && near.length > 0);
+}
+
+/**
  * Pull World Cup fixtures + the top-scorers leaderboard from API-Football
  * and upsert them. Locked matches (commissioner-corrected) are never
  * overwritten. Idempotent — safe to run repeatedly.
