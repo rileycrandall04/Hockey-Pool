@@ -7,7 +7,7 @@ endpoint frequently during match days.
 ## Endpoint
 
 ```
-POST/GET  /api/cron/update-matches?mode=light
+POST/GET  /api/cron/update-matches?mode=light&smart=1
 Header:   Authorization: Bearer <CRON_SECRET>
 ```
 
@@ -15,8 +15,13 @@ Header:   Authorization: Bearer <CRON_SECRET>
   list, group letters, logos rarely change intra-day) and refreshes live
   scorers. A light poll is ~1–2 API calls when nothing is live, plus 1 call
   per in-progress match.
+- `smart=1` self-gates the poll to the schedule: it makes **zero** API calls
+  unless a match is live or its kickoff is within the next 10 min / it could
+  still be running (kickoff in the last 3.5h and not yet final). Otherwise it
+  returns `{"ok":true,"skipped":"no active matches"}` after one cheap DB read.
+  This is what makes polling "start when a game starts, stop when it's over."
 - Omit `mode` (or `mode=full`) for the nightly run that also refreshes the
-  team list, groups, and FIFA ranks.
+  team list, groups, and FIFA ranks. `smart` is ignored for full runs.
 
 ## Two cadences
 
@@ -32,9 +37,10 @@ from an external scheduler. (Vercel Pro can run it natively instead.)
 
 1. Create a free account at https://cron-job.org.
 2. New cronjob:
-   - **URL**: `https://<your-app>.vercel.app/api/cron/update-matches?mode=light`
-   - **Schedule**: every 5 minutes (`*/5 * * * *`). Optionally restrict to
-     match-window hours (e.g. 09:00–24:00 MT) to be frugal.
+   - **URL**: `https://<your-app>.vercel.app/api/cron/update-matches?mode=light&smart=1`
+   - **Schedule**: every 5 minutes (`*/5 * * * *`). With `smart=1` you can
+     safely leave it 24/7 — idle polls cost no API calls. (Restricting to
+     match-window hours is optional belt-and-suspenders.)
    - **Request method**: `GET`
    - **Headers**: add `Authorization` = `Bearer <CRON_SECRET>` (the same
      `CRON_SECRET` set in Vercel env vars).
