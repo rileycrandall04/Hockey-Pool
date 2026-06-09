@@ -322,15 +322,44 @@ async function syncTeamsGroupsRanks(
   }
 }
 
+export interface SyncOptions {
+  /** Narrow the fixtures pull to a [from, to] date window (YYYY-MM-DD). */
+  window?: { from?: string; to?: string };
+  /**
+   * "light" skips the /teams and /standings calls (team list, group letters,
+   * logos — these barely change once the tournament is set) so a frequent
+   * live-polling cron stays cheap and fast. "full" (the default) does
+   * everything and is what the nightly cron uses.
+   */
+  mode?: "full" | "light";
+  /**
+   * Also refresh goal events for in-progress (live) matches so live scorers
+   * appear and update mid-match. Defaults on in light mode. Live matches are
+   * re-pulled every run (never marked goals_synced) until they go final.
+   */
+  liveEvents?: boolean;
+}
+
 /**
  * Pull World Cup fixtures + the top-scorers leaderboard from API-Football
  * and upsert them. Locked matches (commissioner-corrected) are never
  * overwritten. Idempotent — safe to run repeatedly.
+ *
+ * Accepts a plain date window for backward compatibility, or a full
+ * {@link SyncOptions} object for light-mode / live-event polling.
  */
 export async function syncMatches(
   svc: SupabaseClient,
-  window?: { from?: string; to?: string },
+  optsOrWindow?: SyncOptions | { from?: string; to?: string },
 ): Promise<SyncSummary> {
+  // Back-compat: a bare {from,to} is treated as the fixtures window.
+  const opts: SyncOptions =
+    optsOrWindow && ("window" in optsOrWindow || "mode" in optsOrWindow || "liveEvents" in optsOrWindow)
+      ? (optsOrWindow as SyncOptions)
+      : { window: optsOrWindow as { from?: string; to?: string } | undefined };
+  const mode = opts.mode ?? "full";
+  const liveEvents = opts.liveEvents ?? mode === "light";
+  const window = opts.window;
   const summary: SyncSummary = {
     teams_upserted: 0,
     groups_set: 0,
@@ -348,8 +377,11 @@ export async function syncMatches(
 
   // Pull the real team list, group assignments, and apply FIFA ranks first,
   // so fixtures match against accurate countries. Best-effort and per-step
-  // guarded — a failure here never blocks the rest of the sync.
-  await syncTeamsGroupsRanks(svc, summary);
+  // guarded — a failure here never blocks the rest of the sync. Skipped in
+  // light mode (these /teams + /standings calls rarely change intra-day).
+  if (mode !== "light") {
+    await syncTeamsGroupsRanks(svc, summary);
+  }
 
   const { data: countryRows } = await svc
     .from("countries")
@@ -430,7 +462,8 @@ export async function syncMatches(
       }
     }
 
-    const { data: pending } = await svc
+    // Final matches we haven't pulled goals for yet (one-time, then locked in).
+    const { data: pendingFinal } = await svc
       .from("matches")
       .select("id, external_id, home_country_id, away_country_id")
       .eq("status", "final")
@@ -439,7 +472,42 @@ export async function syncMatches(
       .not("external_id", "is", null)
       .limit(MAX_EVENT_FETCHES);
 
-    for (const match of pending ?? []) {
+    const toProcess: Array<{
+      id: string;
+      external_id: number;
+      home_country_id: number;
+      away_country_id: number;
+      markSynced: boolean;
+    }> = (pendingFinal ?? []).map((m) => ({
+      id: m.id as string,
+      external_id: m.external_id as number,
+      home_country_id: m.home_country_id as number,
+      away_country_id: m.away_country_id as number,
+      markSynced: true,
+    }));
+
+    // Live matches: refresh their scorers every run so the scoreboard updates
+    // mid-match. Never marked goals_synced — they keep refreshing until final.
+    if (liveEvents) {
+      const { data: liveMatches } = await svc
+        .from("matches")
+        .select("id, external_id, home_country_id, away_country_id")
+        .eq("status", "live")
+        .eq("locked", false)
+        .not("external_id", "is", null)
+        .limit(MAX_EVENT_FETCHES);
+      for (const m of liveMatches ?? []) {
+        toProcess.push({
+          id: m.id as string,
+          external_id: m.external_id as number,
+          home_country_id: m.home_country_id as number,
+          away_country_id: m.away_country_id as number,
+          markSynced: false,
+        });
+      }
+    }
+
+    for (const match of toProcess) {
       const homeApiId = countryIdToExtId.get(match.home_country_id as number);
       const awayApiId = countryIdToExtId.get(match.away_country_id as number);
       if (homeApiId == null || awayApiId == null) continue;
@@ -485,7 +553,9 @@ export async function syncMatches(
         summary.goals_ingested++;
       }
 
-      await svc.from("matches").update({ goals_synced: true }).eq("id", match.id as string);
+      if (match.markSynced) {
+        await svc.from("matches").update({ goals_synced: true }).eq("id", match.id);
+      }
     }
   } catch (err) {
     summary.errors.push(err instanceof Error ? err.message : "events sync failed");
