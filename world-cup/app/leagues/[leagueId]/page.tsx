@@ -33,6 +33,7 @@ export default async function LeagueStandingsPage({
 
   const drafted = league.draft_status === "complete";
   const odds = (league.odds ?? null) as Record<string, number> | null;
+  const anyLive = rows.some((r) => r.scored.provisional_points !== 0);
 
   return (
     <>
@@ -63,6 +64,13 @@ export default async function LeagueStandingsPage({
           <div className="mb-4 rounded-md border border-puck-border bg-puck-card px-4 py-3 text-sm text-ice-300">
             The draft isn&rsquo;t finished yet, so totals are all zero. Standings
             come alive once matches are scored.
+          </div>
+        )}
+
+        {anyLive && (
+          <div className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            🔴 Games in progress — totals include <strong>provisional</strong> live points (results,
+            goals, clean sheets). They lock in when each match goes final.
           </div>
         )}
 
@@ -151,8 +159,14 @@ export default async function LeagueStandingsPage({
                       <td className="hidden px-3 py-2 text-right text-ice-300 sm:table-cell">
                         {row.scored.tiebreak.goals_for}
                       </td>
-                      <td className="px-2 py-2 text-right font-semibold text-ice-50 sm:px-3">
-                        {fmtPoints(row.scored.total)}
+                      <td className="px-2 py-2 text-right sm:px-3">
+                        <div className="font-semibold text-ice-50">{fmtPoints(row.scored.total)}</div>
+                        {row.scored.provisional_points !== 0 && (
+                          <div className="text-[10px] font-medium text-amber-400">
+                            🔴 {row.scored.provisional_points > 0 ? "+" : ""}
+                            {fmtPoints(row.scored.provisional_points)} live
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
