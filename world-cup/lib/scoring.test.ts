@@ -185,6 +185,30 @@ describe("scoreCountry - late-round 1.5x multiplier", () => {
   });
 });
 
+describe("scoreCountry - live (provisional) scoring", () => {
+  it("scores a live group match provisionally", () => {
+    const s = scoreCountry(1, [m({ status: "live", home_country_id: 1, away_country_id: 2, home_goals: 2, away_goals: 0 })], rank);
+    expect(s.match_points).toBe(3);
+    expect(s.goals_for_points).toBe(2);
+    expect(s.clean_sheet_points).toBe(1);
+    expect(s.provisional_points).toBeCloseTo(6, 5);
+    expect(s.total).toBeCloseTo(6, 5);
+  });
+
+  it("holds the champion bonus until the final is final", () => {
+    const live = scoreCountry(1, [m({ stage: "final", status: "live", home_country_id: 1, away_country_id: 2, home_goals: 2, away_goals: 1 })], rank);
+    expect(live.champion_points).toBe(0); // not awarded while live
+    // match 4.5 + GF 3 + GA -0.75 = 6.75 provisional; + advancement final 2 = 8.75
+    expect(live.provisional_points).toBeCloseTo(6.75, 5);
+    expect(live.total).toBeCloseTo(8.75, 5);
+  });
+
+  it("a finished match contributes no provisional points", () => {
+    const s = scoreCountry(1, [m({ home_country_id: 1, away_country_id: 2, home_goals: 1, away_goals: 0 })], rank);
+    expect(s.provisional_points).toBe(0);
+  });
+});
+
 describe("scoreOwner & rankOwners", () => {
   const matches: ScoringMatch[] = [
     m({ home_country_id: 1, away_country_id: 2, home_goals: 2, away_goals: 0 }), // 1 beats 2
@@ -219,9 +243,9 @@ describe("scoreOwner & rankOwners", () => {
       over_under_guess: over,
     });
     const owners: ScoredOwner[] = [
-      { team_id: "A", countries: [], golden_boot_points: 0, adjustment_points: 0, total: 50, tiebreak: { goals_for: 5, furthest_stage_order: 4, over_under_guess: 70 } },
-      { team_id: "B", countries: [], golden_boot_points: 0, adjustment_points: 0, total: 50, tiebreak: { goals_for: 8, furthest_stage_order: 2, over_under_guess: 40 } },
-      { team_id: "C", countries: [], golden_boot_points: 0, adjustment_points: 0, total: 60, tiebreak: base(null) },
+      { team_id: "A", countries: [], golden_boot_points: 0, adjustment_points: 0, provisional_points: 0, total: 50, tiebreak: { goals_for: 5, furthest_stage_order: 4, over_under_guess: 70 } },
+      { team_id: "B", countries: [], golden_boot_points: 0, adjustment_points: 0, provisional_points: 0, total: 50, tiebreak: { goals_for: 8, furthest_stage_order: 2, over_under_guess: 40 } },
+      { team_id: "C", countries: [], golden_boot_points: 0, adjustment_points: 0, provisional_points: 0, total: 60, tiebreak: base(null) },
     ];
     const ranked = rankOwners(owners);
     expect(ranked.map((o) => o.team_id)).toEqual(["C", "B", "A"]);
@@ -230,8 +254,8 @@ describe("scoreOwner & rankOwners", () => {
 
   it("uses over/under as the last resort when points, goals and stage all tie", () => {
     const owners: ScoredOwner[] = [
-      { team_id: "far", countries: [], golden_boot_points: 0, adjustment_points: 0, total: 50, tiebreak: { goals_for: 5, furthest_stage_order: 4, over_under_guess: 60 } },
-      { team_id: "close", countries: [], golden_boot_points: 0, adjustment_points: 0, total: 50, tiebreak: { goals_for: 5, furthest_stage_order: 4, over_under_guess: 48 } },
+      { team_id: "far", countries: [], golden_boot_points: 0, adjustment_points: 0, provisional_points: 0, total: 50, tiebreak: { goals_for: 5, furthest_stage_order: 4, over_under_guess: 60 } },
+      { team_id: "close", countries: [], golden_boot_points: 0, adjustment_points: 0, provisional_points: 0, total: 50, tiebreak: { goals_for: 5, furthest_stage_order: 4, over_under_guess: 48 } },
     ];
     const ranked = rankOwners(owners);
     expect(ranked[0].team_id).toBe("close"); // |50-48| < |50-60|

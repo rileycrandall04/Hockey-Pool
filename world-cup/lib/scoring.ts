@@ -123,6 +123,7 @@ export function scoreCountry(
   let championPoints = 0;
   let runnerUpPoints = 0;
   let thirdPlacePoints = 0;
+  let provisionalPoints = 0; // points coming from in-progress (live) matches
 
   const stagesReached = new Set<Stage>();
   let furthest: Stage = "group";
@@ -131,7 +132,11 @@ export function scoreCountry(
     stagesReached.add(m.stage);
     if (stageOrder(m.stage) > stageOrder(furthest)) furthest = m.stage;
 
-    if (m.status !== "final") continue;
+    // Score final matches AND live ones. Live matches contribute provisional
+    // result/goals/clean-sheet points (recomputed from the current score);
+    // the one-time podium bonuses only land once the match is final.
+    if (m.status !== "final" && m.status !== "live") continue;
+    const isFinalMatch = m.status === "final";
 
     const isHome = m.home_country_id === countryId;
     const oppId = isHome ? m.away_country_id : m.home_country_id;
@@ -140,37 +145,45 @@ export function scoreCountry(
     // SF/Final match points count 1.5x. Goal COUNT (tiebreaker) stays raw.
     const mult = ROUND_MULTIPLIER[m.stage];
 
-    goalsFor += gf;
-    goalsForPoints += gf * GOAL_FOR_POINTS * mult;
-    goalsAgainstPoints += ga * GOAL_AGAINST_POINTS * mult;
-    if (ga === 0) cleanSheetPoints += CLEAN_SHEET_POINTS * mult;
+    let res = 0;
+    let csp = 0;
+    let ups = 0;
+    const gfp = gf * GOAL_FOR_POINTS * mult;
+    const gap = ga * GOAL_AGAINST_POINTS * mult;
+    if (ga === 0) csp = CLEAN_SHEET_POINTS * mult;
 
     if (m.went_to_shootout) {
       // Decided on penalties: a flat result (no separate draw point).
       const myPens = (isHome ? m.home_pens : m.away_pens) ?? 0;
       const oppPens = (isHome ? m.away_pens : m.home_pens) ?? 0;
       const won = myPens > oppPens;
-      matchPoints += (won ? SHOOTOUT_WIN_POINTS : SHOOTOUT_LOSS_POINTS) * mult;
-      if (m.stage === "final") (won ? (championPoints += CHAMPION_POINTS) : (runnerUpPoints += RUNNER_UP_POINTS));
-      if (m.stage === "third" && won) thirdPlacePoints += THIRD_PLACE_POINTS;
+      res = (won ? SHOOTOUT_WIN_POINTS : SHOOTOUT_LOSS_POINTS) * mult;
+      if (m.stage === "final" && isFinalMatch) (won ? (championPoints += CHAMPION_POINTS) : (runnerUpPoints += RUNNER_UP_POINTS));
+      if (m.stage === "third" && isFinalMatch && won) thirdPlacePoints += THIRD_PLACE_POINTS;
     } else if (gf > ga) {
-      matchPoints += WIN_POINTS * mult;
+      res = WIN_POINTS * mult;
       // Upset bonus: group stage only, beating a better-ranked side.
       if (m.stage === "group") {
         const myRank = fifaRank(countryId);
         const oppRank = fifaRank(oppId);
-        if (myRank != null && oppRank != null && myRank > oppRank) {
-          upsetPoints += UPSET_POINTS;
-        }
+        if (myRank != null && oppRank != null && myRank > oppRank) ups = UPSET_POINTS;
       }
-      if (m.stage === "final") championPoints += CHAMPION_POINTS; // flat
-      if (m.stage === "third") thirdPlacePoints += THIRD_PLACE_POINTS; // flat
+      if (m.stage === "final" && isFinalMatch) championPoints += CHAMPION_POINTS; // flat
+      if (m.stage === "third" && isFinalMatch) thirdPlacePoints += THIRD_PLACE_POINTS; // flat
     } else if (gf === ga) {
-      matchPoints += DRAW_POINTS * mult;
+      res = DRAW_POINTS * mult;
     } else {
-      matchPoints += LOSS_POINTS * mult;
-      if (m.stage === "final") runnerUpPoints += RUNNER_UP_POINTS; // flat
+      res = LOSS_POINTS * mult;
+      if (m.stage === "final" && isFinalMatch) runnerUpPoints += RUNNER_UP_POINTS; // flat
     }
+
+    matchPoints += res;
+    goalsForPoints += gfp;
+    goalsAgainstPoints += gap;
+    cleanSheetPoints += csp;
+    upsetPoints += ups;
+    goalsFor += gf;
+    if (!isFinalMatch) provisionalPoints += res + gfp + gap + csp + ups;
   }
 
   let advancementPoints = 0;
@@ -198,6 +211,7 @@ export function scoreCountry(
     champion_points: championPoints,
     runner_up_points: runnerUpPoints,
     third_place_points: thirdPlacePoints,
+    provisional_points: provisionalPoints,
     total,
     goals_for: goalsFor,
     furthest_stage: furthest,
@@ -234,6 +248,7 @@ export function scoreOwner(
   const total = countryTotal + goldenBootPoints + adjustmentPoints;
 
   const goalsFor = countries.reduce((s, c) => s + c.goals_for, 0);
+  const provisionalPoints = countries.reduce((s, c) => s + c.provisional_points, 0);
   const furthestStageOrder = countries.reduce(
     (max, c) => Math.max(max, stageOrder(c.furthest_stage)),
     0,
@@ -244,6 +259,7 @@ export function scoreOwner(
     countries,
     golden_boot_points: goldenBootPoints,
     adjustment_points: adjustmentPoints,
+    provisional_points: provisionalPoints,
     total,
     tiebreak: {
       goals_for: goalsFor,

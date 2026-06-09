@@ -144,6 +144,8 @@ export interface ScoredCountry {
   champion_points: number;
   runner_up_points: number;
   third_place_points: number;
+  /** Points from in-progress (live) matches — provisional, included in total. */
+  provisional_points: number;
   total: number;
   // Tiebreaker data.
   goals_for: number;
@@ -155,6 +157,8 @@ export interface ScoredOwner {
   countries: ScoredCountry[];
   golden_boot_points: number;
   adjustment_points: number;
+  /** Points from in-progress (live) matches — provisional, included in total. */
+  provisional_points: number;
   total: number;
   tiebreak: {
     goals_for: number;
