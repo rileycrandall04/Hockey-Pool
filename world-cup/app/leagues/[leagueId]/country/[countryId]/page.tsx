@@ -7,6 +7,7 @@ import { loadScorersByMatch } from "@/lib/match-scorers";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { ScorerList } from "@/components/scorer-list";
+import { LiveRefresher } from "@/components/live-refresher";
 import { fmtPoints, fmtShortDate } from "@/lib/utils";
 import type { Country, Match, ScoringMatch } from "@/lib/types";
 
@@ -44,9 +45,11 @@ export default async function CountryPage({
   const fifaRank = (id: number) => countryById.get(id)?.fifa_rank ?? null;
   const breakdown = scoreCountry(cid, matches as ScoringMatch[], fifaRank);
   const scorers = await loadScorersByMatch(svc, matches.map((m) => m.id));
+  const anyLive = matches.some((m) => m.status === "live");
 
   return (
     <>
+      {anyLive && <LiveRefresher />}
       <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
         <div className="mb-4 flex items-center gap-3">
@@ -56,6 +59,12 @@ export default async function CountryPage({
             <p className="text-xs text-ice-400">
               {me.group_letter ? `Group ${me.group_letter}` : ""}
               {me.fifa_rank ? ` · FIFA #${me.fifa_rank}` : ""} · {fmtPoints(breakdown.total)} pool pts
+              {breakdown.provisional_points !== 0 && (
+                <span className="ml-1 font-medium text-amber-400">
+                  · 🔴 {breakdown.provisional_points > 0 ? "+" : ""}
+                  {fmtPoints(breakdown.provisional_points)} live
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -81,18 +90,32 @@ export default async function CountryPage({
             const opp = countryById.get(isHome ? m.away_country_id : m.home_country_id);
             const myGoals = isHome ? m.home_goals : m.away_goals;
             const oppGoals = isHome ? m.away_goals : m.home_goals;
+            const live = m.status === "live";
             const played = m.status === "final" && myGoals != null && oppGoals != null;
-            const resultColor = !played ? "text-ice-400" : myGoals! > oppGoals! ? "text-green-300" : myGoals! < oppGoals! ? "text-red-300" : "text-ice-200";
+            const hasScore = (played || live) && myGoals != null && oppGoals != null;
+            const resultColor = live ? "text-amber-300" : !played ? "text-ice-400" : myGoals! > oppGoals! ? "text-green-300" : myGoals! < oppGoals! ? "text-red-300" : "text-ice-200";
             return (
-              <div key={m.id} className="rounded-md border border-puck-border bg-puck-bg p-3">
+              <div
+                key={m.id}
+                className={
+                  "rounded-md border bg-puck-bg p-3 " +
+                  (live ? "border-red-500/40 ring-1 ring-red-500/20" : "border-puck-border")
+                }
+              >
                 <Link href={`/leagues/${leagueId}/games/${m.id}`} className="group block">
                   <div className="flex items-center justify-between">
                     <span className="text-xs uppercase tracking-wider text-ice-500 group-hover:text-ice-300">
                       {STAGE_LABEL[m.stage] ?? m.stage}
                       {m.kickoff_utc ? ` · ${fmtShortDate(m.kickoff_utc)}` : ""} →
                     </span>
-                    <span className={"text-sm font-semibold " + resultColor}>
-                      {played ? `${myGoals} – ${oppGoals}` : m.status === "live" ? "LIVE" : "—"}
+                    <span className={"flex items-center gap-1.5 text-sm font-semibold " + resultColor}>
+                      {live && (
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
+                        </span>
+                      )}
+                      {hasScore ? `${myGoals} – ${oppGoals}` : "—"}
                       {m.went_to_shootout && played ? ` (${isHome ? m.home_pens : m.away_pens}–${isHome ? m.away_pens : m.home_pens} pens)` : ""}
                     </span>
                   </div>

@@ -6,6 +6,7 @@ import { loadScorersByMatch } from "@/lib/match-scorers";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { ScorerList } from "@/components/scorer-list";
+import { LiveRefresher } from "@/components/live-refresher";
 import { POOL_TZ_OFFSET, poolToday, fmtKickoff } from "@/lib/utils";
 import type { Country, Match } from "@/lib/types";
 
@@ -59,11 +60,13 @@ export default async function SchedulePage({
   const matches = (matchRows ?? []) as Match[];
   const scorers = await loadScorersByMatch(svc, matches.map((m) => m.id));
   const today = poolToday();
+  const anyLive = matches.some((m) => m.status === "live");
 
   return (
     <>
       <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+        {anyLive && <LiveRefresher />}
         <h1 className="mb-1 text-2xl font-bold text-ice-50">Schedule</h1>
         <p className="mb-3 text-xs text-ice-500">All times Mountain (MT)</p>
 
@@ -85,17 +88,37 @@ export default async function SchedulePage({
             {matches.map((m) => {
               const home = countryById.get(m.home_country_id);
               const away = countryById.get(m.away_country_id);
+              const live = m.status === "live";
               const played = m.status === "final" && m.home_goals != null && m.away_goals != null;
+              const hasScore = (played || live) && m.home_goals != null && m.away_goals != null;
               return (
-                <div key={m.id} className="rounded-md border border-puck-border bg-puck-bg p-3">
+                <div
+                  key={m.id}
+                  className={
+                    "rounded-md border bg-puck-bg p-3 " +
+                    (live ? "border-red-500/40 ring-1 ring-red-500/20" : "border-puck-border")
+                  }
+                >
                   <Link href={`/leagues/${leagueId}/games/${m.id}`} className="group block">
                     <div className="mb-1 flex items-center justify-between text-xs text-ice-500">
                       <span className="uppercase tracking-wider group-hover:text-ice-300">{STAGE_LABEL[m.stage] ?? m.stage} →</span>
-                      <span>{m.status === "live" ? "LIVE" : played ? "FT" : fmtKickoff(m.kickoff_utc)}</span>
+                      {live ? (
+                        <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-wider text-red-300">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
+                          </span>
+                          Live
+                        </span>
+                      ) : (
+                        <span>{played ? "FT" : fmtKickoff(m.kickoff_utc)}</span>
+                      )}
                     </div>
                     <div className="flex items-center justify-between">
                       <Row country={home} />
-                      <span className="px-2 text-ice-500">{played ? `${m.home_goals}–${m.away_goals}` : "v"}</span>
+                      <span className={"px-2 " + (live ? "font-semibold text-ice-50" : "text-ice-500")}>
+                        {hasScore ? `${m.home_goals}–${m.away_goals}` : "v"}
+                      </span>
                       <Row country={away} alignRight />
                     </div>
                     {m.went_to_shootout && played && (
