@@ -6,14 +6,20 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Nightly World Cup ingestion. Pulls all fixtures + the top-scorers
- * leaderboard from API-Football and upserts them. Locked (manually
- * corrected) matches are left untouched.
+ * World Cup ingestion endpoint. Pulls fixtures + the top-scorers leaderboard
+ * from API-Football and upserts them. Locked (manually corrected) matches are
+ * left untouched.
  *
- * Vercel Cron sends a GET with an `Authorization: Bearer $CRON_SECRET`
- * header; we accept GET and POST. A manual `from`/`to` window can be
- * passed as query params or JSON body, but the default (whole season) is
- * cheap — it's a single fixtures request.
+ * Two intended cadences:
+ *   - Nightly (Vercel cron): default "full" mode — also refreshes the team
+ *     list, group letters, and FIFA ranks.
+ *   - Live polling (external pinger, e.g. cron-job.org, every ~5 min): pass
+ *     `?mode=light` to skip the /teams + /standings calls and refresh live
+ *     scorers. Cheap enough to run all match day.
+ *
+ * Auth: `Authorization: Bearer $CRON_SECRET` (Vercel cron sends this) or an
+ * `x-cron-secret` header. A `from`/`to` window can be passed as query params
+ * or JSON body; the default (whole season) is a single fixtures request.
  */
 async function run(request: Request): Promise<Response> {
   if (!authorized(request)) {
@@ -25,10 +31,11 @@ async function run(request: Request): Promise<Response> {
   const from = url.searchParams.get("from") ?? body.from;
   const to = url.searchParams.get("to") ?? body.to;
   const window = from || to ? { from: from ?? undefined, to: to ?? undefined } : undefined;
+  const mode = (url.searchParams.get("mode") ?? body.mode) === "light" ? "light" : "full";
 
   const svc = createServiceClient();
-  const summary = await syncMatches(svc, window);
-  return NextResponse.json({ ok: true, ...summary });
+  const summary = await syncMatches(svc, { window, mode });
+  return NextResponse.json({ ok: true, mode, ...summary });
 }
 
 export async function GET(request: Request) {
