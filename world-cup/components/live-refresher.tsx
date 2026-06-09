@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
  * is in progress, so it idles to nothing the rest of the time. Pauses while
  * the tab is hidden to avoid burning refreshes in the background.
  */
-export function LiveRefresher({ intervalMs = 30000 }: { intervalMs?: number }) {
+export function LiveRefresher({ intervalMs = 45000 }: { intervalMs?: number }) {
   const router = useRouter();
 
   useEffect(() => {
