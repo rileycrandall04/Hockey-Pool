@@ -210,6 +210,32 @@ async function swapTeamsAction(formData: FormData) {
   redirect(`/leagues/${leagueId}/admin?swapped=1#trade`);
 }
 
+/** Commissioner-only: rename a team in this league (owner is unchanged). */
+async function renameTeamAction(formData: FormData) {
+  "use server";
+  const leagueId = String(formData.get("league_id") ?? "");
+  const teamId = String(formData.get("team_id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const back = (msg: string): never =>
+    redirect(`/leagues/${leagueId}/admin?error=${encodeURIComponent(msg)}#team-names`);
+
+  const user = await getUser();
+  if (!user) redirect("/login");
+  const svc = createServiceClient();
+  const { data: league } = await svc.from("leagues").select("commissioner_id").eq("id", leagueId).single();
+  if (!league || league.commissioner_id !== user.id) back("Commissioner only");
+  if (!teamId) back("Missing team");
+  if (!name) back("Team name can't be empty");
+  if (name.length > 60) back("Team name is too long (60 characters max)");
+
+  // Scope the update to this league so a commissioner can't rename foreign teams.
+  const { error } = await svc.from("teams").update({ name }).eq("id", teamId).eq("league_id", leagueId);
+  if (error) back(error.message);
+
+  revalidatePath(`/leagues/${leagueId}/admin`);
+  redirect(`/leagues/${leagueId}/admin?renamed=1#team-names`);
+}
+
 /** Commissioner-only: permanently delete the league (cascades teams + picks). */
 async function deleteLeagueAction(formData: FormData) {
   "use server";
@@ -241,10 +267,10 @@ export default async function AdminPage({
   searchParams,
 }: {
   params: Promise<{ leagueId: string }>;
-  searchParams: Promise<{ error?: string; added?: string; swapped?: string }>;
+  searchParams: Promise<{ error?: string; added?: string; swapped?: string; renamed?: string }>;
 }) {
   const { leagueId } = await params;
-  const { error, added, swapped } = await searchParams;
+  const { error, added, swapped, renamed } = await searchParams;
   const user = await getUser();
   if (!user) redirect("/login");
 
@@ -252,7 +278,7 @@ export default async function AdminPage({
   if (!access) redirect("/dashboard");
   if (!access.isCommissioner) redirect(`/leagues/${leagueId}`);
 
-  const { league, teams, displayName } = access;
+  const { league, teams, ownerNames, displayName } = access;
   const svc = createServiceClient();
   const isOwner = isAppOwner(user.email);
 
@@ -327,6 +353,11 @@ export default async function AdminPage({
             ✅ Trade completed.
           </div>
         )}
+        {renamed && (
+          <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+            ✅ Team name updated.
+          </div>
+        )}
 
         <Card>
           <CardHeader>
@@ -341,6 +372,32 @@ export default async function AdminPage({
             <p>Teams: {teams.length} · Roster size: {league.roster_size}</p>
           </CardContent>
         </Card>
+
+        {teams.length > 0 && (
+          <Card id="team-names" className="scroll-mt-20">
+            <CardHeader>
+              <CardTitle>Team names</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="mb-1 text-xs text-ice-400">
+                Rename any team in the league. Owners aren&rsquo;t changed.
+              </p>
+              {teams.map((t) => (
+                <form key={t.id} action={renameTeamAction} className="flex items-end gap-2">
+                  <input type="hidden" name="league_id" value={leagueId} />
+                  <input type="hidden" name="team_id" value={t.id} />
+                  <div className="flex-1 space-y-1">
+                    <label className="text-xs text-ice-400">
+                      {ownerNames.get(t.owner_id) ?? "Player"}
+                    </label>
+                    <Input name="name" defaultValue={t.name} required maxLength={60} />
+                  </div>
+                  <Button type="submit" size="sm" variant="secondary">Save</Button>
+                </form>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {league.draft_status === "pending" && (
           <Card id="add-member" className="scroll-mt-20">
