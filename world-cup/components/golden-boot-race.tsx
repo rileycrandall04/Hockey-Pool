@@ -1,30 +1,24 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { GOLDEN_BOOT_POINTS } from "@/lib/scoring";
+import { computeTopScorers } from "@/lib/top-scorers";
 import { Flag } from "@/components/flag";
 import { GoldenBootIcon } from "@/components/golden-boot-icon";
 import type { Country } from "@/lib/types";
 
-interface ScorerRow {
-  player_name: string;
-  country_id: number | null;
-  goals: number;
-}
-
 /**
  * Compact Golden Boot race for the standings page: the top scorers, who owns
- * each, and which owner currently holds the +5 bonus (🥾). Links to the full
- * leaderboard.
+ * each, and which owner currently holds the +10 bonus (🥾). Links to the full
+ * leaderboard. Derived from our ingested goals so it updates live.
  */
 export async function GoldenBootRace({ leagueId }: { leagueId: string }) {
   const svc = createServiceClient();
-  const [{ data: scorerRows }, { data: countryRows }, { data: pickRows }, { data: teams }] = await Promise.all([
-    svc.from("top_scorers").select("player_name, country_id, goals").order("rank", { ascending: true }).limit(5),
+  const [scorers, { data: countryRows }, { data: pickRows }, { data: teams }] = await Promise.all([
+    computeTopScorers(svc, 5),
     svc.from("countries").select("id, name, code, flag_url"),
     svc.from("draft_picks").select("country_id, team_id").eq("league_id", leagueId),
     svc.from("teams").select("id, name").eq("league_id", leagueId),
   ]);
-  const scorers = (scorerRows ?? []) as ScorerRow[];
   if (scorers.length === 0 || scorers[0].goals === 0) return null;
 
   const countryById = new Map((countryRows ?? []).map((c) => [c.id as number, c as Country]));

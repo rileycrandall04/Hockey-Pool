@@ -398,7 +398,10 @@ export async function syncMatches(
       ? (optsOrWindow as SyncOptions)
       : { window: optsOrWindow as { from?: string; to?: string } | undefined };
   const mode = opts.mode ?? "full";
-  const liveEvents = opts.liveEvents ?? mode === "light";
+  // Always refresh live-match scorers, regardless of mode — fetching events for
+  // the handful of in-progress games is cheap and is what powers live scoring,
+  // so it shouldn't hinge on whether the poll is "light" or "full".
+  const liveEvents = opts.liveEvents ?? true;
   const window = opts.window;
   const summary: SyncSummary = {
     teams_upserted: 0,

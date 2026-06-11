@@ -10,6 +10,7 @@ import { GoldenBootRace } from "@/components/golden-boot-race";
 import { GoldenBootIcon } from "@/components/golden-boot-icon";
 import { TodaysGames } from "@/components/todays-games";
 import { LiveRefresher } from "@/components/live-refresher";
+import { loadScorersByMatch, type ScorerLine } from "@/lib/match-scorers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { fmtPoints, poolToday, POOL_TZ_OFFSET } from "@/lib/utils";
@@ -50,10 +51,15 @@ export default async function LeagueStandingsPage({
     .order("kickoff_utc");
   const todaysGames = (todayRows ?? []) as Match[];
   let todayCountries = new Map<number, Country>();
+  let todayScorers = new Map<string, ScorerLine[]>();
   if (todaysGames.length > 0) {
     const ids = [...new Set(todaysGames.flatMap((m) => [m.home_country_id, m.away_country_id]))];
-    const { data: cs } = await svc.from("countries").select("id, name, code, flag_url").in("id", ids);
+    const [{ data: cs }, scorerMap] = await Promise.all([
+      svc.from("countries").select("id, name, code, flag_url").in("id", ids),
+      loadScorersByMatch(svc, todaysGames.map((m) => m.id)),
+    ]);
     todayCountries = new Map((cs ?? []).map((c) => [c.id as number, c as Country]));
+    todayScorers = scorerMap;
   }
   const anyLiveToday = todaysGames.some((m) => m.status === "live");
 
@@ -99,7 +105,7 @@ export default async function LeagueStandingsPage({
         {todaysGames.length > 0 && (
           <div className="mb-4">
             {anyLiveToday && <LiveRefresher />}
-            <TodaysGames leagueId={leagueId} games={todaysGames} countryById={todayCountries} />
+            <TodaysGames leagueId={leagueId} games={todaysGames} countryById={todayCountries} scorers={todayScorers} />
           </div>
         )}
 

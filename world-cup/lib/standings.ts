@@ -7,6 +7,7 @@ import type {
   Team,
 } from "./types";
 import { scoreCountry, scoreOwner, rankOwners } from "./scoring";
+import { computeTopScorers } from "./top-scorers";
 
 export interface StandingRow {
   team: Team;
@@ -32,15 +33,16 @@ export async function computeStandings(
     { data: pickRows },
     { data: adjRows },
     { data: gb },
-    { data: leader },
+    topScorers,
   ] = await Promise.all([
     svc.from("matches").select("*"),
     svc.from("countries").select("*"),
     svc.from("draft_picks").select("team_id, country_id").eq("league_id", leagueId),
     svc.from("score_adjustments").select("team_id, delta_points").eq("league_id", leagueId),
     svc.from("golden_boot").select("player_id").eq("league_id", leagueId).maybeSingle(),
-    svc.from("top_scorers").select("country_id, goals").order("rank", { ascending: true }).limit(1).maybeSingle(),
+    computeTopScorers(svc, 1),
   ]);
+  const leader = topScorers[0] ?? null;
 
   const matches = (matchRows ?? []) as ScoringMatch[];
   const countries = (countryRows ?? []) as Country[];
@@ -66,8 +68,8 @@ export async function computeStandings(
   }
 
   // Golden boot: which team (if any) owns the top scorer's country? A
-  // commissioner-locked award (golden_boot.player_id) wins; otherwise we
-  // use the live leader from the top_scorers cache.
+  // commissioner-locked award (golden_boot.player_id) wins; otherwise we use
+  // the live leader computed from our ingested goals (match_goals).
   let goldenBootCountryId: number | null = null;
   if (gb?.player_id) {
     const { data: player } = await svc
@@ -76,8 +78,8 @@ export async function computeStandings(
       .eq("id", gb.player_id)
       .maybeSingle();
     goldenBootCountryId = (player?.country_id as number | undefined) ?? null;
-  } else if (leader?.country_id != null && (leader.goals as number) > 0) {
-    goldenBootCountryId = leader.country_id as number;
+  } else if (leader?.country_id != null && leader.goals > 0) {
+    goldenBootCountryId = leader.country_id;
   }
   const goldenBootTeamId =
     goldenBootCountryId != null ? ownerOfCountry.get(goldenBootCountryId) ?? null : null;
