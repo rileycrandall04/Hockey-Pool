@@ -43,12 +43,15 @@ export default async function GoldenBootPage({
         <h1 className="mb-1 inline-flex items-center gap-2 text-2xl font-bold text-ice-50"><GoldenBootIcon /> Golden Boot race</h1>
         <p className="mb-4 text-xs text-ice-400">
           The leader&rsquo;s owner gets <strong className="text-ice-200">+{GOLDEN_BOOT_POINTS}</strong> in
-          the standings. Updates with each data sync.
+          the standings. Updates live as goals are scored.
         </p>
 
         {scorers.length === 0 ? (
           <p className="text-sm text-ice-300">
-            No scorer data yet. It populates once matches with goals are synced from API-Football.
+            No scorer data yet. Scorers populate automatically from live match
+            events. If a result was entered by hand, the match is locked and its
+            goals won&rsquo;t have individual scorers unless you add them in the
+            goals editor (on the game page).
           </p>
         ) : (
           <div className="overflow-hidden rounded-xl border border-puck-border">
