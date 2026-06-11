@@ -9,9 +9,12 @@ import { RecentResults } from "@/components/recent-results";
 import { GoldenBootRace } from "@/components/golden-boot-race";
 import { GoldenBootIcon } from "@/components/golden-boot-icon";
 import { OddsButton } from "@/components/odds-button";
+import { TodaysGames } from "@/components/todays-games";
+import { LiveRefresher } from "@/components/live-refresher";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { fmtPoints } from "@/lib/utils";
+import { fmtPoints, poolToday, POOL_TZ_OFFSET } from "@/lib/utils";
+import type { Country, Match } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +37,27 @@ export default async function LeagueStandingsPage({
   const drafted = league.draft_status === "complete";
   const odds = (league.odds ?? null) as Record<string, number> | null;
   const anyLive = rows.some((r) => r.scored.provisional_points !== 0);
+
+  // Today's fixtures (Mountain-Time day boundaries), for the scoreboard card.
+  const today = poolToday();
+  const dEnd = new Date(`${today}T00:00:00Z`);
+  dEnd.setUTCDate(dEnd.getUTCDate() + 1);
+  const dayStart = `${today}T00:00:00${POOL_TZ_OFFSET}`;
+  const dayEnd = `${dEnd.toISOString().slice(0, 10)}T00:00:00${POOL_TZ_OFFSET}`;
+  const { data: todayRows } = await svc
+    .from("matches")
+    .select("*")
+    .gte("kickoff_utc", dayStart)
+    .lt("kickoff_utc", dayEnd)
+    .order("kickoff_utc");
+  const todaysGames = (todayRows ?? []) as Match[];
+  let todayCountries = new Map<number, Country>();
+  if (todaysGames.length > 0) {
+    const ids = [...new Set(todaysGames.flatMap((m) => [m.home_country_id, m.away_country_id]))];
+    const { data: cs } = await svc.from("countries").select("id, name, code, flag_url").in("id", ids);
+    todayCountries = new Map((cs ?? []).map((c) => [c.id as number, c as Country]));
+  }
+  const anyLiveToday = todaysGames.some((m) => m.status === "live");
 
   return (
     <>
@@ -74,16 +98,23 @@ export default async function LeagueStandingsPage({
           </div>
         )}
 
-        {drafted && (isCommissioner || odds) && (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-puck-border bg-puck-card px-3 py-2">
-            <div className="text-xs text-ice-400">
-              🎲 Preseason win odds {odds ? "(simulated from rosters + FIFA ranks)" : "— not computed yet"}
-              {league.odds_computed_at && (
-                <span className="text-ice-500"> · updated {new Date(league.odds_computed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-              )}
-            </div>
-            {isCommissioner && <OddsButton leagueId={leagueId} recompute={Boolean(odds)} />}
+        {todaysGames.length > 0 ? (
+          <div className="mb-4">
+            {anyLiveToday && <LiveRefresher />}
+            <TodaysGames leagueId={leagueId} games={todaysGames} countryById={todayCountries} />
           </div>
+        ) : (
+          drafted && (isCommissioner || odds) && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-puck-border bg-puck-card px-3 py-2">
+              <div className="text-xs text-ice-400">
+                🎲 Preseason win odds {odds ? "(simulated from rosters + FIFA ranks)" : "— not computed yet"}
+                {league.odds_computed_at && (
+                  <span className="text-ice-500"> · updated {new Date(league.odds_computed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                )}
+              </div>
+              {isCommissioner && <OddsButton leagueId={leagueId} recompute={Boolean(odds)} />}
+            </div>
+          )
         )}
 
         {teams.length === 0 ? (
