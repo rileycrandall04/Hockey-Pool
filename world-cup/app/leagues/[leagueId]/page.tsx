@@ -8,7 +8,6 @@ import { Flag } from "@/components/flag";
 import { RecentResults } from "@/components/recent-results";
 import { GoldenBootRace } from "@/components/golden-boot-race";
 import { GoldenBootIcon } from "@/components/golden-boot-icon";
-import { OddsButton } from "@/components/odds-button";
 import { TodaysGames } from "@/components/todays-games";
 import { LiveRefresher } from "@/components/live-refresher";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,7 +34,6 @@ export default async function LeagueStandingsPage({
   const rows = await computeStandings(svc, leagueId, teams, ownerNames);
 
   const drafted = league.draft_status === "complete";
-  const odds = (league.odds ?? null) as Record<string, number> | null;
   const anyLive = rows.some((r) => r.scored.provisional_points !== 0);
 
   // Today's fixtures (Mountain-Time day boundaries), for the scoreboard card.
@@ -98,23 +96,11 @@ export default async function LeagueStandingsPage({
           </div>
         )}
 
-        {todaysGames.length > 0 ? (
+        {todaysGames.length > 0 && (
           <div className="mb-4">
             {anyLiveToday && <LiveRefresher />}
             <TodaysGames leagueId={leagueId} games={todaysGames} countryById={todayCountries} />
           </div>
-        ) : (
-          drafted && (isCommissioner || odds) && (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-puck-border bg-puck-card px-3 py-2">
-              <div className="text-xs text-ice-400">
-                🎲 Preseason win odds {odds ? "(simulated from rosters + FIFA ranks)" : "— not computed yet"}
-                {league.odds_computed_at && (
-                  <span className="text-ice-500"> · updated {new Date(league.odds_computed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                )}
-              </div>
-              {isCommissioner && <OddsButton leagueId={leagueId} recompute={Boolean(odds)} />}
-            </div>
-          )
         )}
 
         {teams.length === 0 ? (
@@ -176,12 +162,7 @@ export default async function LeagueStandingsPage({
                         {row.scored.golden_boot_points > 0 && (
                           <span title="Holds the Golden Boot bonus"> <GoldenBootIcon /></span>
                         )}
-                        <div className="text-xs text-ice-400">
-                          {row.ownerName}
-                          {odds && odds[row.team.id] != null && (
-                            <span className="text-ice-500"> · {odds[row.team.id]}% to win</span>
-                          )}
-                        </div>
+                        <div className="text-xs text-ice-400">{row.ownerName}</div>
                         <div className="mt-1 flex flex-wrap gap-1 sm:hidden">{chips()}</div>
                       </td>
                       <td className="hidden px-3 py-2 sm:table-cell">
