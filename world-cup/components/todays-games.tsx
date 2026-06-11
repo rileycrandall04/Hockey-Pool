@@ -2,7 +2,22 @@ import Link from "next/link";
 import { Flag } from "@/components/flag";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtKickoff } from "@/lib/utils";
+import type { ScorerLine } from "@/lib/match-scorers";
 import type { Country, Match } from "@/lib/types";
+
+/** One-line "who scored" summary: "⚽ Mbappé 23' · Kane 41' (pen)". */
+function scorerSummary(lines: ScorerLine[], countryById: Map<number, Country>): string {
+  return lines
+    .filter((l) => !l.is_shootout)
+    .map((l) => {
+      const code = l.country_id != null ? countryById.get(l.country_id)?.code : null;
+      const who = l.player_name ?? (code ? code : "Goal");
+      const min = l.minute != null ? ` ${l.minute}'` : "";
+      const og = l.type === "own_goal" ? " (OG)" : l.type === "penalty" ? " (pen)" : "";
+      return `${who}${min}${og}`;
+    })
+    .join(" · ");
+}
 
 const STAGE_LABEL: Record<string, string> = {
   group: "Group", r32: "Round of 32", r16: "Round of 16", qf: "Quarterfinal",
@@ -18,10 +33,12 @@ export function TodaysGames({
   leagueId,
   games,
   countryById,
+  scorers,
 }: {
   leagueId: string;
   games: Match[];
   countryById: Map<number, Country>;
+  scorers: Map<string, ScorerLine[]>;
 }) {
   const anyLive = games.some((m) => m.status === "live");
   return (
@@ -47,6 +64,7 @@ export function TodaysGames({
           const live = m.status === "live";
           const played = m.status === "final" && m.home_goals != null && m.away_goals != null;
           const hasScore = (live || played) && m.home_goals != null && m.away_goals != null;
+          const goalLine = scorerSummary(scorers.get(m.id) ?? [], countryById);
           return (
             <Link
               key={m.id}
@@ -82,6 +100,11 @@ export function TodaysGames({
                   <span className="truncate">{away?.name ?? "TBD"}</span>
                 </span>
               </div>
+              {goalLine && (
+                <div className="mt-1 truncate text-center text-[11px] text-ice-400">
+                  ⚽ {goalLine}
+                </div>
+              )}
               {m.went_to_shootout && played && (
                 <div className="mt-1 text-center text-[11px] text-ice-400">
                   {m.home_pens}–{m.away_pens} on penalties

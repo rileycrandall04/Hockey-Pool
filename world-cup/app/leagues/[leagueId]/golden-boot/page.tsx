@@ -5,18 +5,9 @@ import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { GoldenBootIcon } from "@/components/golden-boot-icon";
 import { GOLDEN_BOOT_POINTS } from "@/lib/scoring";
+import { computeTopScorers } from "@/lib/top-scorers";
 
 export const dynamic = "force-dynamic";
-
-interface ScorerRow {
-  player_external_id: number;
-  player_name: string;
-  country_id: number | null;
-  goals: number;
-  assists: number;
-  minutes: number;
-  rank: number | null;
-}
 
 export default async function GoldenBootPage({
   params,
@@ -32,13 +23,12 @@ export default async function GoldenBootPage({
   const { league, teams, isCommissioner, displayName } = access;
 
   const svc = createServiceClient();
-  const [{ data: scorerRows }, { data: countryRows }, { data: pickRows }] = await Promise.all([
-    svc.from("top_scorers").select("*").order("rank", { ascending: true }).limit(25),
+  const [scorers, { data: countryRows }, { data: pickRows }] = await Promise.all([
+    computeTopScorers(svc, 25),
     svc.from("countries").select("id, name, code, flag_url"),
     svc.from("draft_picks").select("country_id, team_id").eq("league_id", leagueId),
   ]);
 
-  const scorers = (scorerRows ?? []) as ScorerRow[];
   const countryById = new Map((countryRows ?? []).map((c) => [c.id as number, c]));
   const teamName = new Map(teams.map((t) => [t.id, t.name]));
   const ownerOfCountry = new Map<number, string>();
@@ -69,7 +59,6 @@ export default async function GoldenBootPage({
                   <th className="px-2 py-2 sm:px-3">#</th>
                   <th className="px-2 py-2 sm:px-3">Player</th>
                   <th className="px-2 py-2 text-right sm:px-3">G</th>
-                  <th className="hidden px-2 py-2 text-right sm:table-cell sm:px-3">A</th>
                   <th className="px-2 py-2 sm:px-3">Owner</th>
                 </tr>
               </thead>
@@ -80,7 +69,7 @@ export default async function GoldenBootPage({
                   const leader = i === 0;
                   return (
                     <tr
-                      key={s.player_external_id}
+                      key={s.player_id ?? i}
                       className={"border-t border-puck-border " + (leader ? "bg-ice-500/10" : "bg-puck-bg")}
                     >
                       <td className="px-2 py-2 text-ice-400 sm:px-3">{i + 1}</td>
@@ -93,7 +82,6 @@ export default async function GoldenBootPage({
                         </span>
                       </td>
                       <td className="px-2 py-2 text-right font-semibold text-ice-100 sm:px-3">{s.goals}</td>
-                      <td className="hidden px-2 py-2 text-right text-ice-300 sm:table-cell sm:px-3">{s.assists}</td>
                       <td className="px-2 py-2 text-ice-300 sm:px-3">
                         {owner ? <span className="text-ice-100">{owner}</span> : <span className="text-ice-500">—</span>}
                       </td>
