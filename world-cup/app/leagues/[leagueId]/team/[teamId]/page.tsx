@@ -3,7 +3,22 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getUser, loadLeagueAccess } from "@/lib/league-access";
-import { scoreCountry } from "@/lib/scoring";
+import {
+  scoreCountry,
+  WIN_POINTS,
+  DRAW_POINTS,
+  LOSS_POINTS,
+  GOAL_FOR_POINTS,
+  GOAL_AGAINST_POINTS,
+  CLEAN_SHEET_POINTS,
+  UPSET_POINTS,
+  SHOOTOUT_WIN_POINTS,
+  SHOOTOUT_LOSS_POINTS,
+  ADVANCEMENT_POINTS,
+  CHAMPION_POINTS,
+  RUNNER_UP_POINTS,
+  THIRD_PLACE_POINTS,
+} from "@/lib/scoring";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -127,21 +142,42 @@ export default async function TeamPage({
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-ice-400">
-                    <Stat label="Results" v={s.match_points} />
-                    <Stat label="GF" v={s.goals_for_points} />
-                    <Stat label="GA" v={s.goals_against_points} />
-                    <Stat label="CS" v={s.clean_sheet_points} />
+                    <Stat label="Result" v={s.match_points} />
+                    <Stat label="Goals for" v={s.goals_for_points} />
+                    <Stat label="Goals against" v={s.goals_against_points} />
+                    <Stat label="Clean sheet" v={s.clean_sheet_points} />
                     <Stat label="Upset" v={s.upset_points} />
-                    <Stat label="Advance" v={s.advancement_points} />
+                    <Stat label="Advancement" v={s.advancement_points} />
                     <Stat label="Champion" v={s.champion_points} />
                     <Stat label="Runner-up" v={s.runner_up_points} />
-                    <Stat label="3rd place" v={s.third_place_points} />
+                    <Stat label="Third place" v={s.third_place_points} />
                   </div>
                 </div>
               ) : null,
             )}
           </div>
         )}
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>How points are scored</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-1.5 text-xs">
+              {SCORING_LEGEND.map(([label, desc]) => (
+                <div key={label} className="flex flex-wrap gap-x-2">
+                  <dt className="w-28 shrink-0 font-medium text-ice-200">{label}</dt>
+                  <dd className="flex-1 text-ice-400">{desc}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-3 text-[11px] text-ice-500">
+              Semifinal &amp; final match points (result, goals, clean sheet)
+              count ×1.5. A team also earns the Golden Boot bonus for its owner
+              if it has the tournament&rsquo;s top scorer — see the standings.
+            </p>
+          </CardContent>
+        </Card>
 
         {isMine && (
           <Card className="mt-6">
@@ -186,3 +222,21 @@ function Stat({ label, v }: { label: string; v: number }) {
     </span>
   );
 }
+
+/** Format a points value with an explicit sign (e.g. +3, -0.5, 0). */
+function sgn(n: number): string {
+  return n > 0 ? `+${fmtPoints(n)}` : fmtPoints(n);
+}
+
+/** Scoring legend, mirroring the per-country breakdown categories above. */
+const SCORING_LEGEND: Array<[string, string]> = [
+  ["Result", `Win ${sgn(WIN_POINTS)} · Draw ${sgn(DRAW_POINTS)} · Loss ${fmtPoints(LOSS_POINTS)} · Shootout win ${sgn(SHOOTOUT_WIN_POINTS)} / loss ${sgn(SHOOTOUT_LOSS_POINTS)}`],
+  ["Goals for", `${sgn(GOAL_FOR_POINTS)} per goal scored`],
+  ["Goals against", `${sgn(GOAL_AGAINST_POINTS)} per goal conceded`],
+  ["Clean sheet", `${sgn(CLEAN_SHEET_POINTS)} when you concede none in a match`],
+  ["Upset", `${sgn(UPSET_POINTS)} for a group-stage win over a higher-ranked team`],
+  ["Advancement", `${sgn(ADVANCEMENT_POINTS.r16)} each time you reach a knockout round`],
+  ["Champion", `${sgn(CHAMPION_POINTS)} for winning the tournament`],
+  ["Runner-up", `${sgn(RUNNER_UP_POINTS)} for losing the final`],
+  ["Third place", `${sgn(THIRD_PLACE_POINTS)} for winning the third-place playoff`],
+];
