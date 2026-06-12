@@ -62,6 +62,7 @@ export default async function GoldenBootPage({
                   <th className="px-2 py-2 sm:px-3">#</th>
                   <th className="px-2 py-2 sm:px-3">Player</th>
                   <th className="px-2 py-2 text-right sm:px-3">G</th>
+                  <th className="hidden px-2 py-2 text-right sm:table-cell sm:px-3">A</th>
                   <th className="px-2 py-2 sm:px-3">Owner</th>
                 </tr>
               </thead>
@@ -85,6 +86,7 @@ export default async function GoldenBootPage({
                         </span>
                       </td>
                       <td className="px-2 py-2 text-right font-semibold text-ice-100 sm:px-3">{s.goals}</td>
+                      <td className="hidden px-2 py-2 text-right text-ice-300 sm:table-cell sm:px-3">{s.assists}</td>
                       <td className="px-2 py-2 text-ice-300 sm:px-3">
                         {owner ? <span className="text-ice-100">{owner}</span> : <span className="text-ice-500">—</span>}
                       </td>
@@ -95,6 +97,13 @@ export default async function GoldenBootPage({
             </table>
             </div>
           </div>
+        )}
+
+        {scorers.length > 0 && (
+          <p className="mt-3 text-[11px] text-ice-500">
+            Ties are broken by the FIFA Golden Boot rule: most goals, then most
+            assists, then fewest minutes played.
+          </p>
         )}
       </main>
     </>
