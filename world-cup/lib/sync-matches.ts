@@ -100,6 +100,8 @@ function buildMatchRow(
     away_country_id: awayId,
     kickoff_utc: fx.fixture.date,
     status: mapStatus(fx.fixture.status.short),
+    status_detail: fx.fixture.status.short,
+    elapsed: fx.fixture.status.elapsed ?? null,
     home_goals: fx.goals.home,
     away_goals: fx.goals.away,
     went_to_shootout: wentToShootout,

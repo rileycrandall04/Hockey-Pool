@@ -7,7 +7,7 @@ import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { ScorerList } from "@/components/scorer-list";
 import { LiveRefresher } from "@/components/live-refresher";
-import { POOL_TZ_OFFSET, poolToday, fmtKickoff } from "@/lib/utils";
+import { POOL_TZ_OFFSET, poolToday, fmtKickoff, liveClock } from "@/lib/utils";
 import type { Country, Match } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -108,7 +108,7 @@ export default async function SchedulePage({
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
                             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
                           </span>
-                          Live
+                          {liveClock(m.status_detail, m.elapsed)}
                         </span>
                       ) : (
                         <span>{played ? "FT" : fmtKickoff(m.kickoff_utc)}</span>

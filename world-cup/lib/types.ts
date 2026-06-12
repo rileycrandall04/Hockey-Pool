@@ -102,6 +102,10 @@ export interface Match {
   /** Set when a commissioner manually edits the result; blocks API overwrite. */
   locked: boolean;
   external_id: number | null;
+  /** Live match minute reported by the feed (null when not in play). */
+  elapsed?: number | null;
+  /** Detailed status code from the feed: 1H, HT, 2H, ET, BT, P, etc. */
+  status_detail?: string | null;
 }
 
 export interface MatchGoal {

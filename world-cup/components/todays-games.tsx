@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Flag } from "@/components/flag";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fmtKickoff } from "@/lib/utils";
+import { fmtKickoff, liveClock } from "@/lib/utils";
 import type { ScorerLine } from "@/lib/match-scorers";
 import type { Country, Match } from "@/lib/types";
 
@@ -77,7 +77,7 @@ export function TodaysGames({
               <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-wider text-ice-500">
                 <span className="group-hover:text-ice-300">{STAGE_LABEL[m.stage] ?? m.stage}</span>
                 {live ? (
-                  <span className="font-semibold text-red-300">Live</span>
+                  <span className="font-semibold text-red-300">{liveClock(m.status_detail, m.elapsed)}</span>
                 ) : (
                   <span>{played ? "Final" : fmtKickoff(m.kickoff_utc)}</span>
                 )}

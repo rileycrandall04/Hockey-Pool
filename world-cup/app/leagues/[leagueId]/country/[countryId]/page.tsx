@@ -8,7 +8,7 @@ import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { ScorerList } from "@/components/scorer-list";
 import { LiveRefresher } from "@/components/live-refresher";
-import { fmtPoints, fmtShortDate } from "@/lib/utils";
+import { fmtPoints, fmtShortDate, liveClock } from "@/lib/utils";
 import type { Country, Match, ScoringMatch } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -116,6 +116,7 @@ export default async function CountryPage({
                         </span>
                       )}
                       {hasScore ? `${myGoals} – ${oppGoals}` : "—"}
+                      {live && <span className="text-[11px] font-medium text-red-300">{liveClock(m.status_detail, m.elapsed)}</span>}
                       {m.went_to_shootout && played ? ` (${isHome ? m.home_pens : m.away_pens}–${isHome ? m.away_pens : m.home_pens} pens)` : ""}
                     </span>
                   </div>
