@@ -75,6 +75,8 @@ create table if not exists public.matches (
   home_pens int,
   away_pens int,
   external_id int unique,                      -- API-Football fixture id
+  elapsed int,                                 -- live match minute (null off-pitch)
+  status_detail text,                          -- API status code: 1H, HT, 2H, ET, P…
   updated_at timestamptz not null default now()
 );
 

@@ -30,6 +30,21 @@ export function fmtKickoff(iso: string | null): string {
   });
 }
 
+/**
+ * A short live-clock label for an in-progress match from the feed's detailed
+ * status code and minute: "67'", "HT", "ET 105'", "PENS". Falls back to
+ * "Live" when the minute isn't known. Only meaningful while status is "live".
+ */
+export function liveClock(statusDetail?: string | null, elapsed?: number | null): string {
+  const s = (statusDetail ?? "").toUpperCase();
+  if (s === "HT") return "HT";
+  if (s === "BT") return "ET"; // break before extra time
+  if (s === "P" || s === "PEN") return "PENS";
+  if (s === "SUSP" || s === "INT") return "PAUSED";
+  if (elapsed != null) return s === "ET" ? `ET ${elapsed}'` : `${elapsed}'`;
+  return "Live";
+}
+
 /** Short Mountain-Time date (e.g. "Jun 14"). */
 export function fmtShortDate(iso: string | null): string {
   if (!iso) return "";

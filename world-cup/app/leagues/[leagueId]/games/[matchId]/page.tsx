@@ -9,7 +9,7 @@ import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import { ScorerList } from "@/components/scorer-list";
 import { LiveRefresher } from "@/components/live-refresher";
-import { fmtPoints, fmtKickoff, fmtShortDate } from "@/lib/utils";
+import { fmtPoints, fmtKickoff, fmtShortDate, liveClock } from "@/lib/utils";
 import type { Country, Match, ScoredCountry, ScoringMatch } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -81,7 +81,7 @@ export default async function GamePage({
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
               </span>
-              Live
+              Live · {liveClock(m.status_detail, m.elapsed)}
             </span>
           </div>
         )}
