@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getUser, loadLeagueAccess } from "@/lib/league-access";
+import { requireLeagueView } from "@/lib/league-access";
 import { computeStandings } from "@/lib/standings";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
@@ -24,13 +23,10 @@ export default async function LeagueStandingsPage({
   params: Promise<{ leagueId: string }>;
 }) {
   const { leagueId } = await params;
-  const user = await getUser();
-  if (!user) redirect("/login");
+  const access = await requireLeagueView(leagueId);
 
-  const access = await loadLeagueAccess(leagueId, user.id, user.email ?? null);
-  if (!access) redirect("/dashboard");
-
-  const { league, teams, ownerNames, isCommissioner, displayName, myTeam } = access;
+  const { league, teams, ownerNames, isCommissioner, displayName, myTeam, readOnly } =
+    access;
   const svc = createServiceClient();
   const rows = await computeStandings(svc, leagueId, teams, ownerNames);
 
@@ -70,6 +66,7 @@ export default async function LeagueStandingsPage({
         leagueId={leagueId}
         draftStatus={league.draft_status}
         isCommissioner={isCommissioner}
+        readOnly={readOnly}
       />
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         <div className="mb-4 flex items-center justify-between gap-2">
@@ -79,7 +76,7 @@ export default async function LeagueStandingsPage({
               Season {league.season} · {league.draft_status.replace("_", " ")}
             </p>
           </div>
-          {league.draft_status !== "complete" && (
+          {!readOnly && league.draft_status !== "complete" && (
             <Link href={`/leagues/${leagueId}/draft`}>
               <Button size="sm">
                 {league.draft_status === "pending" ? "To draft lobby" : "Go to draft"}
@@ -112,8 +109,14 @@ export default async function LeagueStandingsPage({
         {teams.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-sm text-ice-300">
-              No teams yet. Share the join code{" "}
-              <span className="font-mono text-ice-50">{league.join_code}</span>.
+              No teams yet.
+              {!readOnly && (
+                <>
+                  {" "}
+                  Share the join code{" "}
+                  <span className="font-mono text-ice-50">{league.join_code}</span>.
+                </>
+              )}
             </CardContent>
           </Card>
         ) : (

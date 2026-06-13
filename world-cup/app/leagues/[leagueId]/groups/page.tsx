@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getUser, loadLeagueAccess } from "@/lib/league-access";
+import { requireLeagueView } from "@/lib/league-access";
 import { buildGroupTables } from "@/lib/group-standings";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
@@ -15,11 +14,8 @@ export default async function GroupsPage({
   params: Promise<{ leagueId: string }>;
 }) {
   const { leagueId } = await params;
-  const user = await getUser();
-  if (!user) redirect("/login");
-  const access = await loadLeagueAccess(leagueId, user.id, user.email ?? null);
-  if (!access) redirect("/dashboard");
-  const { league, isCommissioner, displayName } = access;
+  const access = await requireLeagueView(leagueId);
+  const { league, isCommissioner, displayName, readOnly } = access;
 
   const svc = createServiceClient();
   const [{ data: countryRows }, { data: matchRows }] = await Promise.all([
@@ -33,7 +29,7 @@ export default async function GroupsPage({
 
   return (
     <>
-      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
+      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} readOnly={readOnly} />
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         <h1 className="mb-4 text-2xl font-bold text-ice-50">Group tables</h1>
         <div className="grid gap-4 sm:grid-cols-2">

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getUser, loadLeagueAccess } from "@/lib/league-access";
+import { requireLeagueView } from "@/lib/league-access";
 import { isAppAdmin } from "@/lib/admin";
 import { scoreCountry } from "@/lib/scoring";
 import { loadScorersByMatch } from "@/lib/match-scorers";
@@ -30,11 +30,8 @@ export default async function GamePage({
   params: Promise<{ leagueId: string; matchId: string }>;
 }) {
   const { leagueId, matchId } = await params;
-  const user = await getUser();
-  if (!user) redirect("/login");
-  const access = await loadLeagueAccess(leagueId, user.id, user.email ?? null);
-  if (!access) redirect("/dashboard");
-  const { league, isCommissioner, displayName } = access;
+  const access = await requireLeagueView(leagueId);
+  const { league, isCommissioner, displayName, readOnly } = access;
 
   const svc = createServiceClient();
   const { data: match } = await svc.from("matches").select("*").eq("id", matchId).maybeSingle();
@@ -48,7 +45,7 @@ export default async function GamePage({
   const away = countryById.get(m.away_country_id);
 
   const scorers = await loadScorersByMatch(svc, [m.id]);
-  const canEditGoals = await isAppAdmin(svc, user.id, user.email);
+  const canEditGoals = await isAppAdmin(svc, access.user.id, access.user.email);
   const live = m.status === "live";
   const played = m.status === "final" && m.home_goals != null && m.away_goals != null;
   // Show the running score for live games too, not just finals.
@@ -58,7 +55,7 @@ export default async function GamePage({
 
   return (
     <>
-      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
+      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} readOnly={readOnly} />
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
         {canEditGoals && (
           <div className="mb-2 flex justify-end gap-3">

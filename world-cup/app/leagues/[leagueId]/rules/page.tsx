@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getUser, loadLeagueAccess } from "@/lib/league-access";
+import { requireLeagueView } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,15 +21,12 @@ export default async function RulesPage({
   params: Promise<{ leagueId: string }>;
 }) {
   const { leagueId } = await params;
-  const user = await getUser();
-  if (!user) redirect("/login");
-  const access = await loadLeagueAccess(leagueId, user.id, user.email ?? null);
-  if (!access) redirect("/dashboard");
-  const { league, isCommissioner, displayName } = access;
+  const access = await requireLeagueView(leagueId);
+  const { league, isCommissioner, displayName, readOnly } = access;
 
   return (
     <>
-      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
+      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} readOnly={readOnly} />
       <main className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-6">
         <div>
           <h1 className="text-2xl font-bold text-ice-50">Scoring rules</h1>

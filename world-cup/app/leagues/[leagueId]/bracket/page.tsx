@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getUser, loadLeagueAccess } from "@/lib/league-access";
+import { requireLeagueView } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import type { Country, Match, Stage } from "@/lib/types";
@@ -22,11 +21,8 @@ export default async function BracketPage({
   params: Promise<{ leagueId: string }>;
 }) {
   const { leagueId } = await params;
-  const user = await getUser();
-  if (!user) redirect("/login");
-  const access = await loadLeagueAccess(leagueId, user.id, user.email ?? null);
-  if (!access) redirect("/dashboard");
-  const { league, teams, isCommissioner, displayName } = access;
+  const access = await requireLeagueView(leagueId);
+  const { league, teams, isCommissioner, displayName, readOnly } = access;
 
   const svc = createServiceClient();
   const [{ data: matchRows }, { data: countryRows }, { data: pickRows }] = await Promise.all([
@@ -46,7 +42,7 @@ export default async function BracketPage({
 
   return (
     <>
-      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
+      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} readOnly={readOnly} />
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         <h1 className="mb-1 text-2xl font-bold text-ice-50">Knockout bracket</h1>
         <p className="mb-4 text-xs text-ice-400">Tap any match for its point breakdown. Teams you can&rsquo;t see yet are still in the group stage.</p>

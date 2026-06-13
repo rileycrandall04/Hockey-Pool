@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getUser, loadLeagueAccess } from "@/lib/league-access";
+import { requireLeagueView } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
 import type { Country } from "@/lib/types";
@@ -14,13 +13,9 @@ export default async function CountriesPage({
   params: Promise<{ leagueId: string }>;
 }) {
   const { leagueId } = await params;
-  const user = await getUser();
-  if (!user) redirect("/login");
+  const access = await requireLeagueView(leagueId);
 
-  const access = await loadLeagueAccess(leagueId, user.id, user.email ?? null);
-  if (!access) redirect("/dashboard");
-
-  const { league, teams, isCommissioner, displayName } = access;
+  const { league, teams, isCommissioner, displayName, readOnly } = access;
   const svc = createServiceClient();
 
   const [{ data: countryRows }, { data: pickRows }] = await Promise.all([
@@ -42,6 +37,7 @@ export default async function CountriesPage({
         leagueId={leagueId}
         draftStatus={league.draft_status}
         isCommissioner={isCommissioner}
+        readOnly={readOnly}
       />
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         <h1 className="mb-1 text-2xl font-bold text-ice-50">Countries</h1>

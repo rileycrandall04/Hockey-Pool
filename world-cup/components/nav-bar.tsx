@@ -12,6 +12,8 @@ interface NavBarProps {
   leagueId?: string;
   draftStatus?: DraftStatus;
   isCommissioner?: boolean;
+  /** Read-only share-link visitor: hide account actions and write entry points. */
+  readOnly?: boolean;
 }
 
 /**
@@ -23,6 +25,7 @@ export function NavBar({
   leagueId,
   draftStatus,
   isCommissioner = false,
+  readOnly = false,
 }: NavBarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -98,7 +101,7 @@ export function NavBar({
       label: "Rules",
       active: isActive(`/leagues/${leagueId}/rules`),
     });
-    if (draftHref && draftStatus !== "complete") {
+    if (draftHref && draftStatus !== "complete" && !readOnly) {
       items.push({ href: draftHref, label: draftLabel, active: isActive(draftHref) });
     }
     if (isCommissioner) {
@@ -110,14 +113,17 @@ export function NavBar({
     }
   }
 
+  // Read-only visitors have no account, so the account actions don't apply.
   const leagueActions: Item[] = [];
-  if (leagueId) {
-    leagueActions.push({ href: "/dashboard", label: "Switch leagues", active: false });
+  if (!readOnly) {
+    if (leagueId) {
+      leagueActions.push({ href: "/dashboard", label: "Switch leagues", active: false });
+    }
+    leagueActions.push(
+      { href: "/leagues/new", label: "Create league", active: isActive("/leagues/new", true) },
+      { href: "/leagues/join", label: "Join league", active: isActive("/leagues/join", true) },
+    );
   }
-  leagueActions.push(
-    { href: "/leagues/new", label: "Create league", active: isActive("/leagues/new", true) },
-    { href: "/leagues/join", label: "Join league", active: isActive("/leagues/join", true) },
-  );
 
   return (
     <header className="border-b border-puck-border bg-puck-card">
@@ -140,7 +146,7 @@ export function NavBar({
               className="absolute left-0 top-full z-50 mt-1.5 w-56 overflow-hidden rounded-md border border-puck-border bg-puck-card shadow-lg shadow-black/40"
             >
               <div className="border-b border-puck-border px-3 py-2 text-xs text-ice-400">
-                Signed in as{" "}
+                {readOnly ? "Viewing" : "Signed in as"}{" "}
                 <span className="block truncate text-sm text-ice-100">
                   {displayName}
                 </span>
@@ -152,19 +158,29 @@ export function NavBar({
                   </MenuLink>
                 ))}
               </nav>
-              <div className="border-t border-puck-border py-1">
-                {leagueActions.map((item) => (
-                  <MenuLink key={item.href} href={item.href} active={item.active}>
-                    {item.label}
-                  </MenuLink>
-                ))}
-              </div>
+              {leagueActions.length > 0 && (
+                <div className="border-t border-puck-border py-1">
+                  {leagueActions.map((item) => (
+                    <MenuLink key={item.href} href={item.href} active={item.active}>
+                      {item.label}
+                    </MenuLink>
+                  ))}
+                </div>
+              )}
               <div className="border-t border-puck-border p-2">
-                <form action="/auth/signout" method="post">
-                  <Button type="submit" size="sm" variant="secondary" className="w-full">
-                    Sign out
-                  </Button>
-                </form>
+                {readOnly ? (
+                  <Link href="/login">
+                    <Button size="sm" variant="secondary" className="w-full">
+                      Log in
+                    </Button>
+                  </Link>
+                ) : (
+                  <form action="/auth/signout" method="post">
+                    <Button type="submit" size="sm" variant="secondary" className="w-full">
+                      Sign out
+                    </Button>
+                  </form>
+                )}
               </div>
             </div>
           )}

@@ -34,6 +34,8 @@ export interface League {
   season: string;
   commissioner_id: string;
   join_code: string;
+  /** Secret embedded in the read-only /share/<token> link for this league. */
+  public_view_token: string;
   /** Countries each owner drafts. 12 owners x 4 = the full 48-team field. */
   roster_size: number;
   draft_status: DraftStatus;

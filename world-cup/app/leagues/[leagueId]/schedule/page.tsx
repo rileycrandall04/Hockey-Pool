@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getUser, loadLeagueAccess } from "@/lib/league-access";
+import { requireLeagueView } from "@/lib/league-access";
 import { loadScorersByMatch } from "@/lib/match-scorers";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
@@ -40,11 +39,8 @@ export default async function SchedulePage({
 }) {
   const { leagueId } = await params;
   const { date: dateParam } = await searchParams;
-  const user = await getUser();
-  if (!user) redirect("/login");
-  const access = await loadLeagueAccess(leagueId, user.id, user.email ?? null);
-  if (!access) redirect("/dashboard");
-  const { league, isCommissioner, displayName } = access;
+  const access = await requireLeagueView(leagueId);
+  const { league, isCommissioner, displayName, readOnly } = access;
 
   const date = /^\d{4}-\d{2}-\d{2}$/.test(dateParam ?? "") ? dateParam! : poolToday();
   // Day boundaries in Mountain Time so a 9pm MT kickoff lands on the right day.
@@ -64,7 +60,7 @@ export default async function SchedulePage({
 
   return (
     <>
-      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
+      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} readOnly={readOnly} />
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
         {anyLive && <LiveRefresher />}
         <h1 className="mb-1 text-2xl font-bold text-ice-50">Schedule</h1>

@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getUser, loadLeagueAccess } from "@/lib/league-access";
+import { requireLeagueView } from "@/lib/league-access";
 import { aggregatePlayerGoals } from "@/lib/player-stats";
 import { NavBar } from "@/components/nav-bar";
 import { PlayersSearch, type PlayerItem } from "@/components/players-search";
@@ -14,11 +13,8 @@ export default async function PlayersPage({
   params: Promise<{ leagueId: string }>;
 }) {
   const { leagueId } = await params;
-  const user = await getUser();
-  if (!user) redirect("/login");
-  const access = await loadLeagueAccess(leagueId, user.id, user.email ?? null);
-  if (!access) redirect("/dashboard");
-  const { league, isCommissioner, displayName } = access;
+  const access = await requireLeagueView(leagueId);
+  const { league, isCommissioner, displayName, readOnly } = access;
 
   const svc = createServiceClient();
   const [{ data: playerRows }, { data: goalRows }, { data: countryRows }] = await Promise.all([
@@ -46,7 +42,7 @@ export default async function PlayersPage({
 
   return (
     <>
-      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} />
+      <NavBar displayName={displayName} leagueId={leagueId} draftStatus={league.draft_status} isCommissioner={isCommissioner} readOnly={readOnly} />
       <main className="mx-auto max-w-xl px-4 py-6 sm:px-6">
         <h1 className="mb-1 text-2xl font-bold text-ice-50">Players</h1>
         <p className="mb-4 text-xs text-ice-400">

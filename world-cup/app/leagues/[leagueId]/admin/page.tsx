@@ -10,6 +10,7 @@ import { Flag } from "@/components/flag";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { SyncButton } from "@/components/sync-button";
+import { ShareLink } from "@/components/share-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Country } from "@/lib/types";
 
@@ -370,6 +371,14 @@ export default async function AdminPage({
             </p>
             <p>Draft status: {league.draft_status.replace("_", " ")}</p>
             <p>Teams: {teams.length} · Roster size: {league.roster_size}</p>
+            <div className="pt-2">
+              <p className="mb-1 text-xs text-ice-400">
+                Read-only share link — anyone with it can view this league
+                without an account (they can&rsquo;t draft, guess, or change
+                anything).
+              </p>
+              <ShareLink token={league.public_view_token} />
+            </div>
           </CardContent>
         </Card>
 
