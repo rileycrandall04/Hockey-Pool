@@ -155,13 +155,25 @@ export default async function LeagueStandingsPage({
                   return (
                     <tr
                       key={row.team.id}
+                      title={row.live ? "Has a team playing live" : undefined}
                       className={
                         "border-t border-puck-border " +
-                        (isMe ? "bg-ice-500/10" : "bg-puck-bg")
+                        (row.live
+                          ? "outline outline-2 -outline-offset-2 outline-red-500/70 "
+                          : "") +
+                        (isMe ? "bg-ice-500/10" : row.live ? "bg-red-500/10" : "bg-puck-bg")
                       }
                     >
                       <td className="px-2 py-2 text-ice-400 sm:px-3">{i + 1}</td>
                       <td className="px-2 py-2 sm:px-3">
+                        {row.live && (
+                          <span
+                            title="Has a team playing live"
+                            className="mr-1 inline-block animate-pulse text-red-500"
+                          >
+                            🔴
+                          </span>
+                        )}
                         <Link
                           href={`/leagues/${leagueId}/team/${row.team.id}`}
                           className="font-semibold text-ice-50 hover:underline"

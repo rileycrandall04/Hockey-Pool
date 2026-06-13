@@ -14,6 +14,8 @@ export interface StandingRow {
   ownerName: string;
   scored: ScoredOwner;
   countries: Array<{ country: Country; scored: ScoredCountry }>;
+  /** True when at least one of the team's countries is in a live match. */
+  live: boolean;
 }
 
 /**
@@ -45,6 +47,16 @@ export async function computeStandings(
   const leader = topScorers[0] ?? null;
 
   const matches = (matchRows ?? []) as ScoringMatch[];
+
+  // Countries currently in a live match, for the standings "playing now" cue.
+  const liveCountryIds = new Set<number>();
+  for (const m of matches) {
+    if (m.status === "live") {
+      liveCountryIds.add(m.home_country_id);
+      liveCountryIds.add(m.away_country_id);
+    }
+  }
+
   const countries = (countryRows ?? []) as Country[];
   const countryById = new Map<number, Country>();
   for (const c of countries) countryById.set(c.id, c);
@@ -111,6 +123,7 @@ export async function computeStandings(
         country: countryById.get(sc.country_id)!,
         scored: sc,
       })),
+      live: scored.countries.some((sc) => liveCountryIds.has(sc.country_id)),
     };
   });
 }
