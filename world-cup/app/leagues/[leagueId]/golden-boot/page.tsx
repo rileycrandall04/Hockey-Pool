@@ -58,6 +58,7 @@ export default async function GoldenBootPage({
                   <th className="px-2 py-2 sm:px-3">Player</th>
                   <th className="px-2 py-2 text-right sm:px-3">G</th>
                   <th className="hidden px-2 py-2 text-right sm:table-cell sm:px-3">A</th>
+                  <th className="px-2 py-2 text-right sm:px-3" title="Minutes played">Min</th>
                   <th className="px-2 py-2 sm:px-3">Owner</th>
                 </tr>
               </thead>
@@ -82,6 +83,9 @@ export default async function GoldenBootPage({
                       </td>
                       <td className="px-2 py-2 text-right font-semibold text-ice-100 sm:px-3">{s.goals}</td>
                       <td className="hidden px-2 py-2 text-right text-ice-300 sm:table-cell sm:px-3">{s.assists}</td>
+                      <td className="px-2 py-2 text-right text-ice-300 sm:px-3">
+                        {s.minutes != null ? s.minutes : "—"}
+                      </td>
                       <td className="px-2 py-2 text-ice-300 sm:px-3">
                         {owner ? <span className="text-ice-100">{owner}</span> : <span className="text-ice-500">—</span>}
                       </td>
