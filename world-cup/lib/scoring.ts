@@ -1,5 +1,6 @@
 import type {
   ScoredCountry,
+  ScoredCountryBreakdown,
   ScoredOwner,
   ScoringMatch,
   Stage,
@@ -128,6 +129,19 @@ export function scoreCountry(
   const stagesReached = new Set<Stage>();
   let furthest: Stage = "group";
 
+  // Per-category lists of the individual amounts behind each sum.
+  const contributions: ScoredCountryBreakdown = {
+    result: [],
+    goals_for: [],
+    goals_against: [],
+    clean_sheet: [],
+    upset: [],
+    advancement: [],
+    champion: [],
+    runner_up: [],
+    third_place: [],
+  };
+
   for (const m of mine) {
     stagesReached.add(m.stage);
     if (stageOrder(m.stage) > stageOrder(furthest)) furthest = m.stage;
@@ -183,11 +197,29 @@ export function scoreCountry(
     cleanSheetPoints += csp;
     upsetPoints += ups;
     goalsFor += gf;
+    if (res !== 0) contributions.result.push(res);
+    if (gfp !== 0) contributions.goals_for.push(gfp);
+    if (gap !== 0) contributions.goals_against.push(gap);
+    if (csp !== 0) contributions.clean_sheet.push(csp);
+    if (ups !== 0) contributions.upset.push(ups);
     if (!isFinalMatch) provisionalPoints += res + gfp + gap + csp + ups;
   }
 
+  // Advancement bonuses, one per knockout stage reached (in bracket order).
   let advancementPoints = 0;
-  for (const stage of stagesReached) advancementPoints += ADVANCEMENT_POINTS[stage];
+  for (const stage of STAGE_ORDER) {
+    if (!stagesReached.has(stage)) continue;
+    const adv = ADVANCEMENT_POINTS[stage];
+    if (adv > 0) {
+      advancementPoints += adv;
+      contributions.advancement.push(adv);
+    }
+  }
+
+  // Podium bonuses are one-time, so each is at most a single entry.
+  if (championPoints > 0) contributions.champion.push(championPoints);
+  if (runnerUpPoints > 0) contributions.runner_up.push(runnerUpPoints);
+  if (thirdPlacePoints > 0) contributions.third_place.push(thirdPlacePoints);
 
   const total =
     matchPoints +
@@ -215,6 +247,7 @@ export function scoreCountry(
     total,
     goals_for: goalsFor,
     furthest_stage: furthest,
+    contributions,
   };
 }
 

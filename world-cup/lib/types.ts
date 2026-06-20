@@ -156,6 +156,25 @@ export interface ScoredCountry {
   // Tiebreaker data.
   goals_for: number;
   furthest_stage: Stage;
+  /** Per-category lists of the individual point amounts that make up each sum. */
+  contributions: ScoredCountryBreakdown;
+}
+
+/**
+ * The individual point amounts behind each category total, so a breakdown can
+ * show "5, 5" for two upsets instead of a solitary "10". Each array holds the
+ * non-zero contributions in the order they were earned.
+ */
+export interface ScoredCountryBreakdown {
+  result: number[];
+  goals_for: number[];
+  goals_against: number[];
+  clean_sheet: number[];
+  upset: number[];
+  advancement: number[];
+  champion: number[];
+  runner_up: number[];
+  third_place: number[];
 }
 
 export interface ScoredOwner {

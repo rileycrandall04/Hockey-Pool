@@ -139,15 +139,15 @@ export default async function TeamPage({
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-ice-400">
-                    <Stat label="Result" v={s.match_points} />
-                    <Stat label="Goals for" v={s.goals_for_points} />
-                    <Stat label="Goals against" v={s.goals_against_points} />
-                    <Stat label="Clean sheet" v={s.clean_sheet_points} />
-                    <Stat label="Upset" v={s.upset_points} />
-                    <Stat label="Advancement" v={s.advancement_points} />
-                    <Stat label="Champion" v={s.champion_points} />
-                    <Stat label="Runner-up" v={s.runner_up_points} />
-                    <Stat label="Third place" v={s.third_place_points} />
+                    <Stat label="Result" parts={s.contributions.result} />
+                    <Stat label="Goals for" parts={s.contributions.goals_for} />
+                    <Stat label="Goals against" parts={s.contributions.goals_against} />
+                    <Stat label="Clean sheet" parts={s.contributions.clean_sheet} />
+                    <Stat label="Upset" parts={s.contributions.upset} />
+                    <Stat label="Advancement" parts={s.contributions.advancement} />
+                    <Stat label="Champion" parts={s.contributions.champion} />
+                    <Stat label="Runner-up" parts={s.contributions.runner_up} />
+                    <Stat label="Third place" parts={s.contributions.third_place} />
                   </div>
                 </div>
               ) : null,
@@ -211,11 +211,19 @@ export default async function TeamPage({
   );
 }
 
-function Stat({ label, v }: { label: string; v: number }) {
-  if (!v) return null;
+function Stat({ label, parts }: { label: string; parts: number[] }) {
+  if (parts.length === 0) return null;
+  // List each contribution (e.g. two upsets as "5, 5"), plus the running
+  // total in parentheses when there's more than one so the sum stays handy.
+  const list = parts.map((p) => fmtPoints(p)).join(", ");
+  const sum = parts.reduce((a, b) => a + b, 0);
   return (
     <span>
-      {label}: <span className="text-ice-200">{fmtPoints(v)}</span>
+      {label}:{" "}
+      <span className="text-ice-200">
+        {list}
+        {parts.length > 1 && <span className="text-ice-500"> ({fmtPoints(sum)})</span>}
+      </span>
     </span>
   );
 }

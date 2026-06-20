@@ -63,6 +63,24 @@ describe("scoreCountry - group stage", () => {
     // loss 0 + GF 1 - 0.5*3 = -0.5
     expect(s.total).toBeCloseTo(-0.5, 5);
   });
+
+  it("lists each contribution per category (two upsets show as 5, 5)", () => {
+    // Team 4 (rank 48) wins twice over better-ranked sides: 1-0 vs 1, 2-1 vs 3.
+    const s = scoreCountry(
+      4,
+      [
+        m({ home_country_id: 4, away_country_id: 1, home_goals: 1, away_goals: 0 }),
+        m({ home_country_id: 4, away_country_id: 3, home_goals: 2, away_goals: 1 }),
+      ],
+      rank,
+    );
+    expect(s.contributions.upset).toEqual([5, 5]);
+    expect(s.upset_points).toBe(10);
+    expect(s.contributions.result).toEqual([3, 3]); // two wins
+    expect(s.contributions.goals_for).toEqual([1, 2]);
+    expect(s.contributions.goals_against).toEqual([-0.5]); // only the 2nd match conceded
+    expect(s.contributions.clean_sheet).toEqual([1]); // first match only
+  });
 });
 
 describe("scoreCountry - knockout & shootouts", () => {
