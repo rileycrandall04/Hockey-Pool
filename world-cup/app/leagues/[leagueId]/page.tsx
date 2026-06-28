@@ -143,10 +143,19 @@ export default async function LeagueStandingsPage({
                         country ? (
                           <span
                             key={country.id}
-                            className="inline-flex items-center gap-1 rounded bg-puck-card px-1.5 py-0.5 text-xs text-ice-200"
-                            title={country.name}
+                            className={
+                              "inline-flex items-center gap-1 rounded bg-puck-card px-1.5 py-0.5 text-xs " +
+                              (country.eliminated
+                                ? "text-ice-500 line-through opacity-60"
+                                : "text-ice-200")
+                            }
+                            title={country.eliminated ? `${country.name} — eliminated` : country.name}
                           >
-                            <Flag code={country.code} url={country.flag_url} />
+                            <Flag
+                              code={country.code}
+                              url={country.flag_url}
+                              className={country.eliminated ? "opacity-50" : ""}
+                            />
                             {country.code}
                           </span>
                         ) : null,

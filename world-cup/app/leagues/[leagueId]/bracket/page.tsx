@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireLeagueView } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
+import { fmtKickoff, fmtShortDate } from "@/lib/utils";
 import type { Country, Match, Stage } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -101,9 +102,14 @@ function MatchCard({
       href={`/leagues/${leagueId}/games/${m.id}`}
       className="block rounded-md border border-puck-border bg-puck-bg p-2 hover:border-ice-400"
     >
-      <TeamLine country={home} goals={played ? m.home_goals : null} win={homeWin} owner={home ? ownerOf.get(home.id) : ""} />
+      {m.kickoff_utc && (
+        <div className="mb-1 text-center text-[10px] uppercase tracking-wide text-ice-500">
+          {fmtShortDate(m.kickoff_utc)} · {fmtKickoff(m.kickoff_utc)}
+        </div>
+      )}
+      <TeamLine country={home} goals={played ? m.home_goals : null} win={homeWin} lose={awayWin} owner={home ? ownerOf.get(home.id) : ""} />
       <div className="my-1 h-px bg-puck-border" />
-      <TeamLine country={away} goals={played ? m.away_goals : null} win={awayWin} owner={away ? ownerOf.get(away.id) : ""} />
+      <TeamLine country={away} goals={played ? m.away_goals : null} win={awayWin} lose={homeWin} owner={away ? ownerOf.get(away.id) : ""} />
       {m.went_to_shootout && played && (
         <div className="mt-1 text-center text-[10px] text-ice-500">{m.home_pens}–{m.away_pens} pens</div>
       )}
@@ -111,15 +117,17 @@ function MatchCard({
   );
 }
 
-function TeamLine({ country, goals, win, owner }: { country?: Country; goals?: number | null; win?: boolean; owner?: string }) {
+function TeamLine({ country, goals, win, lose, owner }: { country?: Country; goals?: number | null; win?: boolean; lose?: boolean; owner?: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <Flag code={country?.code} url={country?.flag_url} />
-      <span className={"flex-1 truncate text-sm " + (win ? "font-bold text-ice-50" : "text-ice-200")}>
-        {country?.name ?? "TBD"}
+      <Flag code={country?.code} url={country?.flag_url} className={lose ? "opacity-50" : ""} />
+      <span className="flex-1 truncate text-sm">
+        <span className={win ? "font-bold text-ice-50" : lose ? "text-ice-500 line-through" : "text-ice-200"}>
+          {country?.name ?? "TBD"}
+        </span>
         {owner ? <span className="ml-1 text-[10px] font-normal text-ice-500">· {owner}</span> : null}
       </span>
-      <span className={"text-sm tabular-nums " + (win ? "font-bold text-ice-50" : "text-ice-400")}>
+      <span className={"text-sm tabular-nums " + (win ? "font-bold text-ice-50" : lose ? "text-ice-500" : "text-ice-400")}>
         {goals ?? ""}
       </span>
     </div>
