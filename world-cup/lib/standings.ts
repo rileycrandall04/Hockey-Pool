@@ -62,6 +62,11 @@ export async function computeStandings(
   for (const c of countries) countryById.set(c.id, c);
   const fifaRank = (id: number) => countryById.get(id)?.fifa_rank ?? null;
 
+  // Derive who's out from the results (the DB `eliminated` flag is unmaintained).
+  // A country is eliminated if it lost a knockout match, or — once the knockout
+  // bracket is seeded — if it finished group play without reaching the knockouts.
+  const eliminatedIds = computeEliminated(matches, countryById);
+
   // country_id -> team_id (who drafted it)
   const ownerOfCountry = new Map<number, string>();
   const countriesByTeam = new Map<string, number[]>();
@@ -120,10 +125,71 @@ export async function computeStandings(
       ownerName: ownerNames.get(team.owner_id) ?? "Player",
       scored,
       countries: scored.countries.map((sc) => ({
-        country: countryById.get(sc.country_id)!,
+        country: {
+          ...countryById.get(sc.country_id)!,
+          eliminated: eliminatedIds.has(sc.country_id),
+        },
         scored: sc,
       })),
       live: scored.countries.some((sc) => liveCountryIds.has(sc.country_id)),
     };
   });
+}
+
+/**
+ * Work out which countries are eliminated from the match results, since the
+ * `countries.eliminated` column isn't kept up to date by the ingestion.
+ *
+ * A country is out when either:
+ *   - it lost a knockout match (knockouts are single-elimination — the loser of
+ *     a final knockout result, on the scoreline or a shootout, is done), or
+ *   - the knockout bracket has been seeded and the country finished all of its
+ *     group matches without appearing anywhere in the knockout rounds.
+ *
+ * The second rule only fires once at least one knockout match references real
+ * teams, so group sides aren't flagged mid-group-stage or before the draw.
+ */
+function computeEliminated(
+  matches: ScoringMatch[],
+  countryById: Map<number, Country>,
+): Set<number> {
+  const eliminated = new Set<number>();
+
+  // Real countries that appear anywhere in the knockout rounds (= qualified).
+  const knockoutCountryIds = new Set<number>();
+  for (const m of matches) {
+    if (m.stage === "group") continue;
+    if (countryById.has(m.home_country_id)) knockoutCountryIds.add(m.home_country_id);
+    if (countryById.has(m.away_country_id)) knockoutCountryIds.add(m.away_country_id);
+
+    // Loser of a finished knockout match is out.
+    if (m.status === "final" && m.home_goals != null && m.away_goals != null) {
+      const homeWin =
+        m.home_goals > m.away_goals ||
+        (m.went_to_shootout && (m.home_pens ?? 0) > (m.away_pens ?? 0));
+      const awayWin =
+        m.away_goals > m.home_goals ||
+        (m.went_to_shootout && (m.away_pens ?? 0) > (m.home_pens ?? 0));
+      if (homeWin) eliminated.add(m.away_country_id);
+      else if (awayWin) eliminated.add(m.home_country_id);
+    }
+  }
+
+  // Once the bracket is set, any country that has played out its group and isn't
+  // in the knockouts didn't qualify.
+  if (knockoutCountryIds.size > 0) {
+    const groupAllFinal = new Map<number, boolean>();
+    for (const m of matches) {
+      if (m.stage !== "group") continue;
+      for (const cid of [m.home_country_id, m.away_country_id]) {
+        const allFinal = groupAllFinal.get(cid) ?? true;
+        groupAllFinal.set(cid, allFinal && m.status === "final");
+      }
+    }
+    for (const [cid, allFinal] of groupAllFinal) {
+      if (allFinal && !knockoutCountryIds.has(cid)) eliminated.add(cid);
+    }
+  }
+
+  return eliminated;
 }
