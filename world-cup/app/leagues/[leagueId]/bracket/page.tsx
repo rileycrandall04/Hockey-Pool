@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireLeagueView } from "@/lib/league-access";
 import { NavBar } from "@/components/nav-bar";
 import { Flag } from "@/components/flag";
+import { fmtShortDate, fmtKickoff } from "@/lib/utils";
 import type { Country, Match, Stage } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -95,15 +96,26 @@ function MatchCard({
   const played = m.status === "final" && m.home_goals != null && m.away_goals != null;
   const homeWin = played && (m.home_goals! > m.away_goals! || (m.went_to_shootout && (m.home_pens ?? 0) > (m.away_pens ?? 0)));
   const awayWin = played && (m.away_goals! > m.home_goals! || (m.went_to_shootout && (m.away_pens ?? 0) > (m.home_pens ?? 0)));
+  const live = m.status === "live";
+  const date = fmtShortDate(m.kickoff_utc);
+  const time = fmtKickoff(m.kickoff_utc);
 
   return (
     <Link
       href={`/leagues/${leagueId}/games/${m.id}`}
       className="block rounded-md border border-puck-border bg-puck-bg p-2 hover:border-ice-400"
     >
-      <TeamLine country={home} goals={played ? m.home_goals : null} win={homeWin} owner={home ? ownerOf.get(home.id) : ""} />
+      <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-ice-500">
+        <span>{date ? (time ? `${date} · ${time}` : date) : "TBD"}</span>
+        {live ? (
+          <span className="font-semibold text-red-300">Live</span>
+        ) : played ? (
+          <span>Final</span>
+        ) : null}
+      </div>
+      <TeamLine country={home} goals={played ? m.home_goals : null} win={homeWin} loss={played && awayWin} owner={home ? ownerOf.get(home.id) : ""} />
       <div className="my-1 h-px bg-puck-border" />
-      <TeamLine country={away} goals={played ? m.away_goals : null} win={awayWin} owner={away ? ownerOf.get(away.id) : ""} />
+      <TeamLine country={away} goals={played ? m.away_goals : null} win={awayWin} loss={played && homeWin} owner={away ? ownerOf.get(away.id) : ""} />
       {m.went_to_shootout && played && (
         <div className="mt-1 text-center text-[10px] text-ice-500">{m.home_pens}–{m.away_pens} pens</div>
       )}
@@ -111,15 +123,20 @@ function MatchCard({
   );
 }
 
-function TeamLine({ country, goals, win, owner }: { country?: Country; goals?: number | null; win?: boolean; owner?: string }) {
+function TeamLine({ country, goals, win, loss, owner }: { country?: Country; goals?: number | null; win?: boolean; loss?: boolean; owner?: string }) {
+  const nameClass = win
+    ? "font-bold text-ice-50"
+    : loss
+      ? "text-ice-500 line-through opacity-60"
+      : "text-ice-200";
   return (
     <div className="flex items-center gap-1.5">
       <Flag code={country?.code} url={country?.flag_url} />
-      <span className={"flex-1 truncate text-sm " + (win ? "font-bold text-ice-50" : "text-ice-200")}>
+      <span className={"flex-1 truncate text-sm " + nameClass}>
         {country?.name ?? "TBD"}
         {owner ? <span className="ml-1 text-[10px] font-normal text-ice-500">· {owner}</span> : null}
       </span>
-      <span className={"text-sm tabular-nums " + (win ? "font-bold text-ice-50" : "text-ice-400")}>
+      <span className={"text-sm tabular-nums " + (win ? "font-bold text-ice-50" : loss ? "text-ice-500" : "text-ice-400")}>
         {goals ?? ""}
       </span>
     </div>
